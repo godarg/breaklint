@@ -83,7 +83,10 @@ Visible source containers can optionally be verified against a host build receip
 receipt version 1 or framework-agnostic output receipt version 2). This does not
 accept a caller claim of being bound: breaklint captures the receipt and its declared root-relative
 source/config/lock files before and after the screenshot, checks every digest and inventory digest,
-then checks the rendered build ID meta element. A verified result is only
+then checks the rendered build ID meta element and the output build ID the page renders in
+`sourceBinding.compiledOutputAttribute` (on the same element) against the output receipt. Without
+that rendered output ID, or when it differs, the binding stays `declared`: two builds of the same
+sources share the source build ID. A verified result is only
 `verified-container-only` via `build-bound-component-container`; it is never an exact source-line
 claim. Missing, stale, or changed proof remains declared/unknown with a typed event.
 

@@ -532,10 +532,16 @@ export async function samplePage(page: StructuralPage, input: SampleInput): Prom
   return digestBrowserSample(sampled, input.siblingOverlap);
 }
 
-/** Reads the rendered build id the host declared; null when unbound, absent, or unreadable. */
-async function readDomBuildId(page: StructuralPage, binding: HostBuildContainerBinding | undefined): Promise<string | null> {
-  if (!binding) return null;
-  return page.evaluate((b) => { try { return document.querySelector(b.selector)?.getAttribute(b.attribute) ?? null; } catch { return null; } }, { selector: binding.compiledBuildSelector, attribute: binding.compiledBuildAttribute });
+/** The rendered source and output build ids the host declared; null each when unbound, absent, or unreadable. */
+type DomBuildIds = { buildId: string | null; outputId: string | null };
+async function readDomBuildIds(page: StructuralPage, binding: HostBuildContainerBinding | undefined): Promise<DomBuildIds> {
+  if (!binding) return { buildId: null, outputId: null };
+  return page.evaluate((b) => {
+    try {
+      const element = document.querySelector(b.selector);
+      return { buildId: element?.getAttribute(b.attribute) ?? null, outputId: b.outputAttribute === null ? null : element?.getAttribute(b.outputAttribute) ?? null };
+    } catch { return { buildId: null, outputId: null }; }
+  }, { selector: binding.compiledBuildSelector, attribute: binding.compiledBuildAttribute, outputAttribute: binding.compiledOutputAttribute ?? null });
 }
 
 /**
@@ -685,9 +691,9 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
   const stabilizationMs = Math.round(performance.now() - stabilizationStart);
   const stabilizationTimedOut = !stabilized && endedBy === "timeout";
 
-  const readBuildId = async (): Promise<string | null> => (await withTimeout(readDomBuildId(page, options.sourceBinding), phaseBoundMs)).value;
-  const domBuildId = await readBuildId();
-  const bindingBefore = verifyBinding(options.sourceBinding, domBuildId);
+  const readBuildIds = async (): Promise<DomBuildIds> => (await withTimeout(readDomBuildIds(page, options.sourceBinding), phaseBoundMs)).value ?? { buildId: null, outputId: null };
+  const domIds = await readBuildIds();
+  const bindingBefore = verifyBinding(options.sourceBinding, domIds.buildId, domIds.outputId);
   const shot = await withTimeout(page.screenshot({ fullPage }), phaseBoundMs);
   const bytes = shot.value;
   if (bytes === null) infrastructure.push({ kind: "screen-screenshot-timeout", detail: `the host screenshot did not finish within ${phaseBoundMs} ms`, fatal: true });
@@ -695,8 +701,8 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
   const after = afterSample?.value ?? null;
   const postCaptureTimedOut = afterSample !== null && after === null;
   if (postCaptureTimedOut) infrastructure.push({ kind: "screen-post-capture-timeout", detail: `the sample after the screenshot did not finish within ${phaseBoundMs} ms`, fatal: false });
-  const domBuildIdAfter = await readBuildId();
-  const bindingAfter = verifyBinding(options.sourceBinding, domBuildIdAfter);
+  const domIdsAfter = await readBuildIds();
+  const bindingAfter = verifyBinding(options.sourceBinding, domIdsAfter.buildId, domIdsAfter.outputId);
 
   // Public capture digests are keyed with a per-run secret that never leaves this call: they compare
   // samples within the run, but a reader cannot test guessed page text against them.
@@ -729,7 +735,7 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
   if (!samples.every((sample) => sample.signatureTextComplete)) infrastructure.push({ kind: "screen-dom-signature-incomplete", detail: `direct child text exceeded the ${MAX_SIGNATURE_TEXT_BYTES}-byte capture bound or browser hashing was unavailable`, fatal: false });
   if (!samples.every((sample) => sample.ancestorSignatureComplete)) infrastructure.push({ kind: "screen-paint-signature-incomplete", detail: `a target ancestor chain exceeded the ${MAX_SIGNATURE_ANCESTORS}-ancestor capture bound`, fatal: false });
 
-  const bindingStable = bindingBefore.status === "verified-container-only" && bindingAfter.status === "verified-container-only" && bindingBefore.detail === bindingAfter.detail && domBuildId === domBuildIdAfter;
+  const bindingStable = bindingBefore.status === "verified-container-only" && bindingAfter.status === "verified-container-only" && bindingBefore.detail === bindingAfter.detail && domIds.buildId === domIdsAfter.buildId && domIds.outputId === domIdsAfter.outputId;
   if (!bindingStable) events.push({ kind: "source-binding-unavailable", detail: bindingAfter.detail ?? bindingBefore.detail ?? "host build container binding unavailable or changed during capture" });
 
   let rootException = false;

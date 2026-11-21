@@ -53,6 +53,12 @@ export interface HostBuildContainerBinding {
   buildOutputReceiptPath?: string;
   compiledBuildSelector: string;
   compiledBuildAttribute: string;
+  /**
+   * Attribute of the `compiledBuildSelector` element that renders the output build id (the output
+   * receipt's `buildId`, or `nextBuildId` for output receipt 1). Without it, or when the rendered id
+   * differs from the receipt, the binding stays `declared`: nothing ties the receipt to the page.
+   */
+  compiledOutputAttribute?: string;
   containers: readonly HostBuildContainer[];
 }
 

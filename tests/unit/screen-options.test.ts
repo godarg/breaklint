@@ -20,9 +20,9 @@ describe("screen checkPage options", () => {
     const candidate = {
       ...base(), projectId: "ds-os", documentId: "dashboard", runId: "run-1",
       geometry: { intentionalOverlays: [{ selector: "[role=dialog]", reason: "modal" }], maxTargets: 20, stabilizationTimeoutMs: 100 },
-      sourceBinding: { kind: "host-build-container", root: "/tmp/project", receiptPath: ".breaklint-build/receipt.json", compiledBuildSelector: "meta[name=breaklint-build]", compiledBuildAttribute: "content", containers: [{ selector: "[data-breaklint-source]", file: "src/components/Shell.tsx" }] },
+      sourceBinding: { kind: "host-build-container", root: "/tmp/project", receiptPath: ".breaklint-build/receipt.json", compiledBuildSelector: "meta[name=breaklint-build]", compiledBuildAttribute: "content", compiledOutputAttribute: "data-output-build", containers: [{ selector: "[data-breaklint-source]", file: "src/components/Shell.tsx" }] },
     };
-    assert.doesNotThrow(() => validateCheckPageOptions(candidate));
+    assert.equal(validateCheckPageOptions(candidate).sourceBinding?.compiledOutputAttribute, "data-output-build");
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(SCREEN_OPTIONS_SCHEMA);
     assert.equal(validate(candidate), true, JSON.stringify(validate.errors));
   });

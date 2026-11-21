@@ -152,7 +152,8 @@ record the compiled output inventory as a separate receipt: output-receipt versi
 `buildMarkerPath`, `files`, `filesSha256` for static, Vite, Astro, or custom builds). The fixed
 `host-build-container` adapter
 requires both `receiptPath` and `buildOutputReceiptPath`, and verifies current source bytes,
-compiled output bytes and the page ID before/after capture. Preparing a build invalidates previous
+compiled output bytes, the page ID and the output ID the page renders
+(`compiledOutputAttribute`; without it the binding stays `declared`) before/after capture. Preparing a build invalidates previous
 receipts; only a successful, unchanged build creates completed receipts. Symlinked sources, receipt
 paths and build outputs cannot obtain a verified binding.
 The result is `verified-container-only`, method `build-bound-component-container`, for the named

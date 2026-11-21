@@ -44,8 +44,9 @@ function verifyOutputFiles(root: string, files: Record<string, { sha256: string;
 /**
  * Verifies compiled output receipts in either schemaVersion 1 (Next.js `.next/BUILD_ID`) or
  * schemaVersion 2 (framework-agnostic output directory manifest with optional `buildMarkerPath`).
+ * Returns the verified output build id (`nextBuildId` or `buildId`).
  */
-export function verifyOutputReceipt(input: HostBuildContainerBinding, sourceBuildId: string): void {
+export function verifyOutputReceipt(input: HostBuildContainerBinding, sourceBuildId: string): string {
   if (!input.buildOutputReceiptPath) throw new Error("build output receipt path is required for verified host binding");
   if (!sourcePath(input.buildOutputReceiptPath)) throw new Error("unsafe build output receipt path");
   const raw = captureBoundedSourceFile(input.root, input.buildOutputReceiptPath, MAX_RECEIPT_BYTES, "screen build output receipt");
@@ -59,7 +60,7 @@ export function verifyOutputReceipt(input: HostBuildContainerBinding, sourceBuil
     if (!Object.hasOwn(files, ".next/BUILD_ID") || sha(canonicalFiles(files)) !== value.filesSha256) throw new Error("invalid build output receipt inventory");
     if (captureBoundedSourceFile(input.root, ".next/BUILD_ID", 512, "screen compiled build id").toString("utf8").trim() !== value.nextBuildId) throw new Error("compiled BUILD_ID does not match output receipt");
     verifyOutputFiles(input.root, files);
-    return;
+    return value.nextBuildId;
   }
 
   if (value.schemaVersion === 2) {
@@ -77,14 +78,17 @@ export function verifyOutputReceipt(input: HostBuildContainerBinding, sourceBuil
       throw new Error("generic output receipt buildId must equal filesSha256 when buildMarkerPath is omitted");
     }
     verifyOutputFiles(input.root, files);
-    return;
+    return value.buildId;
   }
 
   throw new Error("invalid build output receipt schema");
 }
 
-/** Verifies the host's source receipt, its output receipt and the rendered build id; never throws. */
-export function verifyBinding(input: HostBuildContainerBinding | undefined, domBuildId: string | null): Binding {
+/**
+ * Verifies the host's source receipt, its output receipt, the rendered source build id and the
+ * rendered output build id; never throws.
+ */
+export function verifyBinding(input: HostBuildContainerBinding | undefined, domBuildId: string | null, domOutputId: string | null): Binding {
   if (!input) return { status: "unknown", files: new Set(), containerFiles: new Map(), detail: null };
   try {
     if (!sourcePath(input.receiptPath)) throw new Error("unsafe receipt path");
@@ -101,7 +105,11 @@ export function verifyBinding(input: HostBuildContainerBinding | undefined, domB
       if (bytes.length !== entry.byteLength || sha256Bytes(bytes) !== entry.sha256) throw new Error(`receipt source mismatch: ${file}`);
     }
     if (sha(canonicalFiles(normalized)) !== value.filesSha256) throw new Error("receipt inventory digest mismatch");
-    verifyOutputReceipt(input, value.buildId);
+    const outputId = verifyOutputReceipt(input, value.buildId);
+    // The output receipt describes files on disk; only the output id the page renders shows that
+    // this page is that output (two builds of the same sources share the source id).
+    if (input.compiledOutputAttribute === undefined) throw new Error("no rendered output id (sourceBinding.compiledOutputAttribute) ties the output receipt to the page");
+    if (domOutputId !== outputId) throw new Error("rendered output id does not match the output receipt");
     for (const container of input.containers) if (!Object.hasOwn(normalized, container.file)) throw new Error(`container file absent from receipt: ${container.file}`);
     return { status: "verified-container-only", files: new Set(Object.keys(normalized)), containerFiles: new Map(input.containers.map((container, index) => [index, container.file])), detail: null };
   } catch (error) { return { status: "declared", files: new Set(), containerFiles: new Map(), detail: error instanceof Error ? error.message : String(error) }; }

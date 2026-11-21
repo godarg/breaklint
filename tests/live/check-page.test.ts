@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, existsSync } from "node:fs";
+import { mkdtempSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
@@ -205,6 +205,44 @@ describe("screen checkPage host-page adapter, live", () => {
     assert.ok(res.report.findings.some((f) => f.ruleId === "web/small-touch-target" && f.target.selector === "#nav-link"), marked);
     // Inline links surrounded by running text are exempt whatever the container tag.
     for (const id of ["#div-link", "#prose-link"]) assert.equal(res.report.findings.some((f) => f.ruleId === "web/small-touch-target" && f.target.selector === id), false, `${id} ${marked}`);
+  });
+
+  it("binds verified-container-only only to the output id the opened page renders, before and after capture", async (t) => {
+    if (missingBrowser && optional) return t.skip("missing browser");
+    const digest = (data: string | Buffer): string => createHash("sha256").update(data).digest("hex");
+    const canonical = (files: Record<string, { sha256: string; byteLength: number; role: string }>): string =>
+      JSON.stringify(Object.entries(files).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([file, entry]) => [file, entry.sha256, entry.byteLength, entry.role]));
+    const root = mkdtempSync(join(tmpdir(), "breaklint-output-binding-"));
+    for (const dir of ["src", "dist", ".breaklint"]) mkdirSync(join(root, dir), { recursive: true });
+    const write = (path: string, text: string): { sha256: string; byteLength: number } => { const bytes = Buffer.from(text); writeFileSync(join(root, path), bytes); return { sha256: digest(bytes), byteLength: bytes.length }; };
+    const sources = { "src/Main.tsx": { ...write("src/Main.tsx", "export const Main = () => null;\n"), role: "source" } };
+    const sourceId = digest(canonical(sources));
+    writeFileSync(join(root, ".breaklint/source.json"), JSON.stringify({ schemaVersion: 1, buildId: sourceId, files: sources, filesSha256: sourceId }));
+    const outputs = {
+      "dist/BUILD_MARKER": { ...write("dist/BUILD_MARKER", "out-A\n"), role: "build-output" },
+      "dist/index.html": { ...write("dist/index.html", "<!doctype html><main></main>"), role: "build-output" },
+    };
+    writeFileSync(join(root, ".breaklint/output.json"), JSON.stringify({ schemaVersion: 2, sourceBuildId: sourceId, buildId: "out-A", buildMarkerPath: "dist/BUILD_MARKER", files: outputs, filesSha256: digest(canonical(outputs)) }));
+    const sourceBinding = (extra: Record<string, unknown>) => ({ sourceBinding: {
+      kind: "host-build-container", root, receiptPath: ".breaklint/source.json", buildOutputReceiptPath: ".breaklint/output.json",
+      compiledBuildSelector: 'meta[name="build"]', compiledBuildAttribute: "content", containers: [{ selector: "main", file: "src/Main.tsx" }], ...extra,
+    } });
+    const pageFor = (outputId: string) => `<meta name="build" content="${sourceId}" data-output="${outputId}"><main><p id="bound">bound content</p></main>`;
+    const sourceOf = (result: Awaited<ReturnType<typeof checkPage>>) => result.report.evaluations.filter((e) => e.target.selector === "#bound");
+
+    // Positive: the page renders the output id of the verified output receipt.
+    const bound = await inspect(pageFor("out-A"), "output-bound", {}, sourceBinding({ compiledOutputAttribute: "data-output" }));
+    assert.equal(bound.report.runVerdict, "clean", JSON.stringify(bound.report.events));
+    assert.ok(sourceOf(bound).length > 0 && sourceOf(bound).every((e) => e.source.status === "verified-container-only" && e.source.file === "src/Main.tsx" && e.evidenceBound === true), JSON.stringify(sourceOf(bound).map((e) => [e.source, e.evidenceBound])));
+
+    // Counterproof: same source id, but the opened page is another output.
+    const other = await inspect(pageFor("out-B"), "output-mismatch", {}, sourceBinding({ compiledOutputAttribute: "data-output" }));
+    assert.ok(sourceOf(other).every((e) => e.source.status === "declared" && e.source.file === null && e.evidenceBound === false), JSON.stringify(sourceOf(other).map((e) => [e.source, e.evidenceBound])));
+    assert.ok(other.report.events.some((e) => e.kind === "source-binding-unavailable" && /output id/u.test(e.detail)), JSON.stringify(other.report.events));
+
+    // Without a rendered output id there is nothing that ties the output receipt to this page.
+    const unobserved = await inspect(pageFor("out-B"), "output-unobserved", {}, sourceBinding({}));
+    assert.ok(sourceOf(unobserved).every((e) => e.source.status === "declared" && e.evidenceBound === false), JSON.stringify(sourceOf(unobserved).map((e) => [e.source, e.evidenceBound])));
   });
 
   it("finds visible content cut by an overflow:hidden rectangle", async (t) => {
