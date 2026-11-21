@@ -6,6 +6,10 @@ stated here rather than left to be inferred from a passing test suite.
 
 ## Version 0.11.0: print coverage, Screen Profile v2, and CLI subcommands
 
+**Publication state (2026-11-21):** the tag `v0.11.0` exists, but its release workflow failed at
+the npm publish step, so 0.11.0 is not on npm and has no GitHub Release. The installable version is
+0.10.0 (Action `@v0.10.0`). 0.11.1 will be the first published 0.11 release.
+
 Version 0.11.0 keeps the 17 registered print rules (12 enabled by default), Report 5 (readers accept
 Report 4 and 5), context pack 2, comparison 1 and Configuration Contract 1 unchanged. Snapshot 7
 remains the live measurement stamp (readers accept Snapshot 5, 6 and 7). `PublicScreenReport` moves
