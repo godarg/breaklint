@@ -109,10 +109,15 @@ Advisories reach the dependency graph without a commit here. `npm run test:advis
 published runtime graph and the complete development graph and separates three outcomes: no
 advisory (exit 0), an advisory (exit 1, naming each package, its GHSA ids, the chain that pulls it
 in and whether a fix exists within the declared ranges) and an audit that did not run because the
-registry was unreachable or the time limit passed (exit 75, never 0). With Dependabot security
-updates enabled for the repository, `.github/dependabot.yml` makes them lockfile-only pull requests:
-they move locked versions inside the declared ranges, never change a range or a consumer pin, run
-the complete CI and are never merged automatically.
+registry was unreachable or the time limit passed (exit 75, never 0). It runs on every pull
+request, on every push to `main` and in the release workflow, so an advisory that appears between
+two commits turns the next run red.
+
+There is deliberately no `.github/dependabot.yml`: an automatic pull request would move
+`package-lock.json`, which every visual review round is bound to, without a release decision. The
+fix for an advisory is a maintainer's commit that moves the lockfile (or, where a range has to
+change, a release decision) and passes the complete CI. Dependabot alerts are switched on for the
+repository as a notification only.
 
 ## Scope
 

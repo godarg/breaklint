@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Dependency hygiene: both dependency graphs carry no known advisory, the Node/Puppeteer contract
- * holds, and the configuration that repairs advisory drift is in place.
+ * holds, and no Dependabot configuration opens pull requests against the review-bound lockfile.
  *
  * THREE OUTCOMES, NOT TWO. An advisory database changes without a commit here, so this check can
  * turn red on an unchanged tree, and whoever reads the red run has to know at once which of three
@@ -21,11 +21,18 @@
  * `{message, error}` and no report. On 2026-10-22 a run took 640 s and reported an advisory in a
  * runtime graph that had none; a closed loopback registry reproduces that message in one second.
  *
- * A contract violation (manifest ranges, Dependabot configuration) is exit 1 as well.
+ * A contract violation (manifest ranges, a Dependabot configuration) is exit 1 as well.
+ *
+ * NO DEPENDABOT CONFIGURATION, on purpose (0.11.1). `.github/dependabot.yml` asked for lockfile-only
+ * security pull requests from 0.11.0 on, while the repository's Dependabot security updates were
+ * switched off: it opened nothing, and this script still printed "configured". Switched on, it
+ * would move package-lock.json, one of the inputs every visual review round is bound to, without a
+ * release decision. This gate is what turns advisory drift red; the fix is a maintainer's commit.
+ * Dependabot alerts (notification only) are a repository setting, not a file.
  *
  * `--self-test` runs the classification over npm outputs recorded in tests/fixtures/audit/, checks
- * the Dependabot contract against accepted and rejected configurations, and runs real npm audit
- * against a closed loopback port, both directly and through this script.
+ * that the Dependabot contract accepts no configuration file, and runs real npm audit against a
+ * closed loopback port, both directly and through this script.
  */
 
 import assert from "node:assert/strict";
@@ -201,21 +208,18 @@ export function dependabotEntries(text) {
 }
 
 /**
- * Advisory drift is repaired by Dependabot security updates, and only inside the ranges
- * package.json already allows: the peer range and the pins the Action and the docs install are
- * release decisions, never a bot's.
+ * No configuration file: a bot's pull request would move package-lock.json, which every visual
+ * review round binds, and the peer range and the pins the Action and the docs install are release
+ * decisions. Whatever the file asks for — lockfile-only security fixes, version updates, another
+ * ecosystem — it is refused, and the entries it names are listed so the message says what it is.
  */
 export function dependabotIssues(text) {
-  if (text === null) return [".github/dependabot.yml is missing: nothing proposes a fix when an advisory appears"];
-  const issues = [];
-  if (!/^version:\s*2\s*$/mu.test(text.replace(/\r\n/gu, "\n"))) issues.push(".github/dependabot.yml must declare version: 2");
-  const npm = dependabotEntries(text).filter((entry) => entry["package-ecosystem"] === "npm" && entry.directory === "/");
-  if (npm.length !== 1) {
-    issues.push(`.github/dependabot.yml must have exactly one npm entry for directory "/", found ${npm.length}`);
-  } else if (npm[0]["versioning-strategy"] !== "lockfile-only") {
-    issues.push(`the npm entry must use versioning-strategy: lockfile-only, found ${JSON.stringify(npm[0]["versioning-strategy"] ?? null)}`);
-  }
-  return issues;
+  if (text === null) return [];
+  const named = dependabotEntries(text).map((entry) => `${entry["package-ecosystem"] ?? "?"} ${entry.directory ?? "?"}`);
+  return [
+    ".github/dependabot.yml must not exist: its pull requests would move the review-bound lockfile without a release " +
+      `decision; npm run test:advisories is the advisory gate (entries: ${named.length ? named.join(", ") : "none readable"})`,
+  ];
 }
 
 // --- running -----------------------------------------------------------------------------------
@@ -264,7 +268,7 @@ function runCheck() {
   if (process.exitCode === EXIT.clean) {
     process.stdout.write(
       "dependencies: published runtime and complete development graph have 0 advisories; Node >=22.13 and " +
-        "Puppeteer 25 contract pinned; Dependabot security updates configured lockfile-only\n",
+        "Puppeteer 25 contract pinned; no Dependabot configuration file (advisory drift turns this gate red)\n",
     );
   }
 }
@@ -341,24 +345,19 @@ async function runSelfTest() {
     checks += 1;
   }
 
-  // The Dependabot contract, on the real file and on configurations it must reject.
+  // The Dependabot contract: the repository carries no file, and every configuration is refused.
   const real = readOptional(resolve(ROOT, ".github/dependabot.yml"));
-  assert.deepEqual(dependabotIssues(real), [], "self-test: the repository's own .github/dependabot.yml fails its contract");
+  assert.equal(real, null, "self-test: the repository carries a .github/dependabot.yml");
+  assert.deepEqual(dependabotIssues(null), [], "self-test: the absent file was rejected");
   const minimal = 'version: 2\nupdates:\n  - package-ecosystem: "npm"\n    directory: "/"\n    schedule:\n      interval: "daily"\n    versioning-strategy: lockfile-only\n';
-  assert.deepEqual(dependabotIssues(minimal), [], "self-test: a minimal valid configuration was rejected");
   for (const [name, text] of [
-    ["missing file", null],
-    ["no versioning strategy", minimal.replace(/    versioning-strategy: lockfile-only\n/u, "")],
-    ["a strategy that edits package.json", minimal.replace("lockfile-only", "increase")],
-    ["strategy only in a comment", minimal.replace("    versioning-strategy: lockfile-only\n", "    # versioning-strategy: lockfile-only\n")],
-    ["strategy nested one level too deep", minimal.replace("    versioning-strategy:", "      versioning-strategy:")],
-    ["npm entry for another directory", minimal.replace('directory: "/"', 'directory: "/docs"')],
-    ["no npm entry", minimal.replace('"npm"', '"github-actions"')],
-    ["two npm entries for /", `${minimal}${minimal.split("updates:\n")[1]}`],
-    ["version 1", minimal.replace("version: 2", "version: 1")],
+    ["the 0.11.0 lockfile-only security configuration", minimal],
+    ["version updates that edit package.json", minimal.replace("lockfile-only", "increase")],
+    ["another ecosystem only", minimal.replace('"npm"', '"github-actions"')],
+    ["an empty file", ""],
     ["flow style", 'version: 2\nupdates: [{package-ecosystem: npm, directory: "/", versioning-strategy: lockfile-only}]\n'],
   ]) {
-    assert.ok(dependabotIssues(text).length > 0, `self-test: dependabot contract accepted "${name}"`);
+    assert.match(dependabotIssues(text).join("\n"), /must not exist/u, `self-test: dependabot contract accepted "${name}"`);
     checks += 1;
   }
 
