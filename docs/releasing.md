@@ -8,8 +8,9 @@ Releases are published by GitHub Actions from an annotated version tag. A laptop
 For a release `X.Y.Z`, all of the following must refer to the same commit and the same package
 bytes:
 
-1. `origin/main` and annotated tag `vX.Y.Z`;
-2. the successful `ci.yml` run queried by commit SHA;
+1. annotated tag `vX.Y.Z`, whose commit is on `origin/main` (its tip at tagging time; `main` may
+   move on before a rerun);
+2. the successful `ci.yml` main push run queried by exactly that commit SHA;
 3. the one tarball created by the release workflow;
 4. both clean consumers, on Node 22.13 and Node 24;
 5. npm `breaklint@X.Y.Z` and its `dist.integrity`;
@@ -91,12 +92,18 @@ report-bundle output. Renderer peers remain optional for screen-only consumers.
 
 ## One-time repository prerequisites
 
-- GitHub repository secret `NPM_TOKEN`, scoped to publishing this package.
-- GitHub Actions allowed to request an OIDC identity token for npm provenance.
+- A trusted publisher for `breaklint` on npmjs.com (package settings): GitHub Actions, owner
+  `godarg`, repository `breaklint`, workflow file name `release.yml`, no environment. npm
+  publishes through it with the job's OIDC identity token; the workflow holds no npm token.
+- GitHub Actions allowed to request an OIDC identity token (`id-token: write` on the publish job).
 - The default branch is `main`; `ci.yml` runs on every push to it.
 
-Never put the npm token in a file, a command-line argument, a log or a Markdown document. The
-workflow passes it as `NODE_AUTH_TOKEN` only to the publish step.
+The publish job configures no token: no repository secret, no `registry-url` in setup-node (it
+would write an `.npmrc` that reads `NODE_AUTH_TOKEN`), `NODE_AUTH_TOKEN` unset in the publish
+step, and an explicit `--registry=https://registry.npmjs.org`. Trusted publishing needs npm
+11.5.1 or later, so that job pins npm (`NPM_VERSION`) and verifies the pin; the clean consumers
+keep the npm their Node ships. `tests/tools/release-workflow-contract.mjs` fails on any token
+configuration in `release.yml`.
 
 ## Before creating the tag
 
@@ -197,15 +204,22 @@ and complete physical inventory. `assessHumanGate` remains human-only: only `@Br
 
 Ledger schema 6 additionally permits `kind: "delegated-ai"` for a sight review explicitly
 delegated by the Founder for that release. The round carries `founder: "@Founder"`, the date,
-verbatim session quote, a concrete stable release version (for example `release: "0.10.0"`)
-and `revoked: false`. A version field records the scope of the actual session authorization;
+a concrete stable release version (for example `release: "0.10.0"`) and `revoked: false`.
+Rounds 1–9 also carry the verbatim session quote (`sessionQuote`) and stay as recorded. From
+round 10 on, the public ledger carries no quote: `sessionQuoteSha256` is the SHA-256 of the
+verbatim quote and `statement` is exactly `release-specific delegation recorded`; a round 10 or
+later with a `sessionQuote`, another statement or no hash is refused. A version field records the scope of the actual session authorization;
 it cannot grant authorization. The strict sight gate requires the latest delegated round's
 release to equal `package.json.version` in the bound review-input root. Historical 0.9.0
 rounds keep their original delegation and bytes; their votes do not approve a later release.
 This version-specific validation uses the existing schema-6 fields without a schema migration.
 The reviewer must have a
 nonhuman handle, a recorded nonUNKNOWN `actual_model`, prompt/output SHA-256 hashes, and a native
-receipt with path, SHA-256 and exact image count. Its closed `receivedImages` entries contain
+receipt with path, SHA-256 and exact image count. Rounds 1–9 committed their full native receipts
+under `tests/golden/report-surfaces/`; those files stay byte-identical to their ledger hashes, and no
+other receipt file may be added there. From round 10 on, the receipt itself (session telemetry)
+stays in the maintainers' evidence store outside this repository, and the ledger binds it as
+`maintainer-evidence:<relative path>` with its SHA-256 and image count. Its closed `receivedImages` entries contain
 exact `{path, sha256}` pairs for **every assigned full screen PNG, every screen tile and every A4
 page PNG**. PDF cells are judged through their complete matching raster sets; the receipt cannot
 substitute a PDF filename for unseen pages. Missing, extra, duplicate or differently hashed images
@@ -379,17 +393,43 @@ The release workflow then:
 6. downloads those same bytes into Node 22.13 and Node 24 clean consumers, which check the installed
    README's demo excerpt and the installed docs' schema stamps against the installed code;
 7. proves the ref is an annotated tag (with a lightweight-tag negative control), then proves
-   tag/version, exact `origin/main` SHA and successful main CI;
-8. publishes that tarball with provenance;
+   tag/version, that the tag commit is on `origin/main` (an ancestor of it or its tip) and that
+   `ci.yml` passed a main push run for exactly that commit, and takes the release notes from the
+   tag commit's own `## X.Y.Z — YYYY-MM-DD` CHANGELOG section;
+8. publishes that tarball with provenance through npm trusted publishing (OIDC), without a token;
 9. waits until npm exposes the version, compares `dist.integrity`, binds the package digest and Git
    commit through the signed SLSA provenance, runs npm signature verification and installs the
    registry version in a final consumer;
-10. creates the GitHub Release with the tarball and both identity records attached.
+10. creates the GitHub Release with the tarball and both identity records attached, or completes
+    or verifies the one an earlier attempt left (see *Recovery*).
 
-Do not rerun a partially successful publish blindly: npm versions are immutable. Inspect the npm
-version, workflow logs and GitHub Release first. If npm already serves `X.Y.Z` but a post-publish
-verification failed, repair the release metadata or publish a new patch version; never move the tag
-or overwrite evidence to make the old run look green.
+### Recovery
+
+A failed release run is repaired by rerunning its failed jobs, never by moving the tag:
+
+```bash
+gh run rerun <run-id> --failed
+```
+
+That works while three things hold: the run's package artifact still exists (it is kept for
+**7 days**: `retention-days: 7` in `release.yml`; `gh api repos/godarg/breaklint/actions/runs/<run-id>/artifacts`
+shows `expires_at`), the tag commit is still on `main`, and `ci.yml` has a successful main push
+run for that commit. After the 7 days a rerun of only the failed jobs cannot download the validated
+bytes; a full rerun would pack new bytes for a version whose old bytes may already be signed, so the
+way out is then a new patch release. The decisions a rerun makes live in
+`tests/tools/release-recovery.mjs` (self-test in `npm run test:release-tag`):
+
+- **npm:** no such version (E404) → publish. The version exists → its `dist.integrity` and signed
+  provenance must bind these bytes and this commit, with the attestation lookup retried for five
+  minutes; otherwise the run fails. A lookup failure other than E404 never becomes a publish.
+- **GitHub Release:** none → create it. A draft (an interrupted `gh release create`) → assets it
+  has are compared byte for byte with the validated artifact, only the missing ones are uploaded,
+  then it is published. A published release → every asset must be present and byte-identical.
+  Any difference, foreign asset or other tag fails the run; nothing is overwritten or deleted.
+
+npm versions are immutable. If npm already serves `X.Y.Z` with other bytes, or its provenance does
+not bind this commit, inspect it by hand and publish a new patch version; never move the tag or
+overwrite evidence to make the old run look green.
 
 `npm publish <tarball>` does not populate the legacy `gitHead` registry field. The authoritative
 source binding for this release route is therefore the signed SLSA statement: its package subject

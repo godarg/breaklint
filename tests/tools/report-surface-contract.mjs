@@ -267,15 +267,36 @@ function assertClosedFields(value, fields, label) {
   assert.deepEqual(Object.keys(value).sort(), [...fields].sort(), `${label}: fields must be exactly ${fields.join(", ")}`);
 }
 
+/**
+ * Rounds 1–9 were recorded with the Founder's verbatim session quote and with their full native
+ * receipts committed under tests/golden/report-surfaces/. They keep that shape and those bytes.
+ * From round 10 on, a public ledger records neither: the delegation carries the SHA-256 of the
+ * verbatim quote and one fixed neutral statement, and each native receipt is bound by path, SHA-256
+ * and image count in the maintainers' evidence store outside this repository. The cut is the round
+ * number, not the shape a writer chooses, so a new round cannot fall back to the old one.
+ */
+export const LEGACY_LEDGER_ROUNDS = 9;
+export const DELEGATION_STATEMENT = "release-specific delegation recorded";
+export const EXTERNAL_RECEIPT_PREFIX = "maintainer-evidence:";
+const EXTERNAL_RECEIPT_PATH = /^maintainer-evidence:(?!.*(?:^|\/)\.\.?(?:\/|$))[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9][A-Za-z0-9._-]*)*$/u;
+
 /** A delegation records the explicit session authorization; ledger data cannot grant it. */
 function assertDelegation(round, label) {
   assert.ok(round.delegation, `${label}: Founder delegation missing`);
-  assertClosedFields(round.delegation, ["founder", "date", "sessionQuote", "release", "revoked"], `${label} delegation`);
   const delegation = round.delegation;
+  if (round.round > LEGACY_LEDGER_ROUNDS) {
+    assert.ok(!Object.hasOwn(delegation, "sessionQuote"),
+      `${label}: the delegation carries a verbatim session quote; from round ${LEGACY_LEDGER_ROUNDS + 1} on the ledger records only sessionQuoteSha256 and the neutral statement`);
+    assertClosedFields(delegation, ["founder", "date", "sessionQuoteSha256", "statement", "release", "revoked"], `${label} delegation`);
+    assert.match(delegation.sessionQuoteSha256 ?? "", SHA256, `${label}: delegation sessionQuoteSha256 must be the SHA-256 of the verbatim session quote`);
+    assert.equal(delegation.statement, DELEGATION_STATEMENT, `${label}: delegation must carry exactly the neutral statement "${DELEGATION_STATEMENT}"`);
+  } else {
+    assertClosedFields(delegation, ["founder", "date", "sessionQuote", "release", "revoked"], `${label} delegation`);
+    assert.ok(typeof delegation.sessionQuote === "string" && delegation.sessionQuote.trim().length > 0, `${label}: delegation session quote missing`);
+  }
   assert.equal(delegation.founder, "@Founder", `${label}: delegation must name @Founder`);
   assert.match(delegation.date ?? "", /^\d{4}-\d{2}-\d{2}$/u, `${label}: delegation date missing`);
   assertUtcOrDate(delegation.date, `${label}: delegation date invalid`);
-  assert.ok(typeof delegation.sessionQuote === "string" && delegation.sessionQuote.trim().length > 0, `${label}: delegation session quote missing`);
   assert.match(delegation.release ?? "", /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u, `${label}: delegation must name a concrete stable release version`);
   assert.equal(delegation.revoked, false, `${label}: delegation is revoked or not explicitly active`);
   assert.equal(round.record, "current", `${label}: a delegated review must be a current record`);
@@ -284,7 +305,7 @@ function assertDelegation(round, label) {
   }
 }
 
-function assertDelegatedReviewer(reviewer, label) {
+function assertDelegatedReviewer(reviewer, label, roundNumber) {
   assert.match(reviewer.handle ?? "", AGENT_HANDLE, `${label}: delegated AI handle is malformed`);
   assert.ok(!HUMAN_REVIEW_ROLES.includes(reviewer.handle), `${label}: a delegated AI cannot carry the human review role ${reviewer.handle}`);
   assert.ok(typeof reviewer.actual_model === "string" && reviewer.actual_model.trim().length > 0 && !/^(?:(?:UNKNOWN|UNBEKANNT)\b|n\/a$)/iu.test(reviewer.actual_model.trim()),
@@ -294,6 +315,10 @@ function assertDelegatedReviewer(reviewer, label) {
   }
   assertClosedFields(reviewer.nativeReceipt, ["path", "sha256", "imageCount"], `${label} native receipt`);
   assert.ok(typeof reviewer.nativeReceipt.path === "string" && reviewer.nativeReceipt.path.trim().length > 0, `${label}: native receipt path missing`);
+  if (roundNumber > LEGACY_LEDGER_ROUNDS) {
+    assert.match(reviewer.nativeReceipt.path, EXTERNAL_RECEIPT_PATH,
+      `${label}: native receipt ${reviewer.nativeReceipt.path} must be bound as ${EXTERNAL_RECEIPT_PREFIX}<relative path>, kept outside the repository`);
+  }
   assert.match(reviewer.nativeReceipt.sha256 ?? "", SHA256, `${label}: native receipt SHA-256 missing`);
   assert.ok(Array.isArray(reviewer.receivedImages) && reviewer.receivedImages.length > 0, `${label}: received images missing`);
   assert.ok(Number.isSafeInteger(reviewer.nativeReceipt.imageCount) && reviewer.nativeReceipt.imageCount > 0, `${label}: native image count invalid`);
@@ -315,7 +340,7 @@ function assertDelegatedReviewer(reviewer, label) {
  * time did not name the reviewer, instead of inventing a name afterwards. No other field is
  * accepted, so an agent cannot pass as a human by moving its model label into a field of its own.
  */
-function assertReviewer(reviewer, label) {
+function assertReviewer(reviewer, label, roundNumber) {
   assert.ok(reviewer && typeof reviewer === "object", `${label}: reviewer entry missing`);
   assert.ok(Object.hasOwn(REVIEWER_FIELDS, reviewer.kind ?? ""), `${label}: reviewer kind must be human, agent or not-recorded; delegated-ai requires an explicit Founder delegation`);
   const allowed = REVIEWER_FIELDS[reviewer.kind];
@@ -323,7 +348,7 @@ function assertReviewer(reviewer, label) {
   assert.deepEqual(unknown, [], `${label}: a ${reviewer.kind} reviewer carries only ${allowed.join(" and ")}; unknown field ${unknown.join(", ")}` +
     (reviewer.kind === "human" && unknown.includes("model") ? " (a human reviewer does not carry a model label)" : ""));
   if (reviewer.kind === "delegated-ai") {
-    assertDelegatedReviewer(reviewer, label);
+    assertDelegatedReviewer(reviewer, label, roundNumber);
     assertClosedFields(reviewer, allowed, label);
   } else if (reviewer.kind === "human") {
     assert.ok(HUMAN_REVIEW_ROLES.includes(reviewer.handle),
@@ -430,7 +455,7 @@ export function validateReviewLedger(ledger, { cellCount = 32, now = Date.now() 
     }
     assert.ok(Array.isArray(round.reviewers), `${label}: reviewers missing`);
     assertDistinctReviewers(round.reviewers, label);
-    round.reviewers.forEach((reviewer, reviewerIndex) => assertReviewer(reviewer, `${label} reviewer ${reviewerIndex + 1}`));
+    round.reviewers.forEach((reviewer, reviewerIndex) => assertReviewer(reviewer, `${label} reviewer ${reviewerIndex + 1}`, round.round));
     if (round.reviewers.some((reviewer) => reviewer.kind === "delegated-ai")) assertDelegation(round, label);
     assert.ok(typeof round.note === "string" && round.note.trim().length >= 12, `${label}: note missing`);
     for (const key of ["blocker", "high", "medium", "low"]) {
@@ -666,6 +691,106 @@ export function assessSightGate(ledger, manifest, currentFingerprint, reviewInpu
   assertCurrentDelegationRelease(latest, reviewInputRoot);
   assertDelegatedImageBinding(latest, manifest);
   return { latest, reviewKind: summarizeLatestRound(ledger).humanPass ? "human" : "delegatedAI" };
+}
+
+// The printed page inventory is pinned rather than derived, so that a report which silently doubles in
+// length is a failing gate and not a shrug. History: 32 page rasters; 43 in 0.6.0 when every finding
+// gained a remediation box; 31 when coverage became one aligned table instead of thirteen six-label
+// cards (measured per state: clean 5 -> 2, findings 12 -> 9, infrastructure 13 -> 10,
+// insufficient-coverage 13 -> 10 on Chromium 141 / linux); 32 when the clean print kept its findings
+// section (clean 2 -> 3); 26 when findings fragment between their units instead of taking one page
+// each (findings 9 -> 7, infrastructure 10 -> 8, insufficient-coverage 10 -> 8). Tablet and mobile
+// cells also ship viewport-height tiles, pinned the same way: 148, then 152 when two findings
+// gained real-shaped evidence names that wrap on a phone (infrastructure and insufficient-coverage
+// mobile 14 -> 15 tiles each). 27 page rasters when remediation and note text took the 72ch
+// measure (findings 7 -> 8).
+// The 2026-10-07 macOS measurement was clean 3/20, findings 9/48, infrastructure 9/50,
+// insufficient-coverage 9/50 (page rasters/tiles). Its 30-page total was incorrectly used as a
+// universal pin. The Linux diagnostic https://github.com/godarg/breaklint/actions/runs/37597727752
+// measured clean 3/20, findings 8/48, infrastructure 9/50, insufficient-coverage 9/50 on
+// 2026-10-07 with Google Chrome 154.0.8037.57, Node 24.21.0 and Poppler 24.02.0. Independent
+// pdfinfo and PNG membership/hash/dimensions confirmed its 29 pages; the final universal pin was
+// its only failure. Each supported platform now has a fixed per-state oracle. No manifest-derived
+// expectation, range, or fallback can conceal a changed state split or a longer report.
+// These preceding counts are the historical 0.9.0 matrix. The 0.10.0 presentation has six
+// findings after its natural document ending is accepted, with clarified coverage wording and
+// atomic printed run-fact label/value pairs. Independent pdfinfo, pypdf, physical PNG membership
+// and SHA/dimension checks measured 3/8/8/8 pages and 158 viewport tiles on macOS on 2026-10-07.
+// Linux run https://github.com/godarg/breaklint/actions/runs/37679854862 measured the same fixed
+// per-state pages and tile count from the unchanged candidate, with native renderer/oracle exit0.
+// The first diagnostic run timed out before rendering; it supplies no oracle and remains retained.
+// The round7 HIGH repair records the previously missing handwritten widow decline and adds
+// readable desktop tiles to every screen cell. Independent macOS filesystem/IHDR/pdfinfo/pypdf
+// and Linux run https://github.com/godarg/breaklint/actions/runs/37686731564 measured 212 tiles
+// and the same fixed3/8/8/8 pages on2026-10-07. The212 expectation is a physical observation,
+// not a renderer-manifest-derived count. The preceding158 count remains historical evidence.
+// 0.11.0 (G-148..G-151): explicit decline units, zero-candidate labels ("No candidates"),
+// base-category tags, state-qualified finding gates, and mono slash-wrapped rule IDs in Next checks
+// and Declined candidates measured 214 viewport tiles on macOS and 212 viewport tiles on Linux CI
+// (ubuntu-latest run 44894380636, 2026-11-21), with unchanged 3/8/8/8 (27) PDF pages on both.
+export const EXPECTED_PRINT_PAGES_BY_PLATFORM = Object.freeze({
+  darwin: Object.freeze({ clean: 3, findings: 8, infrastructure: 8, "insufficient-coverage": 8 }),
+  linux: Object.freeze({ clean: 3, findings: 8, infrastructure: 8, "insufficient-coverage": 8 }),
+});
+// 0.11.1: the tile TOTAL is no longer pinned. It is a change detector, not an oracle: Linux and
+// macOS differ by two tiles on the same candidate, and every runner-image font change moved it on an
+// unchanged report (PR runs 37594360825 and 44894380636). What the total stood for is checked as
+// invariants instead: 24 distinct screen cells; every screen row covered by exactly one tile, in
+// order, from the top to the page end; no tile listed twice; physical totals equal to the tiles and
+// pages the artifacts list; and the fixed per-state printed page count above, which still makes a
+// report that silently grows a page a failing gate. The verifier separately re-cuts every tile from
+// the decoded full page and requires the gallery to present each one.
+export const EXPECTED_SCREEN_CELLS = 24;
+
+export function assertSurfaceInventory(inventory, platform) {
+  assert.ok(Object.hasOwn(EXPECTED_PRINT_PAGES_BY_PLATFORM, platform), `unsupported report-surface platform: ${platform}`);
+  const expectedPages = EXPECTED_PRINT_PAGES_BY_PLATFORM[platform];
+  const artifacts = inventory?.artifacts ?? [];
+
+  const screens = artifacts.filter((artifact) => artifact.kind === "screen");
+  const screenCells = new Set(screens.map((artifact) => artifact.cell));
+  assert.equal(screenCells.size, screens.length, `${platform}: a screen cell is listed more than once`);
+  assert.equal(screens.length, EXPECTED_SCREEN_CELLS, `${platform}: the report-surface inventory must contain ${EXPECTED_SCREEN_CELLS} distinct screen cells, not ${screens.length}`);
+  const seenImages = new Set();
+  const once = (path, label) => {
+    assert.ok(typeof path === "string" && path.length > 0, `${label}: image path missing`);
+    assert.ok(!seenImages.has(path), `${label}: ${path} is listed more than once`);
+    seenImages.add(path);
+  };
+  for (const artifact of screens) {
+    once(artifact.path, artifact.cell);
+    const height = artifact.dimensions?.height;
+    assert.ok(Number.isSafeInteger(height) && height > 0, `${artifact.cell}: screen height missing`);
+    assert.ok(Array.isArray(artifact.tiles) && artifact.tiles.length > 0, `${artifact.cell}: every screen row must be covered by exactly one tile; no tile is listed`);
+    let covered = 0;
+    for (const [index, tile] of artifact.tiles.entries()) {
+      once(tile.path, `${artifact.cell} tile ${index + 1}`);
+      assert.equal(tile.index, index + 1, `${artifact.cell}: tile ${index + 1} is numbered ${tile.index}; tiles are listed in order`);
+      assert.ok(Number.isSafeInteger(tile.height) && tile.height > 0, `${artifact.cell}: tile ${index + 1} has no height`);
+      assert.equal(tile.top, covered,
+        `${artifact.cell}: tile ${index + 1} starts at row ${tile.top}, not at row ${covered}; every screen row must be covered by exactly one tile`);
+      covered += tile.height;
+    }
+    assert.equal(covered, height, `${artifact.cell}: tiles end at row ${covered} of a ${height}-row page; every screen row must be covered by exactly one tile`);
+  }
+
+  const pdfs = artifacts.filter((artifact) => artifact.kind === "pdf");
+  assert.equal(pdfs.length, 4, "the report-surface inventory must contain exactly four PDF cells");
+  const actualPages = Object.fromEntries(pdfs.map((artifact) => [artifact.cell.split("/")[1], artifact.pages]));
+  assert.deepEqual(actualPages, expectedPages, `${platform}: print page inventory must match every fixed state`);
+  const rasterSets = artifacts.filter((artifact) => artifact.kind === "raster-set");
+  assert.equal(rasterSets.length, 4, "the report-surface inventory must contain exactly four raster sets");
+  for (const artifact of rasterSets) {
+    const state = artifact.cell.split("/")[1];
+    assert.equal(artifact.pages?.length, expectedPages[state],
+      `${artifact.cell}: the raster set holds ${artifact.pages?.length} pages; its PDF state prints ${expectedPages[state]}`);
+    for (const [index, page] of artifact.pages.entries()) once(page.path, `${artifact.cell} page ${index + 1}`);
+  }
+
+  const screenTiles = screens.reduce((sum, artifact) => sum + artifact.tiles.length, 0);
+  const rasterPages = Object.values(expectedPages).reduce((sum, pages) => sum + pages, 0);
+  assert.deepEqual(inventory.physicalArtifacts, { screens: EXPECTED_SCREEN_CELLS, screenTiles, pdfs: 4, rasterPages },
+    `${platform}: the physical inventory must state exactly the ${EXPECTED_SCREEN_CELLS} screens, ${screenTiles} tiles, 4 PDFs and ${rasterPages} PDF page rasters the artifacts list`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -218,7 +218,7 @@ manifest. Measured on Linux with Chromium 141: display Liberation Serif, body Li
 DejaVu Sans Mono; the four PDFs embed exactly LiberationSerif-Bold, LiberationSans(-Bold) and
 DejaVuSansMono(-Bold). That measurement is from an Ubuntu 24.04 development container
 (Chromium 141, Liberation and DejaVu installed). **Not measured (NEEDS-CI):** the GitHub
-`ubuntu-latest` runner that CI and the release workflow use — which faces it resolves depends on
+`ubuntu-24.04` runner image that CI's check job and the release validate job pin — which faces it resolves depends on
 its installed font packages, and the gate is expected to fail there rather than pass on an
 undeclared face, but no run on it has been read yet; macOS and Windows have not been measured by
 this gate either.
@@ -355,7 +355,7 @@ State in the round's note whether you accept these known residuals:
 
 - the tail label prints on every finding, split or not;
 - an over-long evidence name wraps inside itself;
-- `ubuntu-latest` font resolution is unmeasured (NEEDS-CI).
+- `ubuntu-24.04` runner font resolution is unmeasured (NEEDS-CI).
 
 **4. Record the round.** Append ONE new round to the ledger, and never edit or remove an earlier
 one. It carries:
@@ -445,8 +445,10 @@ Reviewers are named for what they are, and the human roster is closed:
   move into a field of its own.
 
 Every passing cell must name a rostered `human` or `delegated-ai` reviewer of its round.
-A delegated AI record carries the release-specific Founder delegation, actual model identity
-from the native runner output, prompt/output hashes, a native receipt with image count, and
+A delegated AI record carries the release-specific Founder delegation (from round 10 on as the
+SHA-256 of the session quote and a fixed neutral statement, never the quote), actual model identity
+from the native runner output, prompt/output hashes, a native receipt with image count (from round
+10 on bound by path and SHA-256 in the maintainers' evidence store, not committed), and
 the exact path and SHA-256 of every assigned full-page PNG, tile and printed-page raster.
 The strict gate checks the complete received-image inventory and never calls this a human pass.
 Its latest delegated round must also name the package version in the bound review-input root;
@@ -516,8 +518,11 @@ remains on record. The fresh frozen-input second review is round 8: all 32 cells
 263 qualified native image reads and actual model `claude-opus-5-5`. Four medium and 27 low
 findings remain explicitly disposed; this is delegated AI local-image sight evidence, without
 human or Ubuntu visual acceptance. The strict gate must still verify the actual current binding.
-The verifier pins each platform and state separately; it does not derive its expected count from
-the renderer manifest. Long desktop, tablet and mobile pages cannot be judged at fit-to-window
+The verifier pins the printed page count of each platform and state separately; it does not derive
+it from the renderer manifest. The tile total is not pinned, because it moves with platform fonts
+on an unchanged report; the verifier instead requires 24 distinct screen cells, every screen row
+covered by exactly one tile from the top to the page end, no image listed twice, raster sets as
+long as their PDFs and physical totals equal to what the artifacts list. Long desktop, tablet and mobile pages cannot be judged at fit-to-window
 scale; every screen cell therefore supplies viewport-height tiles.
 The verifier re-cuts every tile from the independently decoded full page and
 requires the normalized RGBA to match, so tiles add no unbound pixel. `review-gallery.html` in the
@@ -565,6 +570,8 @@ for, and fails if a check accepts the copy:
 - a tile with one channel of one visible pixel changed, and its manifest entry rewritten to the
   edited tile's hashes (the verifier's round-2 experiment), must fail the re-cut from the full page;
 - the review gallery with one tile reference removed must be reported as omitting that tile;
+- an inventory with one tile listed in place of another (totals unchanged), or a screen whose tiles
+  stop one row short of its page end, must fail the inventory invariants;
 - a printed state's page text with the findings lead moved to the next page must fail the
   stranded-heading check;
 - a page raster whose lower 55 % is replaced by an empty cloned frame — tinted background, dark
