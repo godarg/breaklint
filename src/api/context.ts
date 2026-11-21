@@ -289,7 +289,7 @@ export function createContextPack(report: unknown, options: CreateContextPackOpt
     // Targets the inventory itself dropped are omitted too; leaving them out of the count is the
     // silence this projection exists to prevent.
     const omittedCount = Math.max(0, sorted.length - maxFindings) + typed.targetInventory.omittedCount;
-    const complete = omittedCount === 0 && typed.targetInventory.complete && typed.coverage.notMeasured === 0 && typed.runVerdict !== "infrastructure";
+    const complete = omittedCount === 0 && typed.targetInventory.complete && typed.coverage.notMeasured === 0 && typed.runVerdict !== "infrastructure" && typed.runVerdict !== "insufficient-coverage";
     const screenNotMeasured = new Map<string, { ruleId: string; reason: string; declinedCount: number; candidateCount: number | null; floor: number | null }>();
     for (const entry of typed.evaluations) {
       if (entry.status !== "not-measured") continue;

@@ -797,7 +797,8 @@ async function finish(input: FinishInput): Promise<EvidenceOutcome> {
             pageConf => pageConf.referenceFrom !== "none" && !pageConf.divergent &&
               pageConf.targetsTotal > 0 && pageConf.targetsBound === pageConf.targetsTotal,
           );
-        const blankPdfHasNoMarks = (input.textPages?.[i]?.items ?? []).every(
+        const blankTextPage = input.textPages?.[i];
+        const blankPdfHasNoMarks = blankTextPage !== undefined && blankTextPage.items.every(
           item => !/^BLSID\d+[AE]$/u.test(item.text.replace(/\s+/gu, "")),
         );
         // G-78: a confirmed parity-blank page carries zero flow blocks and zero marks. When the

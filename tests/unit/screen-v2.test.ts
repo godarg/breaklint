@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import { computeScreenDriftDetails, parseCssColorAlpha, verifyOutputReceipt } from "../../src/api/check-page.ts";
 import { createContextPack } from "../../src/api/context.ts";
-import { renderReport } from "../../src/api/bundle.ts";
+import { renderReport, writeReportBundle } from "../../src/api/bundle.ts";
 import { SCREEN_REPORT_SCHEMA_VERSION, type HostBuildContainerBinding, type PublicScreenReport } from "../../src/web/types.ts";
 
 const sha = (data: string | Buffer): string => createHash("sha256").update(data).digest("hex");
@@ -32,13 +32,22 @@ describe("Paket 2: CSS Color 4 alpha parser", () => {
     assert.equal(parseCssColorAlpha("color(srgb 0.2 0.4 0.6)"), 1);
     assert.equal(parseCssColorAlpha("color(display-p3 1 0.5 0 / 50%)"), 0.5);
     assert.equal(parseCssColorAlpha("color(xyz-d65 0.5 0.5 0.5 / 0)"), 0);
+    assert.equal(parseCssColorAlpha("oklab(0.5 -1.2e-3 0.05 / 0.5)"), 0.5);
 
-    // Fail closed on gradients, unknown color spaces, malformed alpha, or out-of-range alpha.
+    // Fail closed on gradients, unknown color spaces, malformed/empty alpha, trailing commas, or non-numeric channels.
     assert.equal(parseCssColorAlpha("url(#grad)"), null);
     assert.equal(parseCssColorAlpha("color(unknown-space 1 0 0)"), null);
     assert.equal(parseCssColorAlpha("oklch(0.7 0.15 180 / 1.5)"), null);
     assert.equal(parseCssColorAlpha("oklch(0.7 0.15)"), null);
     assert.equal(parseCssColorAlpha("not-a-color"), null);
+    assert.equal(parseCssColorAlpha("rgb(255 0 0 / )"), null);
+    assert.equal(parseCssColorAlpha("rgb(255 0 0 / %)"), null);
+    assert.equal(parseCssColorAlpha("rgb(255, 0, 0, )"), null);
+    assert.equal(parseCssColorAlpha("rgba(255, 0, 0,   )"), null);
+    assert.equal(parseCssColorAlpha("oklch(0.5 0.2 120 / )"), null);
+    assert.equal(parseCssColorAlpha("rgb(foo bar baz)"), null);
+    assert.equal(parseCssColorAlpha("oklch(not a color)"), null);
+    assert.equal(parseCssColorAlpha("color(srgb foo bar baz / 0.5)"), null);
   });
 });
 
@@ -171,5 +180,33 @@ describe("Paket 2: screen capture drift diff & schemaVersion 2 context/bundle co
     const html = renderReport(report);
     assert.ok(html.includes("web/sibling-overlap"));
     assert.ok(html.includes("css-document-pixels"));
+
+    // HTML-escape repair prose (e.g. `<text>` in web/svg-text-overflows-viewport) in writeReportBundle so tags never leak raw.
+    const svgReport: PublicScreenReport = {
+      ...report,
+      evaluations: [{ ...report.evaluations[0]!, id: "eval-svg", ruleId: "web/svg-text-overflows-viewport" }],
+      findings: [{ ...report.findings[0]!, id: "finding-svg", ruleId: "web/svg-text-overflows-viewport", severity: "error", evaluationId: "eval-svg" }],
+    };
+    const bundleDir = mkdtempSync(join(tmpdir(), "breaklint-screen-svg-bundle-"));
+    try {
+      const bundle = writeReportBundle(svgReport, { outDir: bundleDir });
+      const svgHtml = readFileSync(bundle.htmlPath, "utf8");
+      assert.ok(svgHtml.includes("&lt;text&gt;"), "screen repair text must HTML-escape <text>");
+      assert.equal(svgHtml.includes("rendered <text> bounding box"), false, "raw <text> tag must not appear in HTML");
+    } finally {
+      rmSync(bundleDir, { recursive: true, force: true });
+    }
+
+    // Drifted / insufficient-coverage screen reports must never claim selection.complete === true.
+    const driftedReport: PublicScreenReport = {
+      ...report,
+      runVerdict: "insufficient-coverage",
+      exitCode: 4,
+      capture: { ...report.capture, drifted: true },
+      findings: [],
+    };
+    const driftedPack = createContextPack(driftedReport);
+    assert.equal(driftedPack.selection.complete, false);
+    assert.equal(driftedPack.selection.reason, "run-verdict-insufficient-coverage");
   });
 });

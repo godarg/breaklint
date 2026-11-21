@@ -244,37 +244,47 @@ function unitsOf(text) {
 function readableSetsIn(unit, stamps) {
   // Read every readable-set claim in the sentence (e.g. Report 4 and 5 alongside Snapshot 5, 6 and 7
   // or Screen 1 and 2), including repeated conjunctions and Oxford commas. Keep duplicate members so a
-  // repeated stamp fails exact-set equality rather than silently disappearing.
+  // repeated stamp fails exact-set equality rather than silently disappearing. Claim only the clause
+  // span (kind + number list), never the shared leading verb, so multi-kind sentences sharing one verb
+  // ("Readers accept Report 4 and 5, Snapshot 5, 6 and 7, and Screen 1 and 2.") evaluate every clause.
   const list = String.raw`\d+(?:(?:,\s*(?:(?:and|or)\s+)?|\s+(?:and|or)\s+)\d+)+`;
-  const prefix = String.raw`\b(?:readers?|reads?|accepts?|accepted|readable)\b[^.;]{0,40}?`;
+  const verbRe = /\b(?:readers?|reads?|accepts?|accepted|readable)\b/iu;
   const suffix = String.raw`\s+(?:are|remain|stay)\s+readable\b`;
   const results = [];
   const claimed = [];
   const overlaps = (start, end) => claimed.some((span) => start < span.end && end > span.start);
-  const addAll = (kind, expected, patterns) => {
-    for (const pattern of patterns) {
-      for (const match of unit.matchAll(pattern)) {
-        const start = match.index;
-        const end = start + match[0].length;
-        if (overlaps(start, end)) continue;
-        claimed.push({ start, end });
-        const numbers = [...match[1].matchAll(/\d+/gu)].map((member) => Number(member[0])).sort((a, b) => a - b);
-        results.push({ kind, expected, numbers, ok: JSON.stringify(numbers) === JSON.stringify(expected), start, end });
+  const record = (kind, expected, rawList, start, end) => {
+    if (overlaps(start, end)) return;
+    claimed.push({ start, end });
+    const numbers = [...rawList.matchAll(/\d+/gu)].map((member) => Number(member[0])).sort((a, b) => a - b);
+    results.push({ kind, expected, numbers, ok: JSON.stringify(numbers) === JSON.stringify(expected), start, end });
+  };
+  const verbMatch = verbRe.exec(unit);
+  const afterVerb = verbMatch ? verbMatch.index + verbMatch[0].length : -1;
+  const addClauses = (kind, expected, patterns) => {
+    for (const { re, requireVerb, listGroup = 1, clauseGroup = 0 } of patterns) {
+      for (const match of unit.matchAll(re)) {
+        const clauseText = match[clauseGroup];
+        const clauseStart = clauseGroup === 0 ? match.index : match.index + match[0].indexOf(clauseText);
+        const clauseEnd = clauseStart + clauseText.length;
+        if (requireVerb && (afterVerb < 0 || clauseStart < afterVerb)) continue;
+        record(kind, expected, match[listGroup], clauseStart, clauseEnd);
       }
     }
   };
-  addAll("snapshot", stamps.readableSnapshots, [
-    new RegExp(`${prefix}Snapshots?[- ]?(${list})`, "giu"),
-    new RegExp(String.raw`\bSnapshots?[- ]?(${list})${suffix}`, "giu"),
+  addClauses("snapshot", stamps.readableSnapshots, [
+    { re: new RegExp(String.raw`\bSnapshots?[- ]?(${list})`, "giu"), requireVerb: true },
+    { re: new RegExp(String.raw`(\bSnapshots?[- ]?(${list}))${suffix}`, "giu"), requireVerb: false, clauseGroup: 1, listGroup: 2 },
   ]);
-  addAll("screen", stamps.readableScreens, [
-    new RegExp(`${prefix}Screen(?:\\s+reports?|\\s+schema)?[- ]?(${list})`, "giu"),
-    new RegExp(String.raw`\bScreen(?:\s+reports?|\s+schema)?[- ]?(${list})${suffix}`, "giu"),
-    new RegExp(String.raw`\bscreen\s+readers?\b[^.;]{0,40}?\bversions?\s+(${list})`, "giu"),
+  addClauses("screen", stamps.readableScreens, [
+    { re: new RegExp(String.raw`\bscreen\s+readers?\b[^.;]{0,40}?(\bversions?\s+(${list}))`, "giu"), requireVerb: false, clauseGroup: 1, listGroup: 2 },
+    { re: new RegExp(String.raw`\bScreen(?:\s+reports?|\s+schema)?[- ]?(${list})`, "giu"), requireVerb: true },
+    { re: new RegExp(String.raw`(\bScreen(?:\s+reports?|\s+schema)?[- ]?(${list}))${suffix}`, "giu"), requireVerb: false, clauseGroup: 1, listGroup: 2 },
   ]);
-  addAll("report", stamps.readable, [
-    new RegExp(`${prefix}(?:Report[- ]?)?(${list})`, "giu"),
-    new RegExp(String.raw`\bReports?[- ]?(${list})${suffix}`, "giu"),
+  addClauses("report", stamps.readable, [
+    { re: new RegExp(String.raw`\bReports?[- ]?(${list})`, "giu"), requireVerb: true },
+    { re: new RegExp(String.raw`(\bReports?[- ]?(${list}))${suffix}`, "giu"), requireVerb: false, clauseGroup: 1, listGroup: 2 },
+    { re: new RegExp(String.raw`\b(?:readers?|reads?|accepts?|accepted|readable)\b[^.;]{0,40}?(${list})`, "giu"), requireVerb: false, clauseGroup: 1, listGroup: 1 },
   ]);
   return results;
 }

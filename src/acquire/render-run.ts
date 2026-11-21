@@ -1553,7 +1553,7 @@ export function runtimeFigureTreeMatches(
   expectedElementCount?: number,
 ): boolean {
   if (!staticIndex || !raw) return false;
-  if (expectedElementCount !== undefined && raw.elementCount !== undefined && raw.elementCount !== expectedElementCount) {
+  if (expectedElementCount !== undefined && raw.elementCount !== expectedElementCount) {
     return false;
   }
   const runtimeIndex = {

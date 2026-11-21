@@ -21,6 +21,20 @@ function readJsonFile(path: string, label: string): unknown {
   }
 }
 
+function requirePathValue(raw: string | undefined, flag: string): string {
+  if (raw === undefined || raw.trim() === "" || raw.startsWith("-")) {
+    throw new UsageError(`${flag} needs a value.`);
+  }
+  return raw;
+}
+
+function requireTextValue(raw: string | undefined, flag: string): string {
+  if (raw === undefined || raw.trim() === "") {
+    throw new UsageError(`${flag} needs a value.`);
+  }
+  return raw;
+}
+
 function parsePositiveInt(raw: string | undefined, flag: string): number {
   if (raw === undefined || !/^[0-9]+$/u.test(raw)) throw new UsageError(`${flag} requires a positive integer.`);
   const n = Number(raw);
@@ -62,9 +76,7 @@ export async function runSubcommand(name: string, argv: readonly string[]): Prom
       for (let i = 0; i < argv.length; i += 1) {
         const arg = argv[i] ?? "";
         if (arg === "--out") {
-          const val = argv[++i];
-          if (!val) throw new UsageError("--out needs a value.");
-          outFile = val;
+          outFile = requirePathValue(argv[++i], "--out");
         } else if (arg.startsWith("-")) {
           throw new UsageError(`unknown option ${arg} for compare. Try breaklint compare --help.`);
         } else {
@@ -95,17 +107,13 @@ export async function runSubcommand(name: string, argv: readonly string[]): Prom
       for (let i = 0; i < argv.length; i += 1) {
         const arg = argv[i] ?? "";
         if (arg === "--out") {
-          const val = argv[++i];
-          if (!val) throw new UsageError("--out needs a value.");
-          outFile = val;
+          outFile = requirePathValue(argv[++i], "--out");
         } else if (arg === "--max-findings") {
           maxFindings = parsePositiveInt(argv[++i], "--max-findings");
         } else if (arg === "--max-text") {
           maxTextPerField = parsePositiveInt(argv[++i], "--max-text");
         } else if (arg === "--comparison") {
-          const val = argv[++i];
-          if (!val) throw new UsageError("--comparison needs a value.");
-          comparisonPath = val;
+          comparisonPath = requirePathValue(argv[++i], "--comparison");
         } else if (arg.startsWith("-")) {
           throw new UsageError(`unknown option ${arg} for context. Try breaklint context --help.`);
         } else {
@@ -142,25 +150,17 @@ export async function runSubcommand(name: string, argv: readonly string[]): Prom
       for (let i = 0; i < argv.length; i += 1) {
         const arg = argv[i] ?? "";
         if (arg === "--out-dir") {
-          const val = argv[++i];
-          if (!val) throw new UsageError("--out-dir needs a value.");
-          outDir = val;
+          outDir = requirePathValue(argv[++i], "--out-dir");
         } else if (arg === "--evidence-dir") {
-          const val = argv[++i];
-          if (!val) throw new UsageError("--evidence-dir needs a value.");
-          evidenceDir = val;
+          evidenceDir = requirePathValue(argv[++i], "--evidence-dir");
         } else if (arg === "--title") {
-          const val = argv[++i];
-          if (!val) throw new UsageError("--title needs a value.");
-          title = val;
+          title = requireTextValue(argv[++i], "--title");
         } else if (arg === "--theme") {
           const val = argv[++i];
           if (val !== "light" && val !== "dark") throw new UsageError("--theme must be light or dark.");
           theme = val;
         } else if (arg === "--comparison") {
-          const val = argv[++i];
-          if (!val) throw new UsageError("--comparison needs a value.");
-          comparisonPath = val;
+          comparisonPath = requirePathValue(argv[++i], "--comparison");
         } else if (arg === "--max-findings") {
           maxFindings = parsePositiveInt(argv[++i], "--max-findings");
         } else if (arg.startsWith("-")) {

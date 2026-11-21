@@ -41,13 +41,19 @@ const CSS_COLOR_SPACES = new Set([
   "srgb", "srgb-linear", "display-p3", "a98-rgb", "prophoto-rgb", "rec2020", "xyz", "xyz-d50", "xyz-d65",
 ]);
 
+const COLOR_NUM_RE = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/u;
+const COLOR_CHANNEL_RE = /^(?:none|[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?(?:%|deg|rad|grad|turn)?)$/u;
+
 function parseAlphaToken(token: string): number | null {
   const trimmed = token.trim().toLowerCase();
   if (trimmed === "none") return 0;
   if (trimmed.endsWith("%")) {
-    const num = Number(trimmed.slice(0, -1));
+    const raw = trimmed.slice(0, -1);
+    if (!COLOR_NUM_RE.test(raw)) return null;
+    const num = Number(raw);
     return Number.isFinite(num) && num >= 0 && num <= 100 ? num / 100 : null;
   }
+  if (!COLOR_NUM_RE.test(trimmed)) return null;
   const num = Number(trimmed);
   return Number.isFinite(num) && num >= 0 && num <= 1 ? num : null;
 }
@@ -65,29 +71,30 @@ export function parseCssColorAlpha(color: string): number | null {
   const body = fnMatch[2]!.trim();
   if (fn === "rgb" || fn === "rgba" || fn === "hsl" || fn === "hsla") {
     if (body.includes(",")) {
-      const parts = body.split(",").map((s) => s.trim()).filter(Boolean);
-      if (parts.length === 3) return 1;
-      if (parts.length === 4) return parseAlphaToken(parts[3]!);
-      return null;
+      const parts = body.split(",").map((s) => s.trim());
+      if (parts.some((p) => p === "")) return null;
+      if (parts.length !== 3 && parts.length !== 4) return null;
+      if (!parts.slice(0, 3).every((p) => COLOR_CHANNEL_RE.test(p))) return null;
+      return parts.length === 4 ? parseAlphaToken(parts[3]!) : 1;
     }
     const slashParts = body.split("/");
     if (slashParts.length > 2) return null;
     const channels = slashParts[0]!.trim().split(/\s+/u).filter(Boolean);
-    if (channels.length !== 3) return null;
+    if (channels.length !== 3 || !channels.every((c) => COLOR_CHANNEL_RE.test(c))) return null;
     return slashParts.length === 2 ? parseAlphaToken(slashParts[1]!) : 1;
   }
   if (fn === "hwb" || fn === "lab" || fn === "lch" || fn === "oklab" || fn === "oklch") {
     const slashParts = body.split("/");
     if (slashParts.length > 2) return null;
     const channels = slashParts[0]!.trim().split(/\s+/u).filter(Boolean);
-    if (channels.length !== 3) return null;
+    if (channels.length !== 3 || !channels.every((c) => COLOR_CHANNEL_RE.test(c))) return null;
     return slashParts.length === 2 ? parseAlphaToken(slashParts[1]!) : 1;
   }
   if (fn === "color") {
     const slashParts = body.split("/");
     if (slashParts.length > 2) return null;
     const tokens = slashParts[0]!.trim().split(/\s+/u).filter(Boolean);
-    if (tokens.length !== 4 || !CSS_COLOR_SPACES.has(tokens[0]!)) return null;
+    if (tokens.length !== 4 || !CSS_COLOR_SPACES.has(tokens[0]!) || !tokens.slice(1).every((c) => COLOR_CHANNEL_RE.test(c))) return null;
     return slashParts.length === 2 ? parseAlphaToken(slashParts[1]!) : 1;
   }
   return null;
@@ -305,11 +312,20 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
     const selector = (node: Element, fallback: string): string => node.id ? `#${CSS.escape(node.id)}` : fallback;
 
     const colorSpaces = new Set(["srgb", "srgb-linear", "display-p3", "a98-rgb", "prophoto-rgb", "rec2020", "xyz", "xyz-d50", "xyz-d65"]);
+    const colorNumRe = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/u;
+    const colorChannelRe = /^(?:none|[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?(?:%|deg|rad|grad|turn)?)$/u;
     const parseAlphaToken = (token: string): number | null => {
       const t = token.trim().toLowerCase();
       if (t === "none") return 0;
-      if (t.endsWith("%")) { const n = Number(t.slice(0, -1)); return Number.isFinite(n) && n >= 0 && n <= 100 ? n / 100 : null; }
-      const n = Number(t); return Number.isFinite(n) && n >= 0 && n <= 1 ? n : null;
+      if (t.endsWith("%")) {
+        const raw = t.slice(0, -1);
+        if (!colorNumRe.test(raw)) return null;
+        const n = Number(raw);
+        return Number.isFinite(n) && n >= 0 && n <= 100 ? n / 100 : null;
+      }
+      if (!colorNumRe.test(t)) return null;
+      const n = Number(t);
+      return Number.isFinite(n) && n >= 0 && n <= 1 ? n : null;
     };
     const alpha = (color: string): number | null => {
       const trimmed = color.trim().toLowerCase();
@@ -319,24 +335,27 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
       const fn = fnMatch[1]!; const body = fnMatch[2]!.trim();
       if (fn === "rgb" || fn === "rgba" || fn === "hsl" || fn === "hsla") {
         if (body.includes(",")) {
-          const parts = body.split(",").map((s) => s.trim()).filter(Boolean);
-          if (parts.length === 3) return 1;
-          if (parts.length === 4) return parseAlphaToken(parts[3]!);
-          return null;
+          const parts = body.split(",").map((s) => s.trim());
+          if (parts.some((p) => p === "")) return null;
+          if (parts.length !== 3 && parts.length !== 4) return null;
+          if (!parts.slice(0, 3).every((p) => colorChannelRe.test(p))) return null;
+          return parts.length === 4 ? parseAlphaToken(parts[3]!) : 1;
         }
         const sp = body.split("/"); if (sp.length > 2) return null;
-        const ch = sp[0]!.trim().split(/\s+/u).filter(Boolean); if (ch.length !== 3) return null;
+        const ch = sp[0]!.trim().split(/\s+/u).filter(Boolean);
+        if (ch.length !== 3 || !ch.every((c) => colorChannelRe.test(c))) return null;
         return sp.length === 2 ? parseAlphaToken(sp[1]!) : 1;
       }
       if (fn === "hwb" || fn === "lab" || fn === "lch" || fn === "oklab" || fn === "oklch") {
         const sp = body.split("/"); if (sp.length > 2) return null;
-        const ch = sp[0]!.trim().split(/\s+/u).filter(Boolean); if (ch.length !== 3) return null;
+        const ch = sp[0]!.trim().split(/\s+/u).filter(Boolean);
+        if (ch.length !== 3 || !ch.every((c) => colorChannelRe.test(c))) return null;
         return sp.length === 2 ? parseAlphaToken(sp[1]!) : 1;
       }
       if (fn === "color") {
         const sp = body.split("/"); if (sp.length > 2) return null;
         const tokens = sp[0]!.trim().split(/\s+/u).filter(Boolean);
-        if (tokens.length !== 4 || !colorSpaces.has(tokens[0]!)) return null;
+        if (tokens.length !== 4 || !colorSpaces.has(tokens[0]!) || !tokens.slice(1).every((c) => colorChannelRe.test(c))) return null;
         return sp.length === 2 ? parseAlphaToken(sp[1]!) : 1;
       }
       return null;

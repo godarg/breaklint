@@ -104,6 +104,7 @@ describe("Paket 1: runtime-verified figure index", () => {
     const expectedElementCount = model.elementCount as number;
     assert.equal(runtimeFigureTreeMatches(model.figureIndex, { ...matching, elementCount: expectedElementCount }, expectedElementCount), true);
     assert.equal(runtimeFigureTreeMatches(model.figureIndex, { ...matching, elementCount: expectedElementCount + 1 }, expectedElementCount), false);
+    assert.equal(runtimeFigureTreeMatches(model.figureIndex, matching, expectedElementCount), false);
     assert.equal(runtimeFigureTreeMatches(model.figureIndex, { ...matching, ids: { ...matching.ids, injectedByScript: 1 } }), false);
     assert.equal(runtimeFigureTreeMatches(model.figureIndex, {
       ...matching,

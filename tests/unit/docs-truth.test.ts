@@ -66,6 +66,9 @@ describe("schema stamps in the shipped documents", () => {
     assert.equal(scanText("x.md", `| Screen report | ${stamps.screen} | geometry |\n`, stamps).length, 0);
     assert.equal(scanText("x.md", `Readers accept Screen ${stamps.readableScreens.join(" and ")}.\n`, stamps).length, 0);
     assert.equal(scanText("x.md", `Readers accept Screen 1 and ${stamps.screen + 5}.\n`, stamps).length, 1);
+    assert.equal(scanText("x.md", `Readers accept Report ${stamps.readable.join(" and ")}, Snapshot ${stamps.readableSnapshots.slice(0, -1).join(", ")} and ${stamps.readableSnapshots.at(-1)}, and Screen ${stamps.readableScreens.join(" and ")}.\n`, stamps).length, 0);
+    assert.equal(scanText("x.md", `Readers accept Report ${stamps.report - 2} and ${stamps.report} and Screen ${stamps.readableScreens.join(" and ")}.\n`, stamps).length, 1);
+    assert.equal(scanText("x.md", `Readers accept Report ${stamps.readable.join(" and ")} and Screen 1 and ${stamps.screen + 5}.\n`, stamps).length, 1);
   });
 
   it("rejects the stale current-state forms that shipped, and each one names its line", () => {

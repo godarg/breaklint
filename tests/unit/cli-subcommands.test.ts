@@ -69,6 +69,11 @@ describe("Paket 3: CLI subcommands (compare, context, bundle)", () => {
       assert.equal(runCli(["context", join(dir, "missing.json")], dir).status, 2);
       assert.equal(runCli(["bundle", afterPath], dir).status, 2);
       assert.equal(runCli(["bundle", afterPath, "--out-dir", bundleDir, "--theme", "sepia"], dir).status, 2);
+      // Flag tokens cannot be consumed as missing path values.
+      assert.equal(runCli(["compare", beforePath, afterPath, "--out", "--unknown"], dir).status, 2);
+      assert.equal(runCli(["context", afterPath, "--out", "--comparison", cmpPath], dir).status, 2);
+      assert.equal(runCli(["bundle", afterPath, "--out-dir", "--theme", "dark"], dir).status, 2);
+      assert.equal(runCli(["bundle", afterPath, "--out-dir", bundleDir, "--evidence-dir", "--title", "x"], dir).status, 2);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
