@@ -1,7 +1,7 @@
 import { closeSync, constants, lstatSync, mkdirSync, openSync, writeFileSync, writeSync } from "node:fs";
 import { basename, extname, join, resolve } from "node:path";
 import type { Evidence, Finding, Report } from "../core/types.ts";
-import { READABLE_SCREEN_REPORT_SCHEMA_VERSIONS, type PublicScreenReport, type ScreenFinding } from "../web/types.ts";
+import { READABLE_SCREEN_REPORT_SCHEMA_VERSIONS, type ReadableScreenReport, type ScreenFinding } from "../web/types.ts";
 import type { ReportComparison } from "./compare.ts";
 import { captureBoundedSourceFile, sha256Bytes } from "../source/bytes.ts";
 import { createContextPack, type ContextFinding, type CreateContextPackOptions } from "./context.ts";
@@ -206,7 +206,7 @@ export function renderReport(report: Report | unknown, options: RenderReportOpti
 }
 
 /** Writes report.json, context.json and a self-contained report.html. Assets are copied only after hash and path verification. */
-export function writeReportBundle(report: Report | PublicScreenReport, options: WriteReportBundleOptions): ReportBundleResult {
+export function writeReportBundle(report: Report | ReadableScreenReport, options: WriteReportBundleOptions): ReportBundleResult {
   const root = resolve(options.outDir);
   if (options.comparison) {
     if (options.comparison.afterRunId !== report.runId) throw new Error("comparison does not refer to this current report");
@@ -252,7 +252,7 @@ export function writeReportBundle(report: Report | PublicScreenReport, options: 
   return { outDir: root, reportPath: join(root, "report.json"), htmlPath: join(root, "report.html"), contextPath: join(root, "context.json"), assets: [...assets.values()].map((asset) => asset.href) };
 }
 
-function screenFindingCard(report: PublicScreenReport, finding: ScreenFinding, index: number, assets: AssetMap, evidenceDir: string | undefined, root: string): string {
+function screenFindingCard(report: ReadableScreenReport, finding: ScreenFinding, index: number, assets: AssetMap, evidenceDir: string | undefined, root: string): string {
   const artifact = report.artifact;
   let asset: Asset | null = null;
   if (evidenceDir && finding.evidence.bindsFinding && artifact.relativePath && artifact.sha256 && artifact.byteLength && artifact.widthPx && artifact.heightPx) {

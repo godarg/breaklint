@@ -152,8 +152,9 @@ export interface ScreenCoverage {
   intentionalOverlays: { selector: string; reason: string; scope: "scenario" | "suite"; count: number }[];
 }
 
+/** The emitted screen report (Screen 2). Readers take `ReadableScreenReport`. */
 export interface PublicScreenReport {
-  schemaVersion: 1 | 2;
+  schemaVersion: typeof SCREEN_REPORT_SCHEMA_VERSION;
   profileKind: "screen";
   runId: string;
   runVerdict: RunVerdict;
@@ -194,6 +195,22 @@ export interface PublicScreenReport {
   infrastructure: ScreenInfrastructureEvent[];
   events: { kind: string; detail: string }[];
 }
+
+/** A named exception counter as 0.10.0 (Screen 1) wrote it: without `scope`. */
+export interface ScreenExceptionCountV1 { selector: string; reason: string; count: number }
+
+/** The Screen 1 report 0.10.0 wrote. Accepted by readers only; checkPage never emits it. */
+export interface PublicScreenReportV1 extends Omit<PublicScreenReport, "schemaVersion" | "failOn" | "rulesEnabled" | "coverage" | "capture"> {
+  schemaVersion: 1;
+  coverage: Omit<ScreenCoverage, "allowedScrollContainers" | "intentionalOverlays"> & {
+    allowedScrollContainers: ScreenExceptionCountV1[];
+    intentionalOverlays: ScreenExceptionCountV1[];
+  };
+  capture: { before: string; stable: string; after: string; fontsReady: boolean; timedOut: boolean; drifted: boolean };
+}
+
+/** Every screen report a reader (context, bundle, CLI) accepts: Screen 1 and Screen 2. */
+export type ReadableScreenReport = PublicScreenReportV1 | PublicScreenReport;
 
 export type ScreenCheckResult =
   | { ok: true; report: PublicScreenReport }

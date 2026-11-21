@@ -120,7 +120,7 @@ the scenario; the adapter records current route, viewport, browser and screensho
 `trust: "host-controlled-page"` and `networkPolicy: "host-owned"` explicitly retain the caller's
 authority. Document text cannot authorize new network access.
 
-The `web-geometry-v2` semantics (`PublicScreenReport` schema 2; readers accept Screen 1 and 2) cover
+The `web-geometry-v2` semantics (`PublicScreenReport` schema 2; readers accept Screen 1 and 2 as `ReadableScreenReport`) cover
 unexpected horizontal overflow (HTML boxes; content inside an `<svg>` is not measured by
 `scrollWidth`), content cut by rectangular clipping ancestors, SVG text extending past the SVG
 viewport that clips it (`web/svg-text-overflows-viewport`; with `overflow: visible` the rule does not
