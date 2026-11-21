@@ -19,6 +19,7 @@ import {
   assertCurrentReviewInput,
   assertObservedEnvironment,
   assertReviewEnvironment,
+  assertSurfaceInventory,
   assessSightGate,
   describeLatestRound,
   runReviewInputMutationControl,
@@ -1184,64 +1185,6 @@ for (const control of ["rowRule", "rowPitch", "headerRule", "fillApplication", "
   assert.ok(verifierSelfControls[control], `verifier ${control} control did not run`);
 }
 assert.ok(fontMutationControl, "PDF font mutation control did not run");
-
-// The printed inventory is pinned rather than derived, so that a report which silently doubles in
-// length is a failing gate and not a shrug. History: 32 page rasters; 43 in 0.6.0 when every finding
-// gained a remediation box; 31 when coverage became one aligned table instead of thirteen six-label
-// cards (measured per state: clean 5 -> 2, findings 12 -> 9, infrastructure 13 -> 10,
-// insufficient-coverage 13 -> 10 on Chromium 141 / linux); 32 when the clean print kept its findings
-// section (clean 2 -> 3); 26 when findings fragment between their units instead of taking one page
-// each (findings 9 -> 7, infrastructure 10 -> 8, insufficient-coverage 10 -> 8). Tablet and mobile
-// cells also ship viewport-height tiles, pinned the same way: 148, then 152 when two findings
-// gained real-shaped evidence names that wrap on a phone (infrastructure and insufficient-coverage
-// mobile 14 -> 15 tiles each). 27 page rasters when remediation and note text took the 72ch
-// measure (findings 7 -> 8).
-// The 2026-10-07 macOS measurement was clean 3/20, findings 9/48, infrastructure 9/50,
-// insufficient-coverage 9/50 (page rasters/tiles). Its 30-page total was incorrectly used as a
-// universal pin. The Linux diagnostic https://github.com/godarg/breaklint/actions/runs/37597727752
-// measured clean 3/20, findings 8/48, infrastructure 9/50, insufficient-coverage 9/50 on
-// 2026-10-07 with Google Chrome 154.0.8037.57, Node 24.21.0 and Poppler 24.02.0. Independent
-// pdfinfo and PNG membership/hash/dimensions confirmed its 29 pages; the final universal pin was
-// its only failure. Each supported platform now has a fixed per-state oracle. No manifest-derived
-// expectation, range, or fallback can conceal a changed state split or a longer report.
-// These preceding counts are the historical 0.9.0 matrix. The 0.10.0 presentation has six
-// findings after its natural document ending is accepted, with clarified coverage wording and
-// atomic printed run-fact label/value pairs. Independent pdfinfo, pypdf, physical PNG membership
-// and SHA/dimension checks measured 3/8/8/8 pages and 158 viewport tiles on macOS on 2026-10-07.
-// Linux run https://github.com/godarg/breaklint/actions/runs/37679854862 measured the same fixed
-// per-state pages and tile count from the unchanged candidate, with native renderer/oracle exit0.
-// The first diagnostic run timed out before rendering; it supplies no oracle and remains retained.
-// The round7 HIGH repair records the previously missing handwritten widow decline and adds
-// readable desktop tiles to every screen cell. Independent macOS filesystem/IHDR/pdfinfo/pypdf
-// and Linux run https://github.com/godarg/breaklint/actions/runs/37686731564 measured 212 tiles
-// and the same fixed3/8/8/8 pages on2026-10-07. The212 expectation is a physical observation,
-// not a renderer-manifest-derived count. The preceding158 count remains historical evidence.
-// 0.11.0 (G-148..G-151): explicit decline units, zero-candidate labels ("No candidates"),
-// base-category tags, state-qualified finding gates, and mono slash-wrapped rule IDs in Next checks
-// and Declined candidates measured 214 viewport tiles on macOS and 212 viewport tiles on Linux CI
-// (ubuntu-latest run 44894380636, 2026-11-21), with unchanged 3/8/8/8 (27) PDF pages on both.
-const EXPECTED_PRINT_PAGES_BY_PLATFORM = Object.freeze({
-  darwin: Object.freeze({ clean: 3, findings: 8, infrastructure: 8, "insufficient-coverage": 8 }),
-  linux: Object.freeze({ clean: 3, findings: 8, infrastructure: 8, "insufficient-coverage": 8 }),
-});
-const EXPECTED_SCREEN_TILES_BY_PLATFORM = Object.freeze({
-  darwin: 214,
-  linux: 212,
-});
-
-function assertSurfaceInventory(inventory, platform) {
-  assert.ok(Object.hasOwn(EXPECTED_PRINT_PAGES_BY_PLATFORM, platform), `unsupported report-surface platform: ${platform}`);
-  assert.ok(Object.hasOwn(EXPECTED_SCREEN_TILES_BY_PLATFORM, platform), `unsupported report-surface tile platform: ${platform}`);
-  const expectedPages = EXPECTED_PRINT_PAGES_BY_PLATFORM[platform];
-  const expectedTiles = EXPECTED_SCREEN_TILES_BY_PLATFORM[platform];
-  const pdfs = inventory.artifacts.filter((artifact) => artifact.kind === "pdf");
-  assert.equal(pdfs.length, 4, "the report-surface inventory must contain exactly four PDF cells");
-  const actualPages = Object.fromEntries(pdfs.map((artifact) => [artifact.cell.split("/")[1], artifact.pages]));
-  assert.deepEqual(actualPages, expectedPages, `${platform}: print page inventory must match every fixed state`);
-  const rasterPages = Object.values(expectedPages).reduce((sum, pages) => sum + pages, 0);
-  assert.deepEqual(inventory.physicalArtifacts, { screens: 24, screenTiles: expectedTiles, pdfs: 4, rasterPages },
-    `${platform}: the report-surface inventory must be exactly 24 screens with ${expectedTiles} viewport tiles, 4 PDFs and ${rasterPages} PDF page rasters`);
-}
 
 assertSurfaceInventory(manifest, process.platform);
 // Mutate only a copy of the measured inventory, never a render artifact. Updating the total with
