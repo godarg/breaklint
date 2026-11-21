@@ -16,10 +16,16 @@
  *
  * WHAT IS COMPARED:
  *   1. the demo ends with exit 1;
- *   2. the excerpt's last line equals the CLI's one counter line, whole-line;
- *   3. the excerpt's finding block — header to `render` line — occurs verbatim and contiguously in
- *      the output, and is exactly one finding;
- *   4. "one of its N findings": N is the number of finding headers the CLI printed.
+ *   2. the excerpt's last line is the CLI's one counter line: its ` · `-separated fields occur in
+ *      the CLI's order, verbatim, and every field left out is marked by a `…` field;
+ *   3. the excerpt's finding block opens with a finding header the CLI printed, verbatim, and every
+ *      further line is a line of that same finding, in order. A line may be shortened only where it
+ *      shows `…`, which stands for at least one character the CLI printed there; every quoted line
+ *      keeps at least 16 characters of its own. Lines of the finding that the excerpt leaves out are
+ *      marked by a line that is only `…`, at the place where they are missing;
+ *   4. "One of its N findings": N is the number of finding headers the CLI printed.
+ * The README shows long lines shortened because npm and GitHub render a code block with a
+ * horizontal scrollbar, which put the remedy out of sight. Every shortening says so in the text.
  *
  * Every `--consumer`/`--package` run also proves it can fail: it corrupts one character of a
  * quoted finding line, the counter line and the count word in memory and requires each corrupted
@@ -35,7 +41,82 @@ import { fileURLToPath } from "node:url";
 /** Finding header lines of the console format: `<severity> <rule-id>  page <n>`. */
 export const FINDING_HEADER = /^(error|warn|info) +[a-z]+\/[a-z0-9-]+ +page \d+$/u;
 const NUMBER_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
-const EXCERPT = /Below is one of its ([a-z]+) findings, plus the closing counters, copied from that\ncommand's output:\n\n```\n([\s\S]*?)\n```\n/u;
+// The sentence must say that the excerpt is the printed output and that `…` marks every cut.
+const EXCERPT = /One of its ([a-z]+) findings and the counter line,\s+as printed\s+\(`…` marks cuts\):\n\n```\n([\s\S]*?)\n```\n/u;
+const ELLIPSIS = "…";
+/** A quoted line keeps at least this many characters of its own besides indentation and `…`. */
+const MIN_QUOTED = 16;
+
+/** The excerpt line as a whole-line pattern: `…`, with one adjacent space each side, is "something here". */
+function linePattern(line) {
+  const pieces = line.split(/ ?… ?/u).map((piece) => piece.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"));
+  return new RegExp(`^${pieces.join("[\\s\\S]+")}$`, "u");
+}
+
+/** Lines of the one finding that starts at `start`: up to the next header, blank or counter line. */
+function findingLines(output, start) {
+  let end = start + 1;
+  while (end < output.length && output[end] !== "" && !FINDING_HEADER.test(output[end]) && !output[end].startsWith("inputs found:")) end += 1;
+  return output.slice(start, end);
+}
+
+/** Issues of the excerpt's finding block against the CLI's lines of that finding. */
+function blockIssues(block, output) {
+  const issues = [];
+  if (!FINDING_HEADER.test(block[0])) return [`the README excerpt does not open with a finding: ${block[0]}`];
+  if (block.slice(1).some((line) => FINDING_HEADER.test(line))) issues.push("the README finding block runs into a second finding");
+  const start = output.indexOf(block[0]);
+  if (start < 0) return [...issues, `the demo prints no finding "${block[0]}"`];
+  const actual = findingLines(output, start);
+  let next = 1;
+  let gapMarked = false;
+  for (const [index, line] of block.slice(1).entries()) {
+    if (line.trim() === ELLIPSIS) {
+      if (gapMarked) issues.push(`excerpt line ${index + 2}: two omission marks in a row`);
+      gapMarked = true;
+      continue;
+    }
+    const own = line.replaceAll(ELLIPSIS, "").trim().length;
+    if (own < MIN_QUOTED) issues.push(`excerpt line ${index + 2} keeps ${own} characters of its own, fewer than ${MIN_QUOTED}: ${line}`);
+    const pattern = linePattern(line);
+    const found = actual.findIndex((candidate, at) => at >= next && pattern.test(candidate));
+    if (found < 0) {
+      issues.push(`README finding block drifted from the actual output at excerpt line ${index + 2}:\n    README: ${line}\n    actual: ${actual[next] ?? "(the finding ended)"}`);
+      continue;
+    }
+    if (found > next && !gapMarked) issues.push(`excerpt line ${index + 2}: ${found - next} line(s) of the finding are left out before it without a "…" line`);
+    if (found === next && gapMarked) issues.push(`excerpt line ${index + 2}: a "…" line marks an omission where nothing was left out`);
+    next = found + 1;
+    gapMarked = false;
+  }
+  if (next < actual.length && !gapMarked) issues.push(`the README finding block leaves out the finding's last ${actual.length - next} line(s) without a closing "…" line`);
+  if (next >= actual.length && gapMarked) issues.push("the README finding block closes with a \"…\" line, but nothing of the finding is left out");
+  return issues;
+}
+
+/** Issues of the excerpt's counter line against the CLI's one counter line. */
+function counterIssues(documented, actual) {
+  const fields = documented.split(" · ");
+  const real = actual.split(" · ");
+  let next = 0;
+  let gapMarked = false;
+  for (const field of fields) {
+    if (field === ELLIPSIS) {
+      if (gapMarked) return [`the README counter line has two omission marks in a row: ${documented}`];
+      gapMarked = true;
+      continue;
+    }
+    const found = real.indexOf(field, next);
+    if (found < 0) return [`README demo counters drifted from the actual output:\n    README: ${documented}\n    actual: ${actual}`];
+    if (found > next && !gapMarked) return [`the README counter line leaves out "${real.slice(next, found).join(" · ")}" without a "…" field`];
+    if (found === next && gapMarked) return [`the README counter line marks an omission before "${field}" where nothing was left out`];
+    next = found + 1;
+    gapMarked = false;
+  }
+  if (next < real.length && !gapMarked) return [`the README counter line leaves out its last ${real.length - next} field(s) without a closing "…"`];
+  if (next >= real.length && gapMarked) return ["the README counter line closes with \"…\", but nothing is left out"];
+  return next === 0 ? ["the README counter line quotes no counter at all"] : [];
+}
 
 export function checkReadmeDemo(readmeText, demoStdout, demoExit) {
   const issues = [];
@@ -54,30 +135,13 @@ export function checkReadmeDemo(readmeText, demoStdout, demoExit) {
   const documentedCounters = excerptLines.at(-1);
   const actualCounters = output.filter((line) => line.startsWith("inputs found:"));
   if (actualCounters.length !== 1) issues.push(`the demo printed ${actualCounters.length} counter lines, not one`);
-  else if (documentedCounters !== actualCounters[0]) {
-    issues.push(`README demo counters drifted from the actual output:\n    README: ${documentedCounters}\n    actual: ${actualCounters[0]}`);
-  }
+  else issues.push(...counterIssues(documentedCounters, actualCounters[0]));
 
   const blank = excerptLines.indexOf("");
-  if (blank <= 0) {
-    issues.push("the README excerpt has no finding block before the counters");
+  if (blank <= 0 || blank !== excerptLines.length - 2) {
+    issues.push("the README excerpt is not one finding block, a blank line and the counter line");
   } else {
-    const block = excerptLines.slice(0, blank);
-    if (!FINDING_HEADER.test(block[0])) issues.push(`the README excerpt does not open with a finding: ${block[0]}`);
-    if (!/^ {2}render {5}/u.test(block.at(-1))) issues.push("the README finding block does not end at its render line");
-    if (block.slice(1).some((line) => FINDING_HEADER.test(line))) issues.push("the README finding block runs into a second finding");
-    const start = output.indexOf(block[0]);
-    if (start < 0) issues.push(`the demo prints no finding "${block[0]}"`);
-    else {
-      const actual = output.slice(start, start + block.length);
-      const differing = block.findIndex((line, i) => line !== actual[i]);
-      if (differing !== -1) {
-        issues.push(
-          `README finding block drifted from the actual output at excerpt line ${differing + 1}:\n` +
-            `    README: ${block[differing]}\n    actual: ${actual[differing] ?? "(output ended)"}`,
-        );
-      }
-    }
+    issues.push(...blockIssues(excerptLines.slice(0, blank), output));
   }
 
   const printed = output.filter((line) => FINDING_HEADER.test(line)).length;
@@ -104,7 +168,7 @@ export function corruptions(readmeText) {
   return [
     { name: `one character of quoted line ${quoted + 1}`, text: withExcerpt(lines.map((line, i) => (i === quoted ? flip(line) : line))) },
     { name: "one character of the counter line", text: withExcerpt(lines.map((line, i) => (i === lines.length - 1 ? flip(line) : line))) },
-    { name: "the finding-count word", text: readmeText.replace(whole, whole.replace(`one of its ${countWord} findings`, `one of its ${nextWord} findings`)) },
+    { name: "the finding-count word", text: readmeText.replace(whole, whole.replace(`One of its ${countWord} findings`, `One of its ${nextWord} findings`)) },
   ];
 }
 
@@ -137,7 +201,7 @@ function verify(readmePath, bin, cwd, label, viaNode = false) {
   }
   process.stdout.write(
     `README demo contract (${label}): the shipped README quotes what the shipped CLI prints ` +
-      `(${result.printed} findings, counters and one finding verbatim); ${controls.length} corrupted copies rejected\n`,
+      `(${result.printed} findings, counters and one finding, shortened only where marked); ${controls.length} corrupted copies rejected\n`,
   );
 }
 

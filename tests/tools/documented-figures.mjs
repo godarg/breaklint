@@ -33,8 +33,8 @@ function acceptedLiveTestCount(liveSummary) {
 
 function documentedFigures(statusText) {
   const match = FIGURES_MARKER.exec(statusText);
-  if (!match) throw new Error("docs/status.md has no unique breaklint-status-figures-v1 marker");
-  if ([...statusText.matchAll(new RegExp(FIGURES_MARKER.source, "gu"))].length !== 1) throw new Error("docs/status.md has more than one figures marker");
+  if (!match) throw new Error("maintainers/status.md has no unique breaklint-status-figures-v1 marker");
+  if ([...statusText.matchAll(new RegExp(FIGURES_MARKER.source, "gu"))].length !== 1) throw new Error("maintainers/status.md has more than one figures marker");
   return {
     unitTests: Number(match[1]),
     aggregateTests: Number(match[2]),
@@ -68,7 +68,7 @@ function argument(argv, name) {
 }
 
 function main() {
-  const statusPath = argument(process.argv, "status") ?? "docs/status.md";
+  const statusPath = argument(process.argv, "status") ?? "maintainers/status.md";
   const unitTapPath = argument(process.argv, "unit-tap");
   const aggregateTapPath = argument(process.argv, "aggregate-tap");
   const liveSummaryPath = argument(process.argv, "live-summary");

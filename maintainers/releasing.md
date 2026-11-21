@@ -8,8 +8,9 @@ Releases are published by GitHub Actions from an annotated version tag. A laptop
 For a release `X.Y.Z`, all of the following must refer to the same commit and the same package
 bytes:
 
-1. `origin/main` and annotated tag `vX.Y.Z`;
-2. the successful `ci.yml` run queried by commit SHA;
+1. annotated tag `vX.Y.Z`, whose commit is on `origin/main` (its tip at tagging time; `main` may
+   move on before a rerun);
+2. the successful `ci.yml` main push run queried by exactly that commit SHA;
 3. the one tarball created by the release workflow;
 4. both clean consumers, on Node 22.13 and Node 24;
 5. npm `breaklint@X.Y.Z` and its `dist.integrity`;
@@ -83,7 +84,7 @@ and the installed package gains public producer, screen, comparison and report-b
 Configuration Contract 1 remains separate and unchanged. Consumers of Report 3 must migrate when
 adopting 0.5.0;
 source identity, declared provenance and verified original positions are separate fields.
-The screen report is its own version-1 contract and contains no document-page semantics.
+0.5.0 introduced the screen report as its own version-1 contract, with no document-page semantics.
 
 The clean consumers also run `tests/tools/installed-api-contract.mjs` with their own installed
 package: ESM, Node require(ESM), strict TypeScript, a real existing Playwright page and canonical
@@ -91,26 +92,32 @@ report-bundle output. Renderer peers remain optional for screen-only consumers.
 
 ## One-time repository prerequisites
 
-- GitHub repository secret `NPM_TOKEN`, scoped to publishing this package.
-- GitHub Actions allowed to request an OIDC identity token for npm provenance.
+- A trusted publisher for `breaklint` on npmjs.com (package settings): GitHub Actions, owner
+  `godarg`, repository `breaklint`, workflow file name `release.yml`, no environment. npm
+  publishes through it with the job's OIDC identity token; the workflow holds no npm token.
+- GitHub Actions allowed to request an OIDC identity token (`id-token: write` on the publish job).
 - The default branch is `main`; `ci.yml` runs on every push to it.
 
-Never put the npm token in a file, a command-line argument, a log or a Markdown document. The
-workflow passes it as `NODE_AUTH_TOKEN` only to the publish step.
+The publish job configures no token: no repository secret, no `registry-url` in setup-node (it
+would write an `.npmrc` that reads `NODE_AUTH_TOKEN`), `NODE_AUTH_TOKEN` unset in the publish
+step, and an explicit `--registry=https://registry.npmjs.org`. Trusted publishing needs npm
+11.5.1 or later, so that job pins npm (`NPM_VERSION`) and verifies the pin; the clean consumers
+keep the npm their Node ships. `tests/tools/release-workflow-contract.mjs` fails on any token
+configuration in `release.yml`.
 
 ## Before creating the tag
 
 Complete preparation and review on a frozen candidate branch before merging its pull request.
 For 0.10.0, actual human feedback on all ten bound examples is recorded in
-`docs/evaluation-0.10.md`. Round 8 supplies fresh delegated AI surface sight evidence, separate
+`maintainers/evaluation-0.10.md`. Round 8 supplies fresh delegated AI surface sight evidence, separate
 from those human labels. Preserve all
 source, environment, artifact and pixel bindings, including historical failed attempts. The
-0.9.0 completion record in `planning/finish-0.9.md` is historical, not approval of the candidate.
+0.9.0 completion record (kept outside this repository) is historical, not approval of the candidate.
 
-1. **Prepare the candidate:** version all package/workflow references, date the changelog,
-   generate rule documentation and schema, and run the ordered local gates below. Run the
+1. **Prepare the candidate:** version all package/workflow references, head the changelog
+   section `## X.Y.Z — TBD-at-tag` (the date is set in step 5), generate rule documentation and schema, and run the ordered local gates below. Run the
    packed consumers from foreign working directories on Node 22.13 and 24.
-2. **Review the complete report matrix:** follow `docs/reporting.md`, *Review package*.
+2. **Review the complete report matrix:** follow `maintainers/report-review.md`, *Review package*.
    A rostered human or the explicitly delegated AI reviewer must actually inspect every
    assigned PNG, tile and A4 page raster. Append one truthful new ledger round and update
    current review-state prose. A failed or incomplete review stops the release.
@@ -120,8 +127,12 @@ source, environment, artifact and pixel bindings, including historical failed at
    record, audit the declared scope and real gate evidence, and resolve every blocker/high.
    Then `npm run test:report-surfaces:local` must pass on the exact input binding.
 4. **Push and merge the pull request after green CI.** The merge must preserve the candidate's
-   reviewed inputs. Query `ci.yml` on the exact resulting `main` commit and verify success.
-5. **Push a new annotated tag `vX.Y.Z` matching the approved version on that exact commit.** The workflow publishes and verifies
+   reviewed inputs.
+5. **Date the changelog in its own commit on `main`:** replace `TBD-at-tag` with the release
+   date (`## X.Y.Z — YYYY-MM-DD`) and change nothing else; `CHANGELOG.md` is not a review input.
+   Push it to `main`, query `ci.yml` on exactly that commit and verify success.
+6. **Push a new annotated tag `vX.Y.Z` matching the approved version on that dated commit, and on
+   no other.** The workflow publishes and verifies
    registry integrity, provenance and release assets. Measure those service results before
    recording publication or updating consumers and the live website.
 
@@ -172,7 +183,7 @@ npm i "$repo/$tgz" --no-audit --no-fund
 npx breaklint --version                                  # prints the package.json version
 npx breaklint --demo > demo.out; echo "exit $?"          # exit 1
 node "$repo/tests/tools/readme-demo-contract.mjs" --consumer .
-node "$repo/tests/tools/docs-truth.mjs" --package node_modules/breaklint --pending "$repo/tests/tools/docs-truth-pending.jsonl"
+node "$repo/tests/tools/docs-truth.mjs" --package node_modules/breaklint --pending "$repo/tests/tools/docs-truth-pending.jsonl" --maintainers "$repo/maintainers"
 node "$repo/tests/tools/installed-config-contract.mjs"
 npm i --no-audit --no-fund --save-exact pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.16.0
 node "$repo/tests/tools/real-document-gate.mjs" --cli "$PWD/node_modules/breaklint/dist/cli/index.js" --cwd "$PWD"
@@ -192,32 +203,40 @@ red when the bound inputs changed and no authorized reviewer reviewed the new ar
 refresh its ledger as release ceremony. A real later review is a new round with its actual
 reviewers, date and outcome — `pass` or `fail`. A passing latest round must cover every cell and
 bind the current input fingerprint, declared environment, rendered artifacts, screen RGBA hashes
-and complete physical inventory. `assessHumanGate` remains human-only: only `@Brand`, `@Neo` or
-`@Founder` can pass it. An ordinary `agent` entry never passes a cell.
+and complete physical inventory. `assessRosterGate` passes only the rostered reviewer handles `@Brand`, `@Neo` or
+`@Founder`. A handle is a role in the maintainer's workflow, which an agent may operate; a pass under
+it is not evidence that a person reviewed. An ordinary `agent` entry never passes a cell.
 
 Ledger schema 6 additionally permits `kind: "delegated-ai"` for a sight review explicitly
 delegated by the Founder for that release. The round carries `founder: "@Founder"`, the date,
-verbatim session quote, a concrete stable release version (for example `release: "0.10.0"`)
-and `revoked: false`. A version field records the scope of the actual session authorization;
+a concrete stable release version (for example `release: "0.10.0"`) and `revoked: false`.
+Rounds 1–9 also carry the verbatim session quote (`sessionQuote`) and stay as recorded. From
+round 10 on, the public ledger carries no quote: `sessionQuoteSha256` is the SHA-256 of the
+verbatim quote and `statement` is exactly `release-specific delegation recorded`; a round 10 or
+later with a `sessionQuote`, another statement or no hash is refused. A version field records the scope of the actual session authorization;
 it cannot grant authorization. The strict sight gate requires the latest delegated round's
 release to equal `package.json.version` in the bound review-input root. Historical 0.9.0
 rounds keep their original delegation and bytes; their votes do not approve a later release.
 This version-specific validation uses the existing schema-6 fields without a schema migration.
 The reviewer must have a
-nonhuman handle, a recorded nonUNKNOWN `actual_model`, prompt/output SHA-256 hashes, and a native
-receipt with path, SHA-256 and exact image count. Its closed `receivedImages` entries contain
+handle outside the roster, a recorded nonUNKNOWN `actual_model`, prompt/output SHA-256 hashes, and a native
+receipt with path, SHA-256 and exact image count. Rounds 1–9 committed their full native receipts
+under `tests/golden/report-surfaces/`; those files stay byte-identical to their ledger hashes, and no
+other receipt file may be added there. From round 10 on, the receipt itself (session telemetry)
+stays in the maintainers' evidence store outside this repository, and the ledger binds it as
+`maintainer-evidence:<relative path>` with its SHA-256 and image count. Its closed `receivedImages` entries contain
 exact `{path, sha256}` pairs for **every assigned full screen PNG, every screen tile and every A4
 page PNG**. PDF cells are judged through their complete matching raster sets; the receipt cannot
 substitute a PDF filename for unseen pages. Missing, extra, duplicate or differently hashed images
 refuse the gate. The release operator must extract these bindings from actual native image-read results; a
 planned call or a model's self-reported image count is insufficient. Strict local status reports
-`delegatedAI` for this path and never calls it a human pass. Migrating the schema stamp preserves
+`delegatedAI` for this path and never calls it a rostered pass. Migrating the schema stamp preserves
 every prior round and does not upgrade any old agent entry or invent a new review.
-<!-- human-review-roles: @Brand, @Neo, @Founder -->
+<!-- rostered-reviewer-roles: @Brand, @Neo, @Founder -->
 The roster check proves only that a rostered handle was written into the ledger; it does not
 authenticate a person. Delegated AI model, receipt and image fields likewise bind the recorded
 review to the manifest; the gate does not authenticate a provider identity or independently prove
-image perception. Whether a rostered human really reviewed rests on repository access control
+image perception. Who stands behind a rostered handle rests on repository access control
 and on reviewing the ledger diff before it merges — check who committed it and that the round's
 cells name the artifacts actually rendered — not on this gate.
 
@@ -241,7 +260,7 @@ not happen, which is the one thing this gate exists to prevent. The ledger forma
 (schema 4) could not hold a failed review at all; since schema 5 the 2026-09-18 FAIL is round 2 of
 the ledger itself, marked as a historical reconstruction from this record and carrying only what is
 stated here — date, outcome, scope, finding counts and headline findings, with no reviewer handle,
-per-cell outcome or binding invented after the fact (see `docs/reporting.md`).
+per-cell outcome or binding invented after the fact (see `maintainers/report-review.md`).
 
 **That leaves 0.6.0 in a third state this document did not provide for, and the decision to ship in
 it was taken deliberately.** The release plan for this version pre-registered exactly two
@@ -283,7 +302,7 @@ Round 6 is a fresh review after the measured platform inventory correction; hist
 The green real-document gate reads the rights/privacy-reviewed corpus manifest and binds exact
 artifact hashes, source evidence, page/rule counts and the positive independent geometry-oracle
 sample. Its one-time red condition is preserved in
-`docs/validation/real-document-red-control-v0.2.3.json`; it was produced by installing the signed
+`maintainers/validation/real-document-red-control-v0.2.3.json`; it was produced by installing the signed
 registry package and running
 `BREAKLINT_023_CLI=<0.2.3-package>/dist/cli/index.js npm run test:real-document:red-control` against
 the exact same third-party bytes. It is historical evidence, not a network-dependent release step.
@@ -292,7 +311,7 @@ The pagination-residue record is the negative half of the same property: six rea
 must NOT measure, and must say why — which elements a paginator left in an overflow column, on which
 pages, and by how far. Their bytes are **not in this repository**: they are chapters of a paid
 product, 27 492 of that bundle's 69 017 words, and this repository is public and MIT. What is public
-is a hash-only record in the shape `docs/validation/corpus-contract-v1.md` defines for
+is a hash-only record in the shape `maintainers/validation/corpus-contract-v1.md` defines for
 `private_nonredistributable` material.
 
 **That record is historical, and it is not a release step.** Re-measured on 2026-09-18, five of the
@@ -333,7 +352,7 @@ only.
   version. The changelog half is also checked, by `tests/tools/changelog-contract.mjs` in
   `npm run test:release-tag`: for a version with no tag yet, the first section must be
   `## X.Y.Z — YYYY-MM-DD` or exactly `## X.Y.Z — TBD-at-tag`, no `## Unreleased` section may
-  remain, and `docs/status.md` must not call the version unreleased. At the tag commit — in the
+  remain, and `maintainers/status.md` must not call the version unreleased. At the tag commit — in the
   release workflow, because that commit is what npm serves — only a date is accepted: the
   published 0.6.0 tarball says `## 0.6.0 — unreleased`, and nothing checked it. A `TBD-at-tag`
   that reaches the tag stops the release workflow in its validation job, before anything is
@@ -351,7 +370,7 @@ only.
 ## Publishing
 
 The release-prep commit carries the heading `## X.Y.Z — TBD-at-tag`, because the release date is
-not known when it is written. Steps 5 to 7 of *Before creating the tag* date it, let CI go green
+not known when it is written. Steps 5 and 6 of *Before creating the tag* date it, let CI go green
 on exactly the dated commit, and tag that commit and no other. Create and push the annotated tag
 only then:
 
@@ -379,17 +398,43 @@ The release workflow then:
 6. downloads those same bytes into Node 22.13 and Node 24 clean consumers, which check the installed
    README's demo excerpt and the installed docs' schema stamps against the installed code;
 7. proves the ref is an annotated tag (with a lightweight-tag negative control), then proves
-   tag/version, exact `origin/main` SHA and successful main CI;
-8. publishes that tarball with provenance;
+   tag/version, that the tag commit is on `origin/main` (an ancestor of it or its tip) and that
+   `ci.yml` passed a main push run for exactly that commit, and takes the release notes from the
+   tag commit's own `## X.Y.Z — YYYY-MM-DD` CHANGELOG section;
+8. publishes that tarball with provenance through npm trusted publishing (OIDC), without a token;
 9. waits until npm exposes the version, compares `dist.integrity`, binds the package digest and Git
    commit through the signed SLSA provenance, runs npm signature verification and installs the
    registry version in a final consumer;
-10. creates the GitHub Release with the tarball and both identity records attached.
+10. creates the GitHub Release with the tarball and both identity records attached, or completes
+    or verifies the one an earlier attempt left (see *Recovery*).
 
-Do not rerun a partially successful publish blindly: npm versions are immutable. Inspect the npm
-version, workflow logs and GitHub Release first. If npm already serves `X.Y.Z` but a post-publish
-verification failed, repair the release metadata or publish a new patch version; never move the tag
-or overwrite evidence to make the old run look green.
+### Recovery
+
+A failed release run is repaired by rerunning its failed jobs, never by moving the tag:
+
+```bash
+gh run rerun <run-id> --failed
+```
+
+That works while three things hold: the run's package artifact still exists (it is kept for
+**7 days**: `retention-days: 7` in `release.yml`; `gh api repos/godarg/breaklint/actions/runs/<run-id>/artifacts`
+shows `expires_at`), the tag commit is still on `main`, and `ci.yml` has a successful main push
+run for that commit. After the 7 days a rerun of only the failed jobs cannot download the validated
+bytes; a full rerun would pack new bytes for a version whose old bytes may already be signed, so the
+way out is then a new patch release. The decisions a rerun makes live in
+`tests/tools/release-recovery.mjs` (self-test in `npm run test:release-tag`):
+
+- **npm:** no such version (E404) → publish. The version exists → its `dist.integrity` and signed
+  provenance must bind these bytes and this commit, with the attestation lookup retried for five
+  minutes; otherwise the run fails. A lookup failure other than E404 never becomes a publish.
+- **GitHub Release:** none → create it. A draft (an interrupted `gh release create`) → assets it
+  has are compared byte for byte with the validated artifact, only the missing ones are uploaded,
+  then it is published. A published release → every asset must be present and byte-identical.
+  Any difference, foreign asset or other tag fails the run; nothing is overwritten or deleted.
+
+npm versions are immutable. If npm already serves `X.Y.Z` with other bytes, or its provenance does
+not bind this commit, inspect it by hand and publish a new patch version; never move the tag or
+overwrite evidence to make the old run look green.
 
 `npm publish <tarball>` does not populate the legacy `gitHead` registry field. The authoritative
 source binding for this release route is therefore the signed SLSA statement: its package subject

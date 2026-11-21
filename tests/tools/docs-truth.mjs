@@ -53,10 +53,28 @@
  * what to do; with an empty one every mention is checked with no exception. Pull requests keep
  * accepting pending entries; tags do not — the same rule as `TBD-at-tag` in the changelog.
  *
+ * TWO MORE KINDS OF STALE SENTENCE, checked in the shipped documents only:
+ *   - a release-status sentence that is true only before a tag — "pending candidate review",
+ *     "pending … tagging" — fails, because the README ships to npm with the tag and would then say
+ *     the version it belongs to is not yet tagged (it did, at 0.11.0);
+ *   - an install command (`npm i`, `npm install`, `pnpm add`, `yarn add`) that names a peer
+ *     (`puppeteer-core`, `pagedjs`, `pdfjs-dist`) with a version the package's own
+ *     `peerDependencies` does not declare fails: a caret spec must denote exactly the declared range,
+ *     an exact version must lie inside it, and a peer named without a version fails too.
+ * The oracle for the second is the `package.json` of the package under test, never this file.
+ * Also in the shipped documents: every versioned link or Action ref into this repository must name
+ * `v<package version>` (never `main`), and the shipped documents and CHANGELOG.md must name no
+ * review persona, no "Founder", no rostered review called human and no internal system name.
+ *
+ * `--maintainers <dir>` adds every Markdown file under that directory (the repository's
+ * `maintainers/`, which npm does not ship) to the stamp check, so a moved page cannot go stale
+ * unseen. Status and install-command checks stay on the shipped documents.
+ *
  * KNOWN LIMITS, accepted: the history grammar is a heuristic over English. A sentence can take one
  * of its forms and still be false ("Live reports have used Report 4 since 0.5.0" passes form 3a),
- * and a stamp named in a shape no pattern reads — "schema version 4", "v4 reports", a number in a
- * code block — is not seen at all. What it does guarantee is that a stale current-state sentence in
+ * and a stamp named in a shape no pattern reads — "v4 reports", a number in a code block — is not
+ * seen at all. "schema version 4" and "a version-4 contract" are read, with the kind of the nearest
+ * kind word before them. What it does guarantee is that a stale current-state sentence in
  * the shapes these documents actually use fails, and that every exception is visible in its text.
  */
 
@@ -155,10 +173,13 @@ const KIND_WORDS = [
 
 /** The kind a bare "schema N" belongs to: the nearest kind word before it, in its unit or paragraph. */
 function kindBefore(text, index) {
+  // Nearest by where the kind word ENDS: "screen report" ends where its "report" ends, and the
+  // tie keeps the earlier, more specific entry of KIND_WORDS, so it reads as a screen report.
   let best = null;
   for (const { kind, pattern } of KIND_WORDS) {
     for (const match of text.slice(0, index).matchAll(pattern)) {
-      if (!best || match.index > best.index) best = { kind, index: match.index };
+      const end = match.index + match[0].length;
+      if (!best || end > best.end) best = { kind, end };
     }
   }
   return best?.kind ?? null;
@@ -189,10 +210,15 @@ function mentionsIn(unit, paragraph, unitOffset) {
       add(kind, Number(match[1]), at, match.index);
     }
   }
-  for (const match of unit.matchAll(/\bschema[- ](\d+)\b/giu)) {
-    const at = match.index + match[0].length - match[1].length;
-    if (taken.has(at)) continue;
-    add(kindBefore(paragraph, unitOffset + match.index) ?? kindBefore(unit, match.index), Number(match[1]), at, match.index);
+  // Bare stamps whose kind is the nearest kind word before them: "schema 2", "schema version 2",
+  // "a version-1 contract" (the DOC-1 sentence "The screen report is its own version-1 contract").
+  for (const re of [/\bschema[- ](\d+)\b/giu, /\bschema\s+version[- ]?(\d+)\b/giu, /\b(?:version|v)[- ]?(\d+)(?=[- ]contract\b)/giu]) {
+    for (const match of unit.matchAll(re)) {
+      const at = match.index + match[0].length - match[1].length;
+      if (taken.has(at)) continue;
+      taken.add(at);
+      add(kindBefore(paragraph, unitOffset + match.index) ?? kindBefore(unit, match.index), Number(match[1]), at, match.index);
+    }
   }
   // Contract tables: `| Document report | 5 | … |`.
   const row = /^\|\s*([^|]+?)\s*\|\s*`?(\d+)`?\s*(?:each\s*)?\|/u.exec(unit);
@@ -328,6 +354,177 @@ export function scanText(file, text, stamps) {
   return scanIssues(file, text, stamps).map((issue) => issue.message);
 }
 
+/** Release-status sentences that are true only before a tag, and must not ship with one. */
+const STALE_STATUS = [
+  { re: /\bpending\s+candidate\s+review\b/iu, label: "pending candidate review" },
+  { re: /\bpending\b[^.\n]{0,80}?\btagging\b/iu, label: "pending … tagging" },
+];
+
+/** Stale release-status sentences in one shipped document. */
+export function statusIssues(file, text) {
+  const issues = [];
+  for (const { unit, line } of unitsOf(text)) {
+    for (const { re, label } of STALE_STATUS) {
+      if (re.test(unit)) issues.push(`${file}:${line}: says "${label}", a release status that is false once the version is tagged and shipped: ${unit.trim()}`);
+    }
+  }
+  return issues;
+}
+
+/**
+ * Links and Action refs into this repository that name a version must name the package's own tag.
+ * npm resolves relative links against the default branch, so shipped pages link absolutely; a
+ * link to `main` moves away from the version it was written for, and a link to an older tag keeps
+ * a superseded page in front of the reader.
+ */
+const REPOSITORY_REF = /(?:github\.com\/godarg\/breaklint\/(?:blob|tree)\/|raw\.githubusercontent\.com\/godarg\/breaklint\/|\bgodarg\/breaklint@)(main|master|v\d+\.\d+\.\d+)(?![\w.-])/gu;
+
+export function pinIssues(file, text, packageVersion) {
+  const issues = [];
+  const wanted = `v${packageVersion}`;
+  for (const [index, line] of text.replace(/\r\n/gu, "\n").split("\n").entries()) {
+    for (const match of line.matchAll(REPOSITORY_REF)) {
+      if (match[1] !== wanted) issues.push(`${file}:${index + 1}: links to ${match[0]}, but a shipped page of ${packageVersion} must pin ${wanted}`);
+    }
+  }
+  return issues;
+}
+
+/**
+ * Names that belong to the maintainer's own organisation, and review roles stated as people, in
+ * any file npm ships with the package — CHANGELOG.md included. A rostered review role is a role,
+ * whoever or whatever holds it; calling its pass "human" claims what the ledger cannot show.
+ */
+const INTERNAL_NAMES = [
+  { re: /@(?:Neo|Brand|Prog|Fin|Doc|Sci|Mark|Ops|Founder)\b/u, label: "a review persona handle" },
+  { re: /\bFounder\b/u, label: "\"Founder\" (say: the maintainer)" },
+  { re: /\bhuman\s+(?:pass|gate)\b|\brostered\s+human\b/iu, label: "a rostered review called human" },
+  { re: /\bDargel\b/u, label: "the maintainer's business name" },
+  { re: /\bDS_OS\b|\bkleingewerbe\b|\bDigital Product Studio\b/iu, label: "an internal system name" },
+];
+
+export function internalNameIssues(file, text) {
+  const issues = [];
+  for (const [index, line] of text.replace(/\r\n/gu, "\n").split("\n").entries()) {
+    for (const { re, label } of INTERNAL_NAMES) {
+      if (re.test(line)) issues.push(`${file}:${index + 1}: names ${label} in a shipped file: ${line.trim()}`);
+    }
+  }
+  return issues;
+}
+
+/**
+ * The code ships too: `dist/**` carries the comments of `src/**` (tsc keeps them, in `.js` and in
+ * `.d.ts`). There a comment may additionally not name the model that took part in a review or a
+ * maintainer register id: neither tells a user anything, and both were in 0.10.0's `dist/`.
+ */
+const COMMENT_ONLY_NAMES = [
+  { re: /\b(?:Gemini|Codex|Grok|Opus|Sonnet|Claude|Anthropic|OpenAI|ChatGPT|GPT-?\d)\b/iu, label: "an AI model or vendor" },
+  { re: /\b(?:G|CDX|ADR)-\d{2,4}\b|\b(?:CODE|VALUE|DOC|COMP)-[A-Z]+-\d+\b/u, label: "a maintainer register id" },
+];
+
+/**
+ * The comment text of a TypeScript or JavaScript file, line by line, with every other character
+ * blanked so line numbers stay true. Deliberately conservative: it does not parse strings or regex
+ * literals, so a `/*` or `//` inside one opens a "comment" too. That can only make it read MORE
+ * text than the comments, never less; `://` (a URL) is not taken for a line comment.
+ */
+export function commentLines(text) {
+  const source = text.replace(/\r\n/gu, "\n");
+  const kept = source.replace(/[^\n]/gu, " ").split("");
+  for (const match of source.matchAll(/\/\*[\s\S]*?(?:\*\/|$)|(?<![:\\])\/\/[^\n]*/gu)) {
+    for (let i = 0; i < match[0].length; i += 1) kept[match.index + i] = match[0][i];
+  }
+  return kept.join("").split("\n");
+}
+
+export function sourceCommentIssues(file, text) {
+  const issues = [];
+  for (const [index, line] of commentLines(text).entries()) {
+    for (const { re, label } of [...INTERNAL_NAMES, ...COMMENT_ONLY_NAMES]) {
+      if (re.test(line)) issues.push(`${file}:${index + 1}: a code comment names ${label} in a shipped file: ${line.trim()}`);
+    }
+  }
+  return issues;
+}
+
+/** Every `.ts` under src/ and every `.js`/`.d.ts` under dist/ that exists in `packageDir`. */
+export function shippedCodeFiles(packageDir) {
+  const root = resolve(packageDir);
+  const walk = (dir, accept) => !existsSync(dir) ? [] : readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) return walk(path, accept);
+    return entry.isFile() && accept(entry.name) ? [path] : [];
+  });
+  return [...walk(join(root, "src"), (name) => name.endsWith(".ts")), ...walk(join(root, "dist"), (name) => name.endsWith(".js") || name.endsWith(".d.ts"))].sort();
+}
+
+const PEERS = ["puppeteer-core", "pagedjs", "pdfjs-dist"];
+const INSTALL = /\b(?:npm\s+(?:i|install|add)|pnpm\s+(?:add|i|install)|yarn\s+add)\b/u;
+
+function version(text) {
+  const match = /^(\d+)(?:\.(\d+))?(?:\.(\d+))?$/u.exec(text.trim());
+  return match ? [Number(match[1]), Number(match[2] ?? 0), Number(match[3] ?? 0)] : null;
+}
+
+function compare(a, b) {
+  for (let i = 0; i < 3; i += 1) if (a[i] !== b[i]) return a[i] - b[i];
+  return 0;
+}
+
+/** A declared or written version spec as an interval [min, max), max null = exactly min. */
+export function specInterval(spec) {
+  const text = spec.trim();
+  const exact = version(text);
+  if (exact && /^\d+\.\d+\.\d+$/u.test(text)) return { min: exact, max: null };
+  const caret = /^\^(\d+\.\d+\.\d+)$/u.exec(text);
+  if (caret) {
+    const min = version(caret[1]);
+    const max = min[0] > 0 ? [min[0] + 1, 0, 0] : min[1] > 0 ? [0, min[1] + 1, 0] : [0, 0, min[2] + 1];
+    return { min, max };
+  }
+  const range = /^>=\s*(\d+(?:\.\d+){0,2})\s+<\s*(\d+(?:\.\d+){0,2})$/u.exec(text);
+  if (range) return { min: version(range[1]), max: version(range[2]) };
+  return null;
+}
+
+function sameInterval(a, b) {
+  return compare(a.min, b.min) === 0 && (a.max === null ? b.max === null : b.max !== null && compare(a.max, b.max) === 0);
+}
+
+function inside(point, range) {
+  if (range.max === null) return compare(point, range.min) === 0;
+  return compare(point, range.min) >= 0 && compare(point, range.max) < 0;
+}
+
+/**
+ * Install commands in one shipped document that name a peer with a version the package does not
+ * declare. `peers` is the `peerDependencies` object of the package under test.
+ */
+export function peerCommandIssues(file, text, peers) {
+  const issues = [];
+  const lines = text.replace(/\r\n/gu, "\n").split("\n");
+  for (const [index, line] of lines.entries()) {
+    if (!INSTALL.test(line)) continue;
+    for (const name of PEERS) {
+      const declared = peers?.[name];
+      if (typeof declared !== "string") continue;
+      const wanted = specInterval(declared);
+      if (!wanted) { issues.push(`${file}:${index + 1}: package.json declares ${name} as "${declared}", which this check cannot read`); continue; }
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+      for (const match of line.matchAll(new RegExp(String.raw`(?<![\w@/-])${escaped}(?:@([^\s` + "`" + String.raw`'"),;]+))?(?=[\s` + "`" + String.raw`'"),;]|$)`, "gu"))) {
+        const spec = match[1]?.replace(/^["']|["']$/gu, "");
+        const written = spec ? specInterval(spec) : null;
+        const ok = written !== null && (written.max === null ? inside(written.min, wanted) : sameInterval(written, wanted));
+        if (!ok) {
+          issues.push(`${file}:${index + 1}: installs ${name}${spec ? `@${spec}` : " without a version"}, but package.json declares the peer range "${declared}": ${line.trim()}`);
+        }
+      }
+    }
+  }
+  return issues;
+}
+
 function markdownUnder(dir) {
   if (!existsSync(dir)) return [];
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -347,16 +544,37 @@ export function shippedDocuments(packageDir) {
  * documents. They differ only in the unit suite, which builds `dist/` into a staging directory and
  * reads the repository's own documents.
  */
-export function checkDocsTruth({ packageDir, docsRoot = packageDir, extra = [], pending = [], stamps = currentStamps(packageDir) }) {
+export function checkDocsTruth({ packageDir, docsRoot = packageDir, extra = [], maintainers = null, pending = [], stamps = currentStamps(packageDir) }) {
   const root = resolve(docsRoot);
-  const files = [...shippedDocuments(root), ...extra.map((path) => resolve(path))];
+  const shipped = shippedDocuments(root);
+  const maintainerDocs = maintainers ? markdownUnder(resolve(maintainers)) : [];
+  const files = [...shipped, ...extra.map((path) => resolve(path)), ...maintainerDocs];
   const issues = [];
+  if (maintainers && maintainerDocs.length === 0) issues.push(`--maintainers ${maintainers} holds no Markdown file; nothing there was checked`);
+  const manifest = JSON.parse(readFileSync(join(resolve(packageDir), "package.json"), "utf8"));
+  const peers = manifest.peerDependencies ?? {};
+  for (const path of shipped) {
+    const text = readFileSync(path, "utf8");
+    const name = relative(root, path);
+    issues.push(...statusIssues(name, text), ...peerCommandIssues(name, text, peers), ...pinIssues(name, text, manifest.version));
+  }
+  // The changelog ships too. Its entries state changes, so it is exempt from the stamp grammar,
+  // but not from the names a user has no use for.
+  for (const path of [...shipped, join(root, "CHANGELOG.md")].filter((file) => existsSync(file))) {
+    issues.push(...internalNameIssues(relative(root, path), readFileSync(path, "utf8")));
+  }
+  // The installed package carries dist/; a source checkout carries src/. Whichever is there is read.
+  for (const path of shippedCodeFiles(packageDir)) {
+    issues.push(...sourceCommentIssues(relative(resolve(packageDir), path), readFileSync(path, "utf8")));
+  }
   // One entry absorbs exactly one issue: same file, kind, number and exact sentence.
   const pendingLeft = new Set(pending.map((_, i) => i));
   let scanned = 0;
   for (const path of files) {
     const text = readFileSync(path, "utf8");
-    const name = path.startsWith(root) ? relative(root, path) : path;
+    const name = maintainers && path.startsWith(resolve(maintainers))
+      ? join("maintainers", relative(resolve(maintainers), path))
+      : path.startsWith(root) ? relative(root, path) : path;
     scanned += 1;
     for (const issue of scanIssues(name, text, stamps)) {
       const match = [...pendingLeft].find((i) => {
@@ -384,7 +602,7 @@ function readPending(file) {
   return file ? readFileSync(file, "utf8").split("\n").filter((line) => line.trim()).map((line) => JSON.parse(line)) : [];
 }
 
-const USAGE = "usage: docs-truth.mjs --package <package-dir> [--docs-root <dir>] [--extra <file> ...] [--pending <jsonl>] [--release]\n";
+const USAGE = "usage: docs-truth.mjs --package <package-dir> [--docs-root <dir>] [--extra <file> ...] [--maintainers <dir>] [--pending <jsonl>] [--release]\n";
 
 /**
  * Arguments are parsed strictly: `--release=no`, `--release-dry` or `--Release` are not a quieter
@@ -393,7 +611,7 @@ const USAGE = "usage: docs-truth.mjs --package <package-dir> [--docs-root <dir>]
  */
 function parseArgs(args) {
   const options = { extra: [], release: false };
-  const single = { "--package": "package", "--docs-root": "docsRoot", "--pending": "pending" };
+  const single = { "--package": "package", "--docs-root": "docsRoot", "--pending": "pending", "--maintainers": "maintainers" };
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
     if (arg === "--release") {
@@ -438,7 +656,11 @@ function main(args) {
     );
     return 1;
   }
-  const result = checkDocsTruth({ packageDir, docsRoot: options.docsRoot ?? packageDir, extra: options.extra, pending: release ? [] : pending });
+  if (options.maintainers !== undefined && !statSync(options.maintainers, { throwIfNoEntry: false })?.isDirectory()) {
+    process.stderr.write(`docs-truth.mjs: --maintainers ${options.maintainers} is not a directory\n${USAGE}`);
+    return 2;
+  }
+  const result = checkDocsTruth({ packageDir, docsRoot: options.docsRoot ?? packageDir, extra: options.extra, maintainers: options.maintainers ?? null, pending: release ? [] : pending });
   const { stamps } = result;
   const summary = `report ${stamps.report} (reads ${stamps.readable.join(", ")}), snapshot ${stamps.snapshot}, screen ${stamps.screen} (reads ${stamps.readableScreens.join(", ")}), context pack ${stamps.context}, comparison ${stamps.comparison}, configuration contract ${stamps.config}`;
   if (!result.valid) {

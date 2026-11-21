@@ -192,8 +192,8 @@ export async function awaitStableLayout(deps: StabilityDeps): Promise<StabilityO
  *
  * The load-bearing geometry, resource, bitmap and text primitives used here are references captured
  * BEFORE any author script could run (see `src/measure/primitives.ts`), so a document that overwrites `Element.prototype
- * .getBoundingClientRect` cannot feed this synthetic numbers. That is Gemini's A3 finding, taken
- * as far as it goes: the geometry a spot-check can cross-examine is cross-examined out of process
+ * .getBoundingClientRect` cannot feed this synthetic numbers. That answers finding A3 of an external
+ * design review, taken as far as it goes: the geometry a spot-check can cross-examine is cross-examined out of process
  * against CDP, and the parts that must run in the page say so rather than pretending otherwise.
  */
 const FREEZE_CAPABILITY_MARKER = "__BREAKLINT_NODE_CAPABILITY__";

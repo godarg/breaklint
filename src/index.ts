@@ -19,9 +19,9 @@ export { checkPage } from "./api/check-page.ts";
 export { SCREEN_OPTIONS_SCHEMA } from "./web/options.ts";
 export { SCREEN_REPORT_SCHEMA_VERSION, READABLE_SCREEN_REPORT_SCHEMA_VERSIONS } from "./web/types.ts";
 export type {
-  StructuralPage, CheckPageOptions, PublicScreenReport, ScreenCheckResult,
+  StructuralPage, CheckPageOptions, PublicScreenReport, PublicScreenReportV1, ReadableScreenReport, ScreenExceptionCountV1, ScreenCheckResult,
   ScreenTargetEvaluation, ScreenFinding, ScreenInfrastructureEvent, ScreenArtifact,
-  ScreenCoverage, NamedScreenException, ScreenRuleId, ScreenOptInRules,
+  ScreenCoverage, NamedScreenException, ScreenRuleId, ScreenOptInRules, ScreenFailOn,
   ScreenDriftDetail, HostBuildContainerBinding, HostBuildContainer,
 } from "./web/types.ts";
 export type { DocumentFontIdentity } from "./core/types.ts";

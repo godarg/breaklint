@@ -228,14 +228,18 @@ const OVERLAY_TEMPLATE = `(() => {
           // relativeY + 1 > areaBox.height in the final 1 px above areaBox.bottom because the mark
           // glyph is 1 px tall. That 1 px envelope stays inside the physical sheet whenever
           // y + 1 <= pageBox.bottom, and is still checked against the actual PDF later.
-          // A continuation container's end edge or a zero-height split wrapper may also sit within
-          // 0.5 px sub-pixel rounding of areaBox.bottom. Never extend either allowance to the
-          // footnote area (G-100); genuine overflow below areaBox.bottom + 0.5 stays refused.
+          // Separately, a fragment Paged.js split at this page (data-split-to on the fragment
+          // that continues; data-split-from/-to on a zero-height split wrapper) may end within
+          // 0.5 px sub-pixel rounding BELOW areaBox.bottom. That rounding allowance needs the
+          // split evidence: an ordinary end edge past the area is an overflow. Never extend
+          // either allowance to the footnote area.
           const notInFootnote = P.closest(el, ".pagedjs_footnote_area") === null;
-          const atAreaBottom = Math.abs(y - areaBox.bottom) <= 0.5;
+          const withinRounding = y > areaBox.bottom && y - areaBox.bottom <= 0.5;
+          const splitTo = P.hasAttr(el, "data-split-to");
+          const splitWrapper = rect.height === 0 && (splitTo || P.hasAttr(el, "data-split-from"));
+          const provenSplitEdge = side === "end" ? (splitTo || splitWrapper) : splitWrapper;
           const observedAreaEdge = notInFootnote && y + 1 <= pageBox.bottom && (
-            y <= areaBox.bottom ||
-            (atAreaBottom && (side === "end" || (side === "start" && rect.height === 0)))
+            y <= areaBox.bottom || (withinRounding && provenSplitEdge)
           );
           if (
             x < pageBox.left || x + maxAdvance > pageBox.right || y < pageBox.top || y > pageBox.bottom ||

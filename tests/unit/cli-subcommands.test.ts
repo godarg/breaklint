@@ -37,7 +37,10 @@ describe("Paket 3: CLI subcommands (compare, context, bundle)", () => {
 
       // 1. compare
       const cmp = runCli(["compare", beforePath, afterPath, "--out", cmpPath], dir);
-      assert.equal(cmp.status, 0, `${cmp.stdout}${cmp.stderr}`);
+      // The fixture's findings carry no stable identity, so every result is "unmatchable": since
+      // 0.11.1 that is exit 4 (findings exist, none can be matched), with the comparison still
+      // written. tests/unit/cli-subcommand-contract.test.ts pins the full exit contract.
+      assert.equal(cmp.status, 4, `${cmp.stdout}${cmp.stderr}`);
       const parsedCmp = JSON.parse(readFileSync(cmpPath, "utf8")) as { beforeRunId: string; afterRunId: string; results: unknown[] };
       assert.equal(parsedCmp.beforeRunId, before.runId);
       assert.equal(parsedCmp.afterRunId, after.runId);

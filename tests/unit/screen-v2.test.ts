@@ -48,6 +48,9 @@ describe("Paket 2: CSS Color 4 alpha parser", () => {
     assert.equal(parseCssColorAlpha("rgb(foo bar baz)"), null);
     assert.equal(parseCssColorAlpha("oklch(not a color)"), null);
     assert.equal(parseCssColorAlpha("color(srgb foo bar baz / 0.5)"), null);
+    // An angle is only a hue (CDX-10): never an RGB channel.
+    assert.equal(parseCssColorAlpha("rgb(10deg 20 30)"), null);
+    assert.equal(parseCssColorAlpha("hsl(120deg 40% 50%)"), 1);
   });
 });
 
@@ -126,10 +129,10 @@ describe("Paket 2: screen capture drift diff & schemaVersion 2 context/bundle co
     const baseTarget = {
       selector: "#card", domPath: "html:nth-child(1)>body:nth-child(2)>div:nth-child(1)", tag: "div", id: "card", className: "",
       textLength: 5, directTextSha256: "abc", hasDirectText: true, isSvg: false, isSvgText: false, isInteractiveControl: false, siblingEligible: true,
-      fontSizePx: 16, siblingOverlapPx: 0, svgTextOverflowPx: 0, paintSignature: "p1", ancestorSignatureComplete: true,
+      fontSizePx: 16, siblingOverlapPx: 0, svgTextOverflowPx: 0, svgClipped: false, svgInterior: false, paintSignature: "p1", ancestorSignatureComplete: true,
       box: { x: 0, y: 0, width: 100, height: 40 }, coordinateSystem: "css-viewport-pixels" as const,
       state: "candidate" as const, reason: null, paint: null, transform: null, clipped: "none" as const,
-      horizontalOverflow: 0, allowedScroll: false, overlay: false, sourceContainer: null, scroll: { x: 0, y: 0 },
+      horizontalOverflow: 0, allowedScroll: false, clipByAllowed: false, svgViewportCut: false, overlay: false, sourceContainer: null, scroll: { x: 0, y: 0 },
     };
     const first = {
       signature: { url: "http://127.0.0.1/", viewport: [640, 400, 1] as [number, number, number], scroll: [0, 0] as [number, number], document: [640, 400, 640, 400, 2] as [number, number, number, number, number], fonts: "loaded" },
@@ -142,6 +145,24 @@ describe("Paket 2: screen capture drift diff & schemaVersion 2 context/bundle co
     const diff = computeScreenDriftDetails(first, second, "post-screenshot");
     assert.equal(diff.some((d) => d.field === "scroll" && d.phase === "post-screenshot"), true);
     assert.equal(diff.some((d) => d.field === "box" && d.selector === "#card" && d.before === "0,0,100x40" && d.after === "0,0,220x40"), true);
+  });
+
+  it("records a text change as a marker with lengths, never as a digest of the text", () => {
+    const target = {
+      selector: "#bal", domPath: "html:nth-child(1)>body:nth-child(2)>p:nth-child(1)", tag: "p", id: "bal", className: "",
+      textLength: 20, directTextSha256: sha("Balance: 1234.56 EUR"), hasDirectText: true, isSvg: false, isSvgText: false, isInteractiveControl: false, siblingEligible: false,
+      fontSizePx: 16, siblingOverlapPx: 0, svgTextOverflowPx: 0, svgClipped: false, svgInterior: false, paintSignature: "p1", ancestorSignatureComplete: true,
+      box: { x: 0, y: 0, width: 100, height: 20 }, coordinateSystem: "css-viewport-pixels" as const,
+      state: "candidate" as const, reason: null, paint: null, transform: null, clipped: "none" as const,
+      horizontalOverflow: 0, allowedScroll: false, clipByAllowed: false, svgViewportCut: false, overlay: false, sourceContainer: null, scroll: { x: 0, y: 0 },
+    };
+    const signature = { url: "http://127.0.0.1/", viewport: [640, 400, 1] as [number, number, number], scroll: [0, 0] as [number, number], document: [640, 400, 640, 400, 3] as [number, number, number, number, number], fonts: "loaded" };
+    const diff = computeScreenDriftDetails(
+      { signature, targets: [target] },
+      { signature, targets: [{ ...target, directTextSha256: sha("Balance: 1299.00 EUR") }] },
+      "post-screenshot",
+    );
+    assert.deepEqual(diff, [{ phase: "post-screenshot", field: "text", selector: "#bal", before: 20, after: 20 }]);
   });
 
   it("reads schemaVersion 2 screen reports in createContextPack and renderReport", () => {
@@ -202,15 +223,18 @@ describe("Paket 2: screen capture drift diff & schemaVersion 2 context/bundle co
       assert.ok(svgHtml.includes("&lt;text&gt;"), "screen repair text must HTML-escape <text>");
       assert.equal(svgHtml.includes("rendered <text> bounding box"), false, "raw <text> tag must not appear in HTML");
 
-      // Malicious string injected into a numeric viewport field must be HTML-escaped.
+      // Malicious string injected into a numeric viewport field must never reach the HTML as
+      // markup. Since 0.11.1 a numeric field is shown only when it is a finite number (C6), so the
+      // string is replaced by "unavailable" rather than shown escaped.
       const xssReport = {
         ...svgReport,
         scope: { ...svgReport.scope, viewport: { ...svgReport.scope.viewport, width: "<b>injected</b>" as unknown as number } },
       };
       const xssBundle = writeReportBundle(xssReport, { outDir: bundleDir });
       const xssHtml = readFileSync(xssBundle.htmlPath, "utf8");
-      assert.ok(xssHtml.includes("&lt;b&gt;injected&lt;/b&gt;"));
+      assert.match(xssHtml, /<dt>Viewport<\/dt><dd>unavailable×\d+<\/dd>/u);
       assert.equal(xssHtml.includes("<b>injected</b>"), false);
+      assert.equal(xssHtml.includes("injected"), false, "the non-numeric viewport value must not be shown at all");
 
       // Failed bundle write (mismatched comparison) must NOT overwrite existing report.json on disk.
       const priorReportJson = readFileSync(join(bundleDir, "report.json"), "utf8");

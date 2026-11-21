@@ -18,7 +18,17 @@
  *      pins in their own named positions (`<package>@X.Y.Z` for a package other than breaklint,
  *      `GITLEAKS_VERSION:` and Node versions). Everything else derives from the trigger at run
  *      time through `--derive-env`, so there is nothing left to forget;
- *   4. every job that reads `RELEASE_VERSION` or `PACKAGE_FILE` derives them first.
+ *   4. every job that reads `RELEASE_VERSION` or `PACKAGE_FILE` derives them first;
+ *   5. npm trusted publishing (OIDC) is the only credential the workflow can publish with: no
+ *      repository secret, no NODE_AUTH_TOKEN except its `unset`, no `registry-url` in the publish
+ *      job (setup-node would write an .npmrc that reads NODE_AUTH_TOKEN), one `npm publish` that
+ *      names the registry explicitly after unsetting the variable, and an npm >= 11.5.1 pinned and
+ *      verified in the publish job and nowhere else. On 2026-11-21 the 0.11.0 publish signed its
+ *      provenance through OIDC and then failed the PUT with E404 on an expired token it had fallen
+ *      back to: a tag on GitHub, nothing on npm.
+ *   6. in the publish job, an unconditional step proves with `release-recovery.mjs --assert-on-main`
+ *      that the tag commit is on origin/main before the step that runs npm publish, the step
+ *      that exchanges the job's OIDC token.
  *
  * WHEN IT FAILS. It runs in `npm run test:release-tag` on every CI run. A release-prep commit
  * that moves package.json, the lock and the trigger together passes; a commit that moves only the
@@ -67,6 +77,7 @@ function isThirdPartyPin(line, index) {
   const at = /([@\w./:-]+)@$/u.exec(before);
   if (at) return !/(^|\/)breaklint$/u.test(at[1]);
   if (/^\s*GITLEAKS_VERSION:\s*$/u.test(before)) return true;
+  if (/^\s*NPM_VERSION:\s*$/u.test(before)) return true;
   if (/^\s*node(-version)?:\s*[[\s"',\d.]*$/u.test(before)) return true;
   return false;
 }
@@ -111,6 +122,125 @@ export function jobsOf(lines) {
     else if (jobs.length) jobs.at(-1).lines.push({ number: i + 1, text: line });
   }
   return jobs;
+}
+
+export const NPM_REGISTRY = "https://registry.npmjs.org";
+// docs.npmjs.com/trusted-publishers: OIDC publishing needs npm 11.5.1 or later.
+const TRUSTED_PUBLISHING_NPM = [11, 5, 1];
+const NPM_PIN = /^\s*(?:-\s+)?(?:run:\s*)?npm install -g "npm@\$NPM_VERSION"\s*$/u;
+const NPM_PIN_CHECK = /^\s*(?:-\s+)?(?:run:\s*)?test "\$\(npm -v\)" = "\$NPM_VERSION"\s*$/u;
+const UNSET_TOKEN = /^\s*unset NODE_AUTH_TOKEN\s*$/u;
+const ASSERT_ON_MAIN = 'node tests/tools/release-recovery.mjs --assert-on-main "$release_commit" origin/main';
+
+function atLeast(parts, floor) {
+  for (let i = 0; i < floor.length; i += 1) {
+    if (parts[i] !== floor[i]) return parts[i] > floor[i];
+  }
+  return true;
+}
+
+/**
+ * Item 5 of the header: the publish job authenticates through OIDC and nothing else. Line-based,
+ * like the rest of this file: a step's lines are its executable text, full-line comments dropped.
+ */
+export function publishAuthIssues(lines) {
+  const issues = [];
+  const where = (number) => `${WORKFLOW}:${number}`;
+  for (const [i, raw] of lines.entries()) {
+    const line = executablePart(raw);
+    if (/\bsecrets\./u.test(line)) {
+      issues.push(`${where(i + 1)}: the release workflow reads a repository secret; npm authenticates through OIDC trusted publishing and nothing else: ${raw.trim()}`);
+    }
+    if (/NODE_AUTH_TOKEN/u.test(line) && !UNSET_TOKEN.test(line)) {
+      issues.push(`${where(i + 1)}: NODE_AUTH_TOKEN may only be unset, never set or passed: ${raw.trim()}`);
+    }
+    if (/NPM_TOKEN|_authToken|always-auth|\.npmrc|\bnpm (?:config set|login|adduser|token)\b/u.test(line)) {
+      issues.push(`${where(i + 1)}: token configuration in the release workflow: ${raw.trim()}`);
+    }
+  }
+
+  const jobs = jobsOf(lines);
+  const publishing = jobs.filter((job) => job.lines.some(({ text }) => /\bnpm publish\b/u.test(executablePart(text))));
+  if (publishing.length !== 1) {
+    issues.push(`${WORKFLOW}: exactly one job may run npm publish, found ${publishing.length}`);
+    return issues;
+  }
+  const [job] = publishing;
+  for (const other of jobs) {
+    if (other === job) continue;
+    const pin = other.lines.find(({ text }) => /NPM_VERSION|install -g "?npm@/u.test(executablePart(text)));
+    if (pin) {
+      issues.push(`${where(pin.number)}: job ${other.name} pins npm; the pin belongs to the publish job only, the consumer arms keep the npm their Node ships`);
+    }
+  }
+  const registryUrl = job.lines.find(({ text }) => /^\s*(?:-\s+)?registry-url\s*:/u.test(executablePart(text)));
+  if (registryUrl) {
+    issues.push(
+      `${where(registryUrl.number)}: job ${job.name}: setup-node must not set registry-url; it writes an .npmrc that reads ` +
+        "NODE_AUTH_TOKEN, and npm then falls back to a token when OIDC fails (the 0.11.0 E404)",
+    );
+  }
+  if (!job.lines.some(({ text }) => /^\s*id-token:\s*write\s*$/u.test(executablePart(text)))) {
+    issues.push(`${WORKFLOW}: job ${job.name} lacks permissions id-token: write, without which npm trusted publishing has no identity`);
+  }
+  const versionLine = job.lines.find(({ text }) => /^ {6}NPM_VERSION:/u.test(executablePart(text)));
+  const version = versionLine && /^ {6}NPM_VERSION:\s*"?(\d+)\.(\d+)\.(\d+)"?\s*$/u.exec(executablePart(versionLine.text));
+  if (!version) {
+    issues.push(`${WORKFLOW}: job ${job.name} must pin npm in its job-level env as NPM_VERSION: X.Y.Z`);
+  } else if (!atLeast(version.slice(1).map(Number), TRUSTED_PUBLISHING_NPM)) {
+    issues.push(`${where(versionLine.number)}: job ${job.name} pins npm ${version.slice(1).join(".")}; trusted publishing needs npm >= ${TRUSTED_PUBLISHING_NPM.join(".")}`);
+  }
+
+  const steps = stepsOf(job.lines);
+  const exec = (step) => step.map(({ text }) => executablePart(text));
+  const pinAt = steps.findIndex((step) => exec(step).some((line) => NPM_PIN.test(line)));
+  const publishAt = steps.findIndex((step) => exec(step).some((line) => /\bnpm publish\b/u.test(line)));
+  if (pinAt === -1) {
+    issues.push(`${WORKFLOW}: job ${job.name} must pin npm with npm install -g "npm@$NPM_VERSION" before npm publish`);
+  } else {
+    if (pinAt > publishAt) issues.push(`${where(steps[pinAt][0].number)}: job ${job.name} must pin npm before npm publish, not after it`);
+    if (!exec(steps[pinAt]).some((line) => NPM_PIN_CHECK.test(line))) {
+      issues.push(`${where(steps[pinAt][0].number)}: job ${job.name} must verify the pinned npm with test "$(npm -v)" = "$NPM_VERSION"`);
+    }
+    for (const { key, number } of conditionKeys(steps[pinAt])) {
+      issues.push(`${where(number)}: job ${job.name}: the npm pin must be unconditional; it carries ${key}:`);
+    }
+  }
+  if (publishAt === -1) {
+    issues.push(`${WORKFLOW}: job ${job.name} runs npm publish outside a step this contract can read`);
+    return issues;
+  }
+  // The job holds id-token: write from its first step; npm publish is what exchanges it. That
+  // exchange must come after the proof that the tag commit is on origin/main, never before it.
+  const mainAt = steps.findIndex((step) => exec(step).some((line) => line.trim() === ASSERT_ON_MAIN));
+  if (mainAt === -1 || mainAt > publishAt) {
+    issues.push(`${WORKFLOW}: job ${job.name} must prove the tag commit is on origin/main before npm publish, with exactly: ${ASSERT_ON_MAIN}`);
+  } else {
+    for (const { key, number } of conditionKeys(steps[mainAt])) {
+      issues.push(`${where(number)}: job ${job.name}: the origin/main check must be unconditional; it carries ${key}:`);
+    }
+  }
+  const publishLines = exec(steps[publishAt]);
+  const commands = publishLines.filter((line) => /\bnpm publish\b/u.test(line));
+  if (commands.length !== 1) {
+    issues.push(`${WORKFLOW}: job ${job.name} must run npm publish exactly once, found ${commands.length}`);
+  } else {
+    const [command] = commands;
+    if (!/(?:^|\s)--registry=https:\/\/registry\.npmjs\.org(?:\s|$)/u.test(command)) {
+      issues.push(`${WORKFLOW}: job ${job.name}: npm publish must name --registry=${NPM_REGISTRY} explicitly: ${command.trim()}`);
+    }
+    if (!/(?:^|\s)--access public(?:\s|$)/u.test(command)) {
+      issues.push(`${WORKFLOW}: job ${job.name}: npm publish must pass --access public: ${command.trim()}`);
+    }
+    if (/[|;&]/u.test(command)) {
+      issues.push(`${WORKFLOW}: job ${job.name}: nothing may be chained after npm publish: ${command.trim()}`);
+    }
+    const unset = publishLines.findIndex((line) => UNSET_TOKEN.test(line));
+    if (unset === -1 || unset > publishLines.indexOf(command)) {
+      issues.push(`${WORKFLOW}: job ${job.name} must unset NODE_AUTH_TOKEN before npm publish, in the same step`);
+    }
+  }
+  return issues;
 }
 
 export function checkReleaseWorkflow({ workflowText, manifest, lock }) {
@@ -201,6 +331,9 @@ export function checkReleaseWorkflow({ workflowText, manifest, lock }) {
       );
     }
   }
+
+  // 4. npm trusted publishing (OIDC) is the only credential.
+  issues.push(...publishAuthIssues(lines));
   return { valid: issues.length === 0, issues, version, tag };
 }
 
@@ -268,6 +401,18 @@ function runSelfTest() {
   const movePin = (text, value) => text.replace(`tags: ["v${version}"]`, `tags: ["v${value}"]`);
   const deriveRun = "        run: node tests/tools/release-workflow-contract.mjs --derive-env";
   assert.ok(real.workflowText.includes(deriveRun), "the real workflow has no derive step to mutate");
+  const publishIf = "        if: steps.registry.outputs.publish_needed == 'true'\n";
+  const npmPin = "      - name: pin an npm that supports trusted publishing (OIDC)\n";
+  const assertOnMain = '          node tests/tools/release-recovery.mjs --assert-on-main "$release_commit" origin/main';
+  const identityStep = "      - name: verify package, tag, origin/main and the successful CI run for one commit\n";
+  const publishStep = "      - name: publish exactly the validated tarball through npm trusted publishing (OIDC)\n" +
+    `${publishIf}        run: |\n          unset NODE_AUTH_TOKEN\n` +
+    `          npm publish "./$PACKAGE_FILE" --provenance --access public --registry=${NPM_REGISTRY}\n`;
+  /** A mutation of a literal the real workflow must contain once; a vanished subject fails loudly. */
+  const mutate = (from, to) => {
+    assert.equal(real.workflowText.split(from).length, 2, `self-test: the real workflow must contain ${JSON.stringify(from)} exactly once`);
+    return real.workflowText.replace(from, to);
+  };
   const cases = [
     { name: "the real files", expect: 0 },
     { name: "a release-prep commit that moves version, lock and pin together", expect: 0,
@@ -296,6 +441,30 @@ function runSelfTest() {
       workflowText: real.workflowText.replace(deriveRun, `${deriveRun} || true`) },
     { name: "a job that reads the identity without deriving it", expect: 1, match: /job extra reads the release identity without deriving it first/u,
       workflowText: `${real.workflowText.trimEnd()}\n  extra:\n    runs-on: ubuntu-latest\n    steps:\n      - run: test -s "$PACKAGE_FILE"\n` },
+    // Item 5: the 0.11.0 shape and each way back to it.
+    { name: "a token passed to npm publish (the 0.11.0 shape)", expect: 1, match: /reads a repository secret/u,
+      workflowText: mutate(publishIf, `${publishIf}        env:\n          NODE_AUTH_TOKEN: \${{ secrets.NPM_TOKEN }}\n`) },
+    { name: "registry-url in the publish job", expect: 1, match: /setup-node must not set registry-url/u,
+      workflowText: mutate(npmPin, `          registry-url: ${NPM_REGISTRY}\n${npmPin}`) },
+    { name: "npm publish without an explicit registry", expect: 1, match: /must name --registry=/u,
+      workflowText: mutate(` --registry=${NPM_REGISTRY}\n`, "\n") },
+    { name: "npm publish without unsetting NODE_AUTH_TOKEN", expect: 1, match: /must unset NODE_AUTH_TOKEN before npm publish/u,
+      workflowText: mutate("          unset NODE_AUTH_TOKEN\n", "") },
+    { name: "an npm too old for trusted publishing", expect: 1, match: /trusted publishing needs npm >= 11\.5\.1/u,
+      workflowText: real.workflowText.replace(/^( {6}NPM_VERSION: )\S+$/mu, "$111.5.0") },
+    { name: "no npm pin in the publish job", expect: 1, match: /must pin npm with npm install -g/u,
+      workflowText: mutate('          npm install -g "npm@$NPM_VERSION"\n', "") },
+    { name: "the npm pin in a consumer job as well", expect: 1, match: /job clean-consumer pins npm/u,
+      workflowText: mutate("    name: clean consumer (Node ${{ matrix.node }})\n", "    name: clean consumer (Node ${{ matrix.node }})\n    env:\n      NPM_VERSION: 11.21.2\n") },
+    // The OIDC exchange happens in npm publish; it must follow the proof that the tag commit is on main.
+    { name: "npm publish moved before the origin/main check", expect: 1, match: /must prove the tag commit is on origin\/main before npm publish/u,
+      workflowText: mutate(publishStep, "").replace(identityStep, `${publishStep}\n${identityStep}`) },
+    { name: "no origin/main check in the publish job", expect: 1, match: /must prove the tag commit is on origin\/main/u,
+      workflowText: mutate(`${assertOnMain}\n`, "") },
+    { name: "an origin/main check whose exit code is swallowed", expect: 1, match: /must prove the tag commit is on origin\/main/u,
+      workflowText: mutate(`${assertOnMain}\n`, `${assertOnMain} || true\n`) },
+    { name: "an origin/main check that may be skipped", expect: 1, match: /the origin\/main check must be unconditional; it carries if:/u,
+      workflowText: mutate("        id: identity\n", "        id: identity\n        if: ${{ false }}\n") },
   ];
   try {
     for (const [index, testCase] of cases.entries()) {

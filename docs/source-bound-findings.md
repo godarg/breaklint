@@ -81,38 +81,29 @@ captured input artifact. `originalSource.location` addresses the verified editab
 the copy chain and inventory prove it. The location includes a role, digest and byte count; unknown
 and duplicate origins remain visible.
 
-## Digital Product Studio
+## Example host: a document generator
 
-The first real consumer preserves source pieces in its existing generator and print-edition path,
-before chapter/block provenance is lost. Its host project register selects a fixed adapter; it does
-not infer executable commands from a manifest. The Python advisory entry point invokes the installed
-public package through a fixed Node bridge:
+A host generator binds sources best when it preserves source pieces in its own build and
+print-edition path, before chapter and block provenance is lost. The host chooses a fixed adapter
+from its own project register; breaklint never infers executable commands from a manifest. A host
+wrapper may stay advisory (exit 0) as long as it keeps the checker's actual exit 0–4 and an
+explicit unavailable state, and publishes each fresh attempt before the child process starts, so
+an older successful report is never mistaken for the current one.
 
-```bash
-python3 _tools/breaklint_layout_report.py <product-directory> \
-  --breaklint <consumer>/node_modules/breaklint \
-  --out-dir <private-report-directory> \
-  --output-path build/chapter.html
-```
+Such a bridge can add an optional bounded ZIP delivery binding and then call `writeReportBundle`
+on the final canonical report. Archive inspection captures bytes once and validates member
+headers, names, CRC, actual decompression limits and the complete mapping without extracting
+files. `local-package-bound` means matching local package bytes; `delivery-verified` additionally
+requires matching readback of the attachment as delivered. Covered and omitted members remain
+listed; it is not a purchase or download receipt. Private product bytes and seller metadata stay
+outside the public package.
 
-Repeated `--output-path` selects existing multi-file inputs. Expected outputs are checked; this is
-not a second batch implementation. A fresh attempt is published before child startup. `current.json`
-can point only to that attempt; older successful reports remain historical. The Python wrapper stays
-advisory (exit 0) while retaining the actual checker exit 0–4 and explicit unavailable state.
+The retained `diagnostic-pdf` is the exact PDF selected from the measured acquisition. Its hash
+binds the checked input; its `delivery: "not-asserted"` prevents a separately produced native PDF
+from borrowing page addresses. A host's own native print renderer is a different artifact, and a
+green diagnostic render does not establish that PDF's layout.
 
-The bridge adds optional bounded ZIP delivery binding, then calls `writeReportBundle` on the final
-canonical report. Archive inspection captures bytes once and validates member headers, names, CRC,
-actual decompression limits and the complete mapping without extracting files. `local-package-bound`
-means matching local package bytes. `delivery-verified` additionally requires matching current seller
-attachment readback. Covered and omitted members remain listed; it is not a purchase or download
-receipt. Private product bytes and seller metadata are kept outside this public package.
-
-The retained `diagnostic-pdf` is the exact selected PDF from the measured acquisition. Its hash binds
-the checked input; its `delivery: "not-asserted"` prevents a separate native PDF from borrowing page
-addresses. The Studio native print renderer remains a different artifact. A green diagnostic render
-does not establish the shipped native PDF's layout.
-
-## Existing Playwright page and DS_OS
+## Existing Playwright page
 
 `checkPage` observes a caller-owned, already prepared page. It does not navigate, authenticate,
 resize, scroll, change network policy or close it. Pass route state through the actual page and name
@@ -120,35 +111,42 @@ the scenario; the adapter records current route, viewport, browser and screensho
 `trust: "host-controlled-page"` and `networkPolicy: "host-owned"` explicitly retain the caller's
 authority. Document text cannot authorize new network access.
 
-The `web-geometry-v2` semantics (`PublicScreenReport` schema 2; readers accept Screen 1 and 2) cover
-unexpected horizontal overflow, content cut by rectangular clipping ancestors, visible HTML sibling
-overlap (`web/sibling-overlap`), SVG text extending past its viewport (`web/svg-text-overflows-viewport`),
-and opt-in typography/touch-target advisories (`web/small-text`, `web/small-touch-target`). When
+The `web-geometry-v2` semantics (`PublicScreenReport` schema 2; readers accept Screen 1 and 2 as `ReadableScreenReport`) cover
+unexpected horizontal overflow (HTML boxes; content inside an `<svg>` is not measured by
+`scrollWidth`), content cut by rectangular clipping ancestors, SVG text extending past the SVG
+viewport that clips it (`web/svg-text-overflows-viewport`; with `overflow: visible` the rule does not
+apply), and the opt-in advisories `web/sibling-overlap`, `web/small-text` and `web/small-touch-target`. When
 `output.screenshot` is `"full-page"`, targets across the full document height are measured in
 `css-document-pixels`; viewport screenshots measure the visible viewport in `css-viewport-pixels`.
 Named allowed scroll containers and intentional overlays retain reasons, match counts, and optional
-`scope: "scenario" | "suite"` metadata. Hidden/off-viewport nodes are exclusions, not positive repairs;
+`scope: "scenario" | "suite"` metadata. Hidden/off-viewport nodes and content that is not rendered
+(the body of a closed `<details>`, contents of `content-visibility: hidden`, and contents that
+`content-visibility: auto` leaves unpainted in the capture) are exclusions, not positive repairs;
 inert/ARIA alone do not hide geometry. CSS Color 4 solid colors (`oklch()`, `oklab()`, `lab()`, `lch()`,
 `hwb()`, `color(...)`) are parsed for alpha visibility; semi-transparent opacity (`0 < opacity < 1`),
-`filter`, and `backdrop-filter` do not disqualify geometry rules, while `opacity: 0` stays
-`evidence/target-not-visible`. Non-axis-aligned transforms, masks, clip-paths, active animations,
+`filter`, and `backdrop-filter` do not disqualify geometry rules, while an effective opacity of 0
+(`opacity` and `filter: opacity()` multiplied along the ancestors) is excluded as
+`target/not-visible`. Non-axis-aligned transforms, masks, clip-paths, active animations (other than
+of shadows, box colours or background position),
 capture drift (reported via `capture.driftDetails` after the bounded stabilization loop), font timeout,
 and truncated inventory prevent a clean claim.
 
-DS_OS reuses its existing authenticated E2E navigation, scenario fixtures and five viewports. The
-shared overflow harness adds canonical breaklint diagnostics while retaining its independent width
-assertion. A dedicated scenario suite and reporter enumerate expected states before navigation and
-retain missing/skipped/aborted attempts and retry inconsistencies. This is hermetic frontend evidence,
-not a backend correctness, live operational-state or human usability claim.
+An example host reuses its existing authenticated end-to-end navigation, scenario fixtures and
+viewports; its own overflow assertions keep running beside breaklint's diagnostics. A scenario
+suite and reporter that enumerate the expected states before navigation keep missing, skipped or
+aborted attempts visible. This is frontend evidence, not a backend correctness, operational-state
+or usability claim.
 
-Its production build records sorted source/config/lock file hashes. A generated build ID is compiled
+A host production build records sorted source/config/lock file hashes. A generated build ID is compiled
 into `<meta name="breaklint-build">`; sources are checked again after the build. Completed builds
 record the compiled output inventory as a separate receipt: output-receipt version 1
 (`.next/BUILD_ID` for Next.js) or framework-agnostic output-receipt version 2 (`buildId`, optional
 `buildMarkerPath`, `files`, `filesSha256` for static, Vite, Astro, or custom builds). The fixed
 `host-build-container` adapter
 requires both `receiptPath` and `buildOutputReceiptPath`, and verifies current source bytes,
-compiled output bytes and the page ID before/after capture. Preparing a build invalidates previous
+compiled output bytes, the page ID and the output ID the page renders
+(`compiledOutputAttribute`; without it the binding stays `declared`; a version-2 receipt needs
+`buildMarkerPath` for the page to be able to render its output ID) before/after capture. Preparing a build invalidates previous
 receipts; only a successful, unchanged build creates completed receipts. Symlinked sources, receipt
 paths and build outputs cannot obtain a verified binding.
 The result is `verified-container-only`, method `build-bound-component-container`, for the named

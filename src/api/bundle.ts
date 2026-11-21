@@ -1,18 +1,34 @@
-import { closeSync, constants, lstatSync, mkdirSync, openSync, writeFileSync, writeSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { closeSync, constants, lstatSync, mkdirSync, openSync, renameSync, rmSync, writeSync } from "node:fs";
 import { basename, extname, join, resolve } from "node:path";
 import type { Evidence, Finding, Report } from "../core/types.ts";
-import { READABLE_SCREEN_REPORT_SCHEMA_VERSIONS, type PublicScreenReport, type ScreenFinding } from "../web/types.ts";
+import { READABLE_SCREEN_REPORT_SCHEMA_VERSIONS, type ReadableScreenReport, type ScreenFinding } from "../web/types.ts";
 import type { ReportComparison } from "./compare.ts";
 import { captureBoundedSourceFile, sha256Bytes } from "../source/bytes.ts";
 import { createContextPack, type ContextFinding, type CreateContextPackOptions } from "./context.ts";
 import { READABLE_REPORT_SCHEMA_VERSIONS } from "../core/enums.ts";
 import { bundleColor, bundleToken, bundleTokenDeclarations } from "../report/html-tokens.ts";
+import { physicalPath } from "./output-path.ts";
 
 export interface RenderReportOptions extends CreateContextPackOptions { title?: string; theme?: "light" | "dark"; comparison?: ReportComparison; }
 export interface WriteReportBundleOptions extends RenderReportOptions { outDir: string; evidenceDir?: string; }
 export interface ReportBundleResult { outDir: string; reportPath: string; htmlPath: string; contextPath: string; assets: readonly string[]; }
 
+/**
+ * The three sinks of this view. Every report value reaches the HTML through exactly one of them,
+ * because a report handed to `renderReport()` or `writeReportBundle()` may come from anywhere and
+ * its types are only a claim: a `page` that is a string was once written into the markup as is.
+ *   esc   text and attribute values (every attribute here is double-quoted)
+ *   num   a value the report types as a number: shown only when it is one and finite
+ *         (an exit code only when it is one of the documented codes, `exitCode`)
+ *   href  a link target: only the bundle's own verified asset paths and in-page anchors
+ */
 const esc = (value: unknown): string => String(value ?? "").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/gu, "�").replace(/&/gu, "&amp;").replace(/</gu, "&lt;").replace(/>/gu, "&gt;").replace(/"/gu, "&quot;");
+const finiteNumber = (value: unknown): number | null => typeof value === "number" && Number.isFinite(value) ? value : null;
+const num = (value: unknown): string => { const n = finiteNumber(value); return n === null ? "unavailable" : String(n); };
+/** An exit code is shown only when it is one of the documented codes 0–4; a finite 7 is not one. */
+const exitCode = (value: unknown): string => Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 4 ? String(value) : "unavailable";
+const href = (value: string): string => /^(?:assets\/[a-f0-9]{64}\.(?:png|pdf)|bundle\.json|#finding(?:-navigation|-[1-9][0-9]*))$/u.test(value) ? esc(value) : "#";
 const MAX_ASSET_BYTES = 64 * 1024 * 1024;
 
 /**
@@ -71,22 +87,43 @@ function capturedAsset(sourceRoot: string, leaf: string, maxBytes: number): Buff
   catch { return null; }
 }
 
+/**
+ * Replaces one file of the bundle, never writing into what is already there. The API accepts a
+ * used output directory (updating a bundle in place is legitimate), and a file in it may be a hard
+ * link: opening it with O_TRUNC wrote through the link into the other name's file. So the bytes go
+ * to a new temporary file (O_EXCL) and a rename replaces the directory entry; a hard-linked old
+ * entry keeps its bytes under its other name. A symlink at the leaf is refused, not replaced.
+ */
+function replaceFile(directory: string, name: string, bytes: Buffer, mode: number): void {
+  const target = join(directory, name);
+  let leaf: ReturnType<typeof lstatSync> | null = null;
+  try { leaf = lstatSync(target); } catch { leaf = null; }
+  if (leaf?.isSymbolicLink()) throw Object.assign(new Error(`report bundle file is a symbolic link: ${target}`), { code: "ELOOP" });
+  if (leaf && !leaf.isFile()) throw Object.assign(new Error(`report bundle file is not a regular file: ${target}`), { code: "EISDIR" });
+  const temporary = join(directory, `.${name}.${process.pid}-${randomBytes(6).toString("hex")}.breaklint-tmp`);
+  try {
+    const fd = openSync(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, mode);
+    try {
+      let offset = 0;
+      while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset);
+    } finally { closeSync(fd); }
+    renameSync(temporary, target);
+  } catch (error) {
+    rmSync(temporary, { force: true });
+    throw error;
+  }
+}
+
 function writeCapturedAsset(targetRoot: string, name: string, bytes: Buffer): void {
   const assets = join(targetRoot, "assets");
   const directory = lstatSync(assets);
   if (!directory.isDirectory() || directory.isSymbolicLink()) throw new Error("report asset directory is not a regular directory");
-  const target = join(assets, name);
-  const fd = openSync(target, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW, 0o600);
-  try {
-    let offset = 0;
-    while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset);
-  } finally { closeSync(fd); }
+  replaceFile(assets, name, bytes, 0o600);
 }
 
 /** Top-level bundle files: like assets, a pre-existing symlink at the leaf is refused, not followed. */
 function writeBundleFile(targetRoot: string, name: string, content: string): void {
-  const fd = openSync(join(targetRoot, name), constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW, 0o666);
-  try { writeFileSync(fd, content, "utf8"); } finally { closeSync(fd); }
+  replaceFile(targetRoot, name, Buffer.from(content, "utf8"), 0o666);
 }
 
 function evidenceAsset(evidence: Evidence, sourceRoot: string, targetRoot: string): Asset | null {
@@ -138,33 +175,33 @@ function crop(asset: Asset | null, finding: Finding): string {
   const width = Math.min(box.pageWidth, box.x + box.width + pad) - left;
   const height = Math.min(box.pageHeight, box.y + box.height + pad) - top;
   const clipId = `crop-${sha256Bytes(Buffer.from(`${finding.runFindingId}:${left}:${top}:${width}:${height}`)).slice(0, 24)}`;
-  return `<figure class="crop"><svg role="img" aria-label="Verified target and surrounding context" viewBox="${left} ${top} ${width} ${height}" style="display:block;width:100%"><defs><clipPath id="${clipId}" clipPathUnits="userSpaceOnUse"><rect x="${left}" y="${top}" width="${width}" height="${height}"/></clipPath></defs><g clip-path="url(#${clipId})"><image href="${esc(asset.href)}" x="0" y="0" width="${box.pageWidth}" height="${box.pageHeight}"/><rect class="target-outline" x="${box.x}" y="${box.y}" width="${box.width}" height="${box.height}" fill="none" stroke-width="3" vector-effect="non-scaling-stroke"/></g></svg><figcaption>Marked target context from verified full-page evidence; only the visible intersection is shown for overflow. The original box is page-relative in css-page-top-left coordinates. Source: ${source(finding)}.</figcaption></figure>`;
+  return `<figure class="crop"><svg role="img" aria-label="Verified target and surrounding context" viewBox="${left} ${top} ${width} ${height}" style="display:block;width:100%"><defs><clipPath id="${clipId}" clipPathUnits="userSpaceOnUse"><rect x="${left}" y="${top}" width="${width}" height="${height}"/></clipPath></defs><g clip-path="url(#${clipId})"><image href="${href(asset.href)}" x="0" y="0" width="${box.pageWidth}" height="${box.pageHeight}"/><rect class="target-outline" x="${box.x}" y="${box.y}" width="${box.width}" height="${box.height}" fill="none" stroke-width="3" vector-effect="non-scaling-stroke"/></g></svg><figcaption>Marked target context from verified full-page evidence; only the visible intersection is shown for overflow. The original box is page-relative in css-page-top-left coordinates. Source: ${source(finding)}.</figcaption></figure>`;
 }
 
 function source(finding: Finding): string {
   const original = finding.originalSource;
   if (original.status === "verified" && original.location) {
     return original.role === "verified-container-only"
-      ? `Verified container only: ${displayPath(original.location.file)}:${original.location.line}:${original.location.column}; no exact original range`
-      : `Verified original range: ${displayPath(original.location.file)}:${original.location.line}:${original.location.column}`;
+      ? `Verified container only: ${displayPath(original.location.file)}:${num(original.location.line)}:${num(original.location.column)}; no exact original range`
+      : `Verified original range: ${displayPath(original.location.file)}:${num(original.location.line)}:${num(original.location.column)}`;
   }
-  if (original.status === "ambiguous") return `Ambiguous original source (${original.candidates.length} candidates)`;
+  if (original.status === "ambiguous") return `Ambiguous original source (${num(Array.isArray(original.candidates) ? original.candidates.length : null)} candidates)`;
   if (original.status === "declared") return "Declared original source; verify before editing";
   return "Original source unavailable";
 }
 
-function displayPath(value: string): string {
-  return /^(?:\/|~[\\/]|[A-Za-z]:[\\/]|\\\\)/u.test(value) ? "&lt;local-path-withheld&gt;" : esc(value);
+function displayPath(value: unknown): string {
+  return typeof value === "string" && /^(?:\/|~[\\/]|[A-Za-z]:[\\/]|\\\\)/u.test(value) ? "&lt;local-path-withheld&gt;" : esc(value);
 }
 
 function contextOrigin(finding: ContextFinding): string {
   const origin = finding.originalSource;
-  if (origin.status === "ambiguous") return `ambiguous · ${origin.candidateCount} candidate source range${origin.candidateCount === 1 ? "" : "s"} · choose none automatically`;
+  if (origin.status === "ambiguous") return `ambiguous · ${num(origin.candidateCount)} candidate source range${origin.candidateCount === 1 ? "" : "s"} · choose none automatically`;
   if (!origin.location) return `${esc(origin.status)} · ${esc(origin.role)} · no original range`;
   const location = origin.location;
-  if (origin.role === "verified-container-only") return `${displayPath(location.file)}:${location.line}:${location.column} · verified container only · no exact original range`;
-  const integrity = origin.integrity ? ` · SHA-256 ${esc(origin.integrity.sha256)} (${origin.integrity.byteLength} bytes)` : " · integrity unavailable";
-  return `${displayPath(location.file)}:${location.line}:${location.column}–${location.endLine}:${location.endColumn} · bytes ${location.offset}–${location.endOffset} · ${esc(location.coordinateSystem)} · ${esc(origin.status)} · ${esc(origin.role)}${integrity}`;
+  if (origin.role === "verified-container-only") return `${displayPath(location.file)}:${num(location.line)}:${num(location.column)} · verified container only · no exact original range`;
+  const integrity = origin.integrity ? ` · SHA-256 ${esc(origin.integrity.sha256)} (${num(origin.integrity.byteLength)} bytes)` : " · integrity unavailable";
+  return `${displayPath(location.file)}:${num(location.line)}:${num(location.column)}–${num(location.endLine)}:${num(location.endColumn)} · bytes ${num(location.offset)}–${num(location.endOffset)} · ${esc(location.coordinateSystem)} · ${esc(origin.status)} · ${esc(origin.role)}${integrity}`;
 }
 
 function contextEvaluation(finding: ContextFinding): string {
@@ -179,35 +216,42 @@ function findingCard(report: Report, finding: Finding, index: number, assets: As
   if (asset) assets.set(finding.runFindingId, asset);
   const pdf = diagnosticPdf(report, finding, evidenceDir, outputRoot);
   if (pdf) assets.set(`pdf:${pdf.integrity.sha256}`, pdf);
-  const evidence = asset ? `<a href="${esc(asset.href)}">Open verified full-page evidence</a>` : "Evidence unavailable or failed integrity verification.";
-  const pdfLink = pdf ? ` <a href="${esc(pdf.href)}">Open verified diagnostic PDF</a>` : "";
+  const evidence = asset ? `<a href="${href(asset.href)}">Open verified full-page evidence</a>` : "Evidence unavailable or failed integrity verification.";
+  const pdfLink = pdf ? ` <a href="${href(pdf.href)}">Open verified diagnostic PDF</a>` : "";
   const origin = context ? contextOrigin(context) : `${source(finding)} · role ${esc(finding.originalSource.role)}`;
   const evaluation = context ? contextEvaluation(context) : "No uniquely matching canonical target evaluation is available.";
   const repair = context?.repair.options.length ? context.repair.options.map(esc).join(" ") : "No concrete verified-source repair option is available.";
-  return `<article class="finding ${esc(finding.severity)}" id="finding-${index + 1}"><p class="eyebrow">${esc(finding.severity)} · ${esc(finding.ruleId)}</p><h2>${esc(finding.runFindingId)}</h2><p>${esc(finding.message)}</p><dl><div><dt>Measured</dt><dd>${esc(finding.measurement.value)} ${esc(finding.measurement.unit)}</dd></div><div><dt>Threshold</dt><dd>${esc(finding.measurement.threshold)} ${esc(finding.measurement.unit)}</dd></div><div><dt>Scope</dt><dd>${displayPath(finding.document)} · diagnostic page ${finding.page} · target ${esc(finding.target.nodeKey)} · box ${finding.target.renderBox ? "css-page-top-left" : "css-screen-pixels"}</dd></div><div><dt>Original source range</dt><dd>${origin}</dd></div><div><dt>Canonical evaluation</dt><dd>${esc(evaluation)}</dd></div><div><dt>Input position / identity</dt><dd>${finding.source ? `${displayPath(finding.source.file)}:${finding.source.line}:${finding.source.column} (${esc(finding.source.coordinateSystem)})` : "unavailable"} · ${esc(finding.stableIdentity.status)}</dd></div></dl><p><strong>Proven fact:</strong> the measurement above was recorded for this target.</p><p><strong>Possible causes:</strong> not established by this report.</p><p><strong>Repair option:</strong> ${repair}</p><p><strong>Next check:</strong> inspect source and evidence, then recheck under compatible conditions.</p><p class="evidence">${evidence}${pdfLink}</p>${crop(asset, finding)}<p><a href="#finding-navigation">Back to findings</a></p></article>`;
+  return `<article class="finding ${esc(finding.severity)}" id="finding-${index + 1}"><p class="eyebrow">${esc(finding.severity)} · ${esc(finding.ruleId)}</p><h2>${esc(finding.runFindingId)}</h2><p>${esc(finding.message)}</p><dl><div><dt>Measured</dt><dd>${num(finding.measurement.value)} ${esc(finding.measurement.unit)}</dd></div><div><dt>Threshold</dt><dd>${num(finding.measurement.threshold)} ${esc(finding.measurement.unit)}</dd></div><div><dt>Scope</dt><dd>${displayPath(finding.document)} · diagnostic page ${num(finding.page)} · target ${esc(finding.target.nodeKey)} · box ${finding.target.renderBox ? "css-page-top-left" : "css-screen-pixels"}</dd></div><div><dt>Original source range</dt><dd>${origin}</dd></div><div><dt>Canonical evaluation</dt><dd>${esc(evaluation)}</dd></div><div><dt>Input position / identity</dt><dd>${finding.source ? `${displayPath(finding.source.file)}:${num(finding.source.line)}:${num(finding.source.column)} (${esc(finding.source.coordinateSystem)})` : "unavailable"} · ${esc(finding.stableIdentity.status)}</dd></div></dl><p><strong>Proven fact:</strong> the measurement above was recorded for this target.</p><p><strong>Possible causes:</strong> not established by this report.</p><p><strong>Repair option:</strong> ${repair}</p><p><strong>Next check:</strong> inspect source and evidence, then recheck under compatible conditions.</p><p class="evidence">${evidence}${pdfLink}</p>${crop(asset, finding)}<p><a href="#finding-navigation">Back to findings</a></p></article>`;
 }
 
 /** Script-free, offline HTML from a canonical document report (schema 4 or 5) or a screen report. It does not make evidence navigable by itself. */
 export function renderReport(report: Report | unknown, options: RenderReportOptions = {}): string {
   const context = createContextPack(report, options);
-  const isScreen = READABLE_SCREEN_REPORT_SCHEMA_VERSIONS.includes(context.canonicalReport.schemaVersion as number) && context.canonicalReport.profileKind === "screen";
-  const legacy = !isScreen && (!READABLE_REPORT_SCHEMA_VERSIONS.includes(context.canonicalReport.schemaVersion as number) || context.canonicalReport.profileKind !== "document");
+  // The context pack already decided whether this report can be projected; a stamped report
+  // without the parts the projection reads is "legacy or invalid" there, and so it is here.
+  const invalid = context.selection.reason === "legacy-or-invalid-report-cannot-establish-source-or-repair-claims";
+  const isScreen = !invalid && READABLE_SCREEN_REPORT_SCHEMA_VERSIONS.includes(context.canonicalReport.schemaVersion as number) && context.canonicalReport.profileKind === "screen";
+  const legacy = invalid || !isScreen && (!READABLE_REPORT_SCHEMA_VERSIONS.includes(context.canonicalReport.schemaVersion as number) || context.canonicalReport.profileKind !== "document");
   const title = options.title ?? "breaklint report";
   const theme = options.theme ?? "light";
   if (options.comparison && options.comparison.afterRunId !== context.canonicalReport.runId) throw new Error("comparison does not refer to this current report");
   const comparison = options.comparison ? `<section class="state"><h2>Repair comparison</h2><p>Before ${esc(options.comparison.beforeRunId)} → after ${esc(options.comparison.afterRunId)}</p><dl>${(["new", "persisting", "resolved", "unmatchable", "not-sufficiently-measured"] as const).map(status => `<div><dt>${status}</dt><dd>${options.comparison!.results.filter(item => item.status === status).length}</dd></div>`).join("")}</dl><ul>${options.comparison.results.map(item => `<li>${esc(item.beforeRunFindingId ?? item.afterRunFindingIds.join(", "))}: ${esc(item.status)} — ${esc(item.reasons.join(", "))}</li>`).join("")}</ul><p>Absent or reduced measurement is not a repair. Identical removal and recreation between observations cannot be distinguished.</p></section>` : "";
   const documentFindings = context.findings.filter((item): item is ContextFinding => "runFindingId" in item);
-  const screenCards = context.findings.filter((item) => "id" in item).map((item, index) => `<article class="finding ${esc(item.severity)}" id="finding-${index + 1}"><p class="eyebrow">${esc(item.severity)} · ${esc(item.ruleId)}</p><h2>${esc(item.id)}</h2><p>${esc(item.observation)}</p><dl><div><dt>Measured</dt><dd>${esc(item.measurement.value)} ${esc(item.measurement.unit ?? "")}</dd></div><div><dt>Scenario / route</dt><dd>${esc(item.scope.scenario)} · ${esc(item.scope.route)} · ${esc(item.scope.viewport)}</dd></div><div><dt>Target</dt><dd>${esc(item.scope.targetRef)} · ${esc(item.scope.coordinateSystem)}</dd></div><div><dt>Source</dt><dd>${esc(item.source.status)} ${item.source.file ? displayPath(item.source.file) : ""}</dd></div><div><dt>Evidence</dt><dd>${item.evidence.bindsFinding ? esc(item.evidence.screenshot ?? "bound asset unavailable") : "not bound"}</dd></div></dl><p><strong>Next check:</strong> rerun the same scenario and viewport after a bounded repair.</p><p><a href="#finding-navigation">Back to findings</a></p></article>`).join("");
-  const runState = `<dl class="run-state"><div><dt>Verdict / exit</dt><dd>${esc(context.run.verdict ?? "unavailable")} / ${esc(context.run.exitCode ?? "unavailable")}</dd></div><div><dt>Infrastructure events</dt><dd>${context.run.infrastructureCount}</dd></div><div><dt>Not measured</dt><dd>${context.run.notMeasuredCount}</dd></div></dl>`;
-  const diagnostics = context.diagnostics.items.length === 0 ? "" : `<section class="diagnostics" aria-labelledby="diagnostics-heading"><h2 id="diagnostics-heading">Infrastructure and nonmeasurement</h2><ul>${context.diagnostics.items.map((item) => `<li><code>${esc(item.kind)}</code>: ${esc(item.reason)}${item.context ? ` · ${esc(item.context)}` : ""}</li>`).join("")}</ul>${context.diagnostics.omittedCount ? `<p>${context.diagnostics.omittedCount} additional diagnostic entries omitted from this bounded view; inspect canonical JSON.</p>` : ""}</section>`;
+  const screenCards = context.findings.filter((item) => "id" in item).map((item, index) => `<article class="finding ${esc(item.severity)}" id="finding-${index + 1}"><p class="eyebrow">${esc(item.severity)} · ${esc(item.ruleId)}</p><h2>${esc(item.id)}</h2><p>${esc(item.observation)}</p><dl><div><dt>Measured</dt><dd>${num(item.measurement.value)} ${esc(item.measurement.unit ?? "")}</dd></div><div><dt>Scenario / route</dt><dd>${esc(item.scope.scenario)} · ${esc(item.scope.route)} · ${esc(item.scope.viewport)}</dd></div><div><dt>Target</dt><dd>${esc(item.scope.targetRef)} · ${esc(item.scope.coordinateSystem)}</dd></div><div><dt>Source</dt><dd>${esc(item.source.status)} ${item.source.file ? displayPath(item.source.file) : ""}</dd></div><div><dt>Evidence</dt><dd>${item.evidence.bindsFinding ? esc(item.evidence.screenshot ?? "bound asset unavailable") : "not bound"}</dd></div></dl><p><strong>Next check:</strong> rerun the same scenario and viewport after a bounded repair.</p><p><a href="#finding-navigation">Back to findings</a></p></article>`).join("");
+  const runState = `<dl class="run-state"><div><dt>Verdict / exit</dt><dd>${esc(context.run.verdict ?? "unavailable")} / ${exitCode(context.run.exitCode)}</dd></div><div><dt>Infrastructure events</dt><dd>${num(context.run.infrastructureCount)}</dd></div><div><dt>Not measured</dt><dd>${num(context.run.notMeasuredCount)}</dd></div></dl>`;
+  const diagnostics = context.diagnostics.items.length === 0 ? "" : `<section class="diagnostics" aria-labelledby="diagnostics-heading"><h2 id="diagnostics-heading">Infrastructure and nonmeasurement</h2><ul>${context.diagnostics.items.map((item) => `<li><code>${esc(item.kind)}</code>: ${esc(item.reason)}${item.context ? ` · ${esc(item.context)}` : ""}</li>`).join("")}</ul>${context.diagnostics.omittedCount ? `<p>${num(context.diagnostics.omittedCount)} additional diagnostic entries omitted from this bounded view; inspect canonical JSON.</p>` : ""}</section>`;
   const navigation = `<nav id="finding-navigation" aria-label="Finding navigation">${context.findings.map((item, index) => `<a href="#finding-${index + 1}">${index + 1}. ${esc(item.severity)} ${esc(item.ruleId)}</a>`).join(" · ")}</nav>`;
-  const cards = legacy ? `<section class="state"><h2>Legacy or invalid report</h2><p>Source verification and repair claims are unavailable for this report shape. Inspect canonical JSON with a compatible breaklint version.</p>${runState}</section>` : `<section class="state ${context.selection.complete ? "complete" : "incomplete"}"><h2>${context.selection.complete ? "Measured report" : "Incomplete report"}</h2><p>${context.selection.complete ? "The bounded context includes all recorded findings." : `Do not treat absence as repair. ${esc(context.selection.reason)}; omitted findings: ${context.selection.omittedCount}.`}</p>${runState}</section><section class="cards"><p class="section-label">Prioritized findings</p>${navigation}${isScreen ? screenCards : documentFindings.map((item, index) => `<article class="finding ${esc(item.severity)}" id="finding-${index + 1}"><p class="eyebrow">${esc(item.severity)} · ${esc(item.ruleId)}</p><h2>${esc(item.runFindingId)}</h2><p>${esc(item.observation)}</p><dl><div><dt>Measured</dt><dd>${esc(item.measurement.value)} ${esc(item.measurement.unit)}</dd></div><div><dt>Threshold</dt><dd>${esc(item.measurement.threshold)} ${esc(item.measurement.unit)}</dd></div><div><dt>Scope</dt><dd>${esc(item.scope.document)} · diagnostic page ${item.scope.page} · ${esc(item.scope.coordinateSystem)}</dd></div><div><dt>Original source range</dt><dd>${contextOrigin(item)}</dd></div></dl><p><strong>Canonical evaluation:</strong> ${esc(contextEvaluation(item))}</p><p><strong>Repair option:</strong> ${item.repair.options.length ? item.repair.options.map(esc).join(" ") : "No concrete verified-source repair option is available."}</p><p><strong>Next check:</strong> inspect source and evidence, then recheck after a bounded repair.</p><p><a href="#finding-navigation">Back to findings</a></p></article>`).join("") || "<p>No finding cards were recorded. Infrastructure and nonmeasurement counts remain above.</p>"}</section>`;
+  const cards = legacy ? `<section class="state"><h2>Legacy or invalid report</h2><p>Source verification and repair claims are unavailable for this report shape. Inspect canonical JSON with a compatible breaklint version.</p>${runState}</section>` : `<section class="state ${context.selection.complete ? "complete" : "incomplete"}"><h2>${context.selection.complete ? "Measured report" : "Incomplete report"}</h2><p>${context.selection.complete ? "The bounded context includes all recorded findings." : `Do not treat absence as repair. ${esc(context.selection.reason)}; omitted findings: ${num(context.selection.omittedCount)}.`}</p>${runState}</section><section class="cards"><p class="section-label">Prioritized findings</p>${navigation}${isScreen ? screenCards : documentFindings.map((item, index) => `<article class="finding ${esc(item.severity)}" id="finding-${index + 1}"><p class="eyebrow">${esc(item.severity)} · ${esc(item.ruleId)}</p><h2>${esc(item.runFindingId)}</h2><p>${esc(item.observation)}</p><dl><div><dt>Measured</dt><dd>${num(item.measurement.value)} ${esc(item.measurement.unit)}</dd></div><div><dt>Threshold</dt><dd>${num(item.measurement.threshold)} ${esc(item.measurement.unit)}</dd></div><div><dt>Scope</dt><dd>${esc(item.scope.document)} · diagnostic page ${num(item.scope.page)} · ${esc(item.scope.coordinateSystem)}</dd></div><div><dt>Original source range</dt><dd>${contextOrigin(item)}</dd></div></dl><p><strong>Canonical evaluation:</strong> ${esc(contextEvaluation(item))}</p><p><strong>Repair option:</strong> ${item.repair.options.length ? item.repair.options.map(esc).join(" ") : "No concrete verified-source repair option is available."}</p><p><strong>Next check:</strong> inspect source and evidence, then recheck after a bounded repair.</p><p><a href="#finding-navigation">Back to findings</a></p></article>`).join("") || "<p>No finding cards were recorded. Infrastructure and nonmeasurement counts remain above.</p>"}</section>`;
   return `<!doctype html><html lang="en" data-theme="${esc(theme)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'"><title>${esc(title)}</title><style>${BUNDLE_HTML_STYLES}</style></head><body><main><header><p class="eyebrow">Canonical JSON report ${esc(context.canonicalReport.runId ?? "unavailable")}</p><h1>${esc(title)}</h1><p>JSON is canonical. This offline view is a bounded projection.</p></header>${comparison}${diagnostics}${cards}<footer><p>${esc(context.untrustedData.notice)}</p></footer></main></body></html>`;
 }
 
 /** Writes report.json, context.json and a self-contained report.html. Assets are copied only after hash and path verification. */
-export function writeReportBundle(report: Report | PublicScreenReport, options: WriteReportBundleOptions): ReportBundleResult {
-  const root = resolve(options.outDir);
+export function writeReportBundle(report: Report | ReadableScreenReport, options: WriteReportBundleOptions): ReportBundleResult {
+  // A non-object cannot be a report; it was once noticed only after the output directory existed.
+  if (report === null || typeof report !== "object" || Array.isArray(report)) throw new TypeError("writeReportBundle requires a report object");
+  // Resolved as the file system resolves it, so `link/../dir` is the directory beside the link's
+  // target that a caller's own check (and the CLI's empty-directory check) looked at.
+  const root = physicalPath(options.outDir);
   if (options.comparison) {
     if (options.comparison.afterRunId !== report.runId) throw new Error("comparison does not refer to this current report");
   }
@@ -239,7 +283,7 @@ export function writeReportBundle(report: Report | PublicScreenReport, options: 
     }),
     assets: [...new Map([...assets.values()].map(asset => [asset.href, asset])).values()].map(asset => ({ path: asset.href, kind: asset.kind, ...asset.integrity })),
   };
-  const availability = `<section class="diagnostics"><h2>Current bundle evidence</h2><p>Canonical JSON describes the historical capture. This bundle separately verifies the copied files. A comparison of historical reports is not a current asset recheck.</p><ul>${bundleEvidence.findings.map(item => `<li>${esc(item.findingId)}: ${esc(item.status)}${item.asset ? ` · <a href="${esc(item.asset.path)}">verified asset</a> · SHA-256 ${esc(item.asset.sha256)}` : ""}</li>`).join("")}</ul><p><a href="bundle.json">Complete asset integrity manifest</a></p></section>`;
+  const availability = `<section class="diagnostics"><h2>Current bundle evidence</h2><p>Canonical JSON describes the historical capture. This bundle separately verifies the copied files. A comparison of historical reports is not a current asset recheck.</p><ul>${bundleEvidence.findings.map(item => `<li>${esc(item.findingId)}: ${esc(item.status)}${item.asset ? ` · <a href="${href(item.asset.path)}">verified asset</a> · SHA-256 ${esc(item.asset.sha256)}` : ""}</li>`).join("")}</ul><p><a href="bundle.json">Complete asset integrity manifest</a></p></section>`;
   html = html.replace('<section class="cards">', () => `${availability}<section class="cards">`);
 
   writeBundleFile(root, "report.json", canonical);
@@ -249,10 +293,14 @@ export function writeReportBundle(report: Report | PublicScreenReport, options: 
   writeBundleFile(root, "bundle.json", JSON.stringify(bundleEvidence, null, 2) + "\n");
   writeBundleFile(root, "context.json", JSON.stringify({ ...contextPack, bundleEvidence }, null, 2) + "\n");
   writeBundleFile(root, "report.html", html);
-  return { outDir: root, reportPath: join(root, "report.json"), htmlPath: join(root, "report.html"), contextPath: join(root, "context.json"), assets: [...assets.values()].map((asset) => asset.href) };
+  // The paths are reported as the caller wrote them (resolved) unless that spelling names a
+  // different directory than the one written, which only a `..` after a symlink does.
+  const lexical = resolve(options.outDir);
+  const shown = physicalPath(lexical) === root ? lexical : root;
+  return { outDir: shown, reportPath: join(shown, "report.json"), htmlPath: join(shown, "report.html"), contextPath: join(shown, "context.json"), assets: [...assets.values()].map((asset) => asset.href) };
 }
 
-function screenFindingCard(report: PublicScreenReport, finding: ScreenFinding, index: number, assets: AssetMap, evidenceDir: string | undefined, root: string): string {
+function screenFindingCard(report: ReadableScreenReport, finding: ScreenFinding, index: number, assets: AssetMap, evidenceDir: string | undefined, root: string): string {
   const artifact = report.artifact;
   let asset: Asset | null = null;
   if (evidenceDir && finding.evidence.bindsFinding && artifact.relativePath && artifact.sha256 && artifact.byteLength && artifact.widthPx && artifact.heightPx) {
@@ -266,18 +314,22 @@ function screenFindingCard(report: PublicScreenReport, finding: ScreenFinding, i
     }
   }
   const source = report.evaluations.find((entry) => entry.id === finding.evaluationId)?.source;
-  const box = finding.target.box;
-  const scale = report.scope.viewport.deviceScaleFactor;
-  const width = artifact.widthPx && scale > 0 ? artifact.widthPx / scale : 0;
-  const height = artifact.heightPx && scale > 0 ? artifact.heightPx / scale : 0;
+  // Geometry is only used when every value is a finite number; otherwise there is no outline.
+  const rawBox = finding.target.box;
+  const box = rawBox && [rawBox.x, rawBox.y, rawBox.width, rawBox.height].every((value) => finiteNumber(value) !== null) ? rawBox : null;
+  const scale = finiteNumber(report.scope.viewport.deviceScaleFactor) ?? 0;
+  const widthPx = finiteNumber(artifact.widthPx) ?? 0, heightPx = finiteNumber(artifact.heightPx) ?? 0;
+  const width = widthPx && scale > 0 ? widthPx / scale : 0;
+  const height = heightPx && scale > 0 ? heightPx / scale : 0;
   const addScroll = artifact.capture === "full-page" && finding.target.coordinateSystem !== "css-document-pixels";
-  const x = box ? box.x + (addScroll ? finding.target.scroll.x : 0) : 0;
-  const y = box ? box.y + (addScroll ? finding.target.scroll.y : 0) : 0;
+  const scrollX = finiteNumber(finding.target.scroll?.x), scrollY = finiteNumber(finding.target.scroll?.y);
+  const x = box && (!addScroll || scrollX !== null) ? box.x + (addScroll ? scrollX! : 0) : 0;
+  const y = box && (!addScroll || scrollY !== null) ? box.y + (addScroll ? scrollY! : 0) : 0;
   const left = Math.max(0, x), top = Math.max(0, y);
   const right = Math.min(width, x + (box?.width ?? 0)), bottom = Math.min(height, y + (box?.height ?? 0));
   const outline = box && width > 0 && height > 0 && right > left && bottom > top
     ? `<span class="target-outline" aria-hidden="true" style="left:${left / width * 100}%;top:${top / height * 100}%;width:${(right - left) / width * 100}%;height:${(bottom - top) / height * 100}%"></span>` : "";
-  const evidence = asset ? `<figure style="position:relative;margin:1rem 0"><img style="display:block;width:100%" src="${esc(asset.href)}" alt="Verified screen evidence with marked visible target">${outline}</figure><a href="${esc(asset.href)}">Open verified full screen surface</a><p>Visible intersection of the target box; coordinates: ${esc(finding.target.coordinateSystem)}. Capture: ${esc(artifact.capture)}.</p>` : "Evidence unavailable or failed integrity verification.";
+  const evidence = asset ? `<figure style="position:relative;margin:1rem 0"><img style="display:block;width:100%" src="${href(asset.href)}" alt="Verified screen evidence with marked visible target">${outline}</figure><a href="${href(asset.href)}">Open verified full screen surface</a><p>Visible intersection of the target box; coordinates: ${esc(finding.target.coordinateSystem)}. Capture: ${esc(artifact.capture)}.</p>` : "Evidence unavailable or failed integrity verification.";
   const repairByRule: Record<ScreenFinding["ruleId"], string> = {
     "web/unexpected-horizontal-overflow": "Inspect the named container width, minimum width and child sizing. Constrain the overflowing child to the available width; retain an explicit scroll container where wider content is intentional.",
     "web/content-clipped": "Inspect the clipping ancestor and the target box. Increase the available size or restore an intentional scroll path so the content is reachable.",
@@ -287,5 +339,5 @@ function screenFindingCard(report: PublicScreenReport, finding: ScreenFinding, i
     "web/small-touch-target": "Increase the interactive control's hit area (padding, min-width, min-height) above the configured minimum dimension (uncalibrated heuristic).",
   };
   const repair = repairByRule[finding.ruleId] ?? "Inspect the target geometry and rerun the same scenario and viewport.";
-  return `<article class="finding ${esc(finding.severity)}" id="finding-${index + 1}"><p class="eyebrow">${esc(finding.severity)} · ${esc(finding.ruleId)}</p><h2>${esc(finding.id)}</h2><dl><div><dt>Measured / threshold</dt><dd>${esc(finding.measurement.value)} / ${esc(finding.measurement.threshold)} ${esc(finding.measurement.unit)}</dd></div><div><dt>Scenario / route</dt><dd>${esc(report.scope.scenario)} · ${esc(report.scope.url)}</dd></div><div><dt>Viewport</dt><dd>${esc(report.scope.viewport.width)}×${esc(report.scope.viewport.height)}</dd></div><div><dt>Target</dt><dd>${esc(finding.target.selector)}</dd></div><div><dt>Source</dt><dd>${esc(source?.status ?? "unknown")} ${source?.file ? displayPath(source.file) : ""}</dd></div></dl><p><strong>Observation:</strong> geometry recorded for the target; a shared cause is not established.</p><p><strong>Repair option:</strong> ${esc(repair)}</p><p><strong>Next check:</strong> rerun the same scenario and viewport and inspect adjacent content for follow-up effects.</p><div class="evidence">${evidence}</div><p><a href="#finding-navigation">Back to findings</a></p></article>`;
+  return `<article class="finding ${esc(finding.severity)}" id="finding-${index + 1}"><p class="eyebrow">${esc(finding.severity)} · ${esc(finding.ruleId)}</p><h2>${esc(finding.id)}</h2><dl><div><dt>Measured / threshold</dt><dd>${num(finding.measurement.value)} / ${num(finding.measurement.threshold)} ${esc(finding.measurement.unit)}</dd></div><div><dt>Scenario / route</dt><dd>${esc(report.scope.scenario)} · ${esc(report.scope.url)}</dd></div><div><dt>Viewport</dt><dd>${num(report.scope.viewport.width)}×${num(report.scope.viewport.height)}</dd></div><div><dt>Target</dt><dd>${esc(finding.target.selector)}</dd></div><div><dt>Source</dt><dd>${esc(source?.status ?? "unknown")} ${source?.file ? displayPath(source.file) : ""}</dd></div></dl><p><strong>Observation:</strong> geometry recorded for the target; a shared cause is not established.</p><p><strong>Repair option:</strong> ${esc(repair)}</p><p><strong>Next check:</strong> rerun the same scenario and viewport and inspect adjacent content for follow-up effects.</p><div class="evidence">${evidence}</div><p><a href="#finding-navigation">Back to findings</a></p></article>`;
 }

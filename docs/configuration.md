@@ -9,53 +9,13 @@ The default file is `breaklint.config.json`. A different JSON file can be select
 `--config <file>`. JavaScript configuration is intentionally unsupported because loading it would
 execute repository code inside the checking process.
 
-## Screen page adapter
+## Screen checks
 
-`checkPage(page, options)` is a separate public API for an **already opened** Playwright page. It
-does not import Playwright, navigate, change authentication or network policy, mutate the page, or
-close the page. The caller owns the browser lifecycle and supplies the compulsory boundary:
-
-```ts
-const result = await checkPage(page, {
-  trust: "host-controlled-page",
-  networkPolicy: "host-owned",
-  scenario: "signed-in-dashboard",
-  output: { dir: "artifacts/breaklint", screenshot: "viewport" },
-  geometry: {
-    stabilizationTimeoutMs: 500,
-    allowedScrollContainers: [{ selector: "[data-grid]", reason: "wide data grid", scope: "suite" }],
-    intentionalOverlays: [{ selector: "[role=dialog]", reason: "open modal" }],
-    rules: { smallText: true, smallTouchTarget: true },
-  },
-});
-```
-
-The option object is closed: unknown fields, unbounded target counts, malformed exception records,
-and any trust/network value other than the two literals above are rejected before the adapter calls
-the page. `SCREEN_OPTIONS_SCHEMA` is the matching exported input schema for tooling.
-
-Screen reports are discriminated by `profileKind: "screen"` and emit `schemaVersion: 2` (readers
-accept Screen 1 and 2); they do not contain Paged.js pages or PDF coordinates. They record the
-sanitized route, current viewport and coordinate system (`css-viewport-pixels` for viewport captures
-or `css-document-pixels` for `"full-page"` captures), browser version, before/stable/after capture
-signatures with structured `capture.driftDetails` on drift, actual PNG hash and dimensions, target
-evaluations (including healthy, excluded, and not-measured targets), coverage counts, and typed
-events. Screen profile v2 checks unexpected horizontal overflow, content visibly cut by rectangular
-`overflow: hidden` or `clip` ancestors, visible HTML sibling overlap (`web/sibling-overlap`), SVG text
-overflowing its viewport (`web/svg-text-overflows-viewport`), and opt-in `web/small-text` /
-`web/small-touch-target` warnings. CSS Color 4 solid colors (`oklch()`, `oklab()`, `lab()`, `lch()`,
-`hwb()`, `color(...)`), semi-transparent opacity (`0 < opacity < 1`), `filter`, and `backdrop-filter`
-are measured normally for geometry; `opacity: 0`, masks, clip-paths, unsupported transforms, and
-running animations stay excluded or `not-measured`. Ordinary vertical scrolling and general visual
-occlusion are outside this measurement contract.
-
-Visible source containers can optionally be verified against a host build receipt (Next.js output
-receipt version 1 or framework-agnostic output receipt version 2). This does not
-accept a caller claim of being bound: breaklint captures the receipt and its declared root-relative
-source/config/lock files before and after the screenshot, checks every digest and inventory digest,
-then checks the rendered build ID meta element. A verified result is only
-`verified-container-only` via `build-bound-component-container`; it is never an exact source-line
-claim. Missing, stale, or changed proof remains declared/unknown with a typed event.
+`checkPage(page, options)`, the API for an already opened Playwright page, takes its options in
+code, not from this file. Its options (`trust`, `networkPolicy`, `scenario`, `output`, `failOn`,
+`geometry`, `sourceBinding`) are a closed object validated the same way: unknown fields and
+malformed values are rejected before the page is touched, and `SCREEN_OPTIONS_SCHEMA` is the
+exported input schema. They are described in [`screen-checks.md`](screen-checks.md).
 
 ## Complete example
 
@@ -96,10 +56,9 @@ There are exactly two profiles:
 | `default` | `error` | by severity: error 1, warning 0.5, info 0 | 12 of 17 rules; half-empty-page, both figure checks and both table checks are off |
 | `strict` | `warn` | 1 for every rule | all 17 rules, including the five optional checks; experimental half-empty-page never gates |
 
-`strict` is a real preset, not a label. A config-file `failOn` can replace its warning gate and a
-CLI `--fail-on` can replace the file. Coverage is different: `coverageFloors` can equal or raise
-the active profile floor, never lower it. `strict` therefore cannot be made partially blind by a
-file that asks for 0.9 or by a later `--profile default`; both invocations end with exit 2.
+A config-file `failOn` can replace a profile's gate, and `--fail-on` can replace the file.
+Coverage is different: `coverageFloors` can equal or raise the active profile floor, never lower
+it, so a file asking `strict` for 0.9 ends with exit 2.
 
 CLI rule selection is also explicit. `--only` replaces config-file enablement for the selected
 set, then `--disable` can remove rules from that set. Empty lists and unknown rule ids are usage
@@ -110,17 +69,15 @@ errors.
 One document has a default acquisition budget of 600000 ms (10 minutes). Set
 `documentTimeoutMs` in the JSON file or pass `--document-timeout-ms <n>`; the CLI wins when both
 are present. The value must be an integer from 30000 to 1800000 ms. Invalid values stop before
-Chrome starts with exit 2. Exceeding the budget during acquisition ends with exit 3; the message
-reports the effective budget and names the flag. The producer API uses the same default and hard
-maximum for its host-controlled process boundary. A larger budget can use substantially more
-memory on long documents; it is not a page-count or memory guarantee.
+Chrome starts with exit 2. Exceeding the budget ends with exit 3 and names the
+effective budget. A larger budget is not a page-count or memory guarantee.
 
 ## Rules and options
 
 A rule value is either `true`, `false`, or an options object. `false` disables the rule; any other
 value enables it — `true`, and equally an options object, including an empty one. For the rules that
 run by default this is invisible; for any of the five off-by-default rules it means that
-configuring an option also turns the rule on (see [limitations](limitations.md)), and a
+configuring an option also turns the rule on, and a
 `{"rules": {"layout/half-empty-page": false}}` still turns it off under `strict`. The complete rule
 and option surface, including types and defaults, is in the generated
 [JSON Schema](../breaklint.schema.json). Runtime validation and that file derive from the same rule
@@ -162,19 +119,19 @@ The canonical document JSON report uses report schema 5 and records:
 - a source for every effective leaf: `default`, `profile`, `config`, or `cli`;
 - a 64-character SHA-256 `config.fingerprint`.
 
-The selected profile is resolution metadata, not a second semantic input: its fully expanded
-effects already appear as `failOn` and per-rule floors. It is therefore reported with its source
-but excluded from `config.effective`. A `strict` profile and a completely expanded equivalent
-default profile receive the same fingerprint.
+The profile is reported with its source but excluded from `config.effective`, because its effects
+already appear as `failOn` and per-rule floors. The fingerprint covers canonicalised effective
+semantics only (domain prefix `breaklint-effective-config-v1`): reordering keys or set-like values
+does not change it; changing an effective option does.
 
-The fingerprint is computed over canonicalised effective semantics with the domain prefix
-`breaklint-effective-config-v1` and a NUL separator. It excludes provenance, output paths,
-report format, observed runtime counters and absolute machine paths. Reordering object keys or
-set-like values therefore does not change it; changing an effective option does.
+Report and snapshot schemas evolve independently. The document report is schema 5 (readers accept
+4 and 5), snapshots are Snapshot 7 (readers accept Snapshot 5, 6 and 7), and the Configuration
+Contract is v1. Unknown stamps and malformed data are refused; a stored snapshot without a figure
+or table inventory declines the corresponding enabled checks.
 
-Report schema and snapshot schema evolve independently. The document report remains schema 5 (readers accept 4 and 5); the candidate emits Snapshot 7, and Configuration Contract remains v1. Snapshot 7 adds the optional table inventory with source rows/cells and actual printed fragments, including unsupported-flow witnesses. Readers accept Snapshot 5, 6 and 7 with their required block/line fields. Missing figure or table inventories explicitly decline the corresponding enabled checks. The optional legacy named-anchor inventory supplements authored IDs; an older inventory without it cannot prove that a target absent from IDs is missing. Unknown stamps and malformed present data remain refused. A hand-written snapshot must not invent a complete source inventory.
-
-`figure/caption-separated` and `figure/dangling-reference` are warning checks, off in the default profile. Strict mode and explicit enablement run them. Their allowance options `maxPageDistance` and `maxMissingTargets` default to 0 and accept only safe integers from 0 through 9007199254740991. These are heuristic allowances, not configurable proof-source error thresholds. Effective values and their config/profile/CLI origins remain in the canonical configuration.
+`figure/caption-separated` and `figure/dangling-reference` are warning checks, off by default.
+Their allowances `maxPageDistance` and `maxMissingTargets` default to 0 and accept safe integers
+from 0 upward.
 
 ## Command-line output options
 
@@ -182,15 +139,10 @@ Report schema and snapshot schema evolve independently. The document report rema
 and they are not part of `config.effective` or the fingerprint, because they decide where and in
 which projection a result is written rather than what is measured.
 
-`--out-dir <dir>` is the directory a live run writes its evidence into: one PNG per page and the
-PDF it checked. It defaults to `./breaklint-report`, relative to the working directory, and is
-created when a live run first writes evidence into it; `--demo` writes no evidence and creates
-nothing. A
-missing or blank value is exit 2. The report does not repeat the directory, but every
-`evidence[].path` in it is relative to it, so the report and the directory travel together.
-`tests/e2e/input-validation.test.ts` pins the exit-2 cases and `--help`, and
-`tests/live/cli-out-dir.test.ts` observes the evidence landing in the named directory and in the
-default one.
+`--out-dir <dir>` is where a live run writes its evidence: one PNG per page and the checked PDF
+(default `./breaklint-report`, created on first write; `--demo` writes nothing). A blank value is
+exit 2. Every `evidence[].path` in the report is relative to it, so report and directory travel
+together.
 
 ## Failure boundary
 

@@ -7,7 +7,7 @@
  * Why a fork and not the parent design system's `ds` namespace: the report is a public, MIT
  * product surface, not an instance of that design system; no code links the two, and a shared
  * prefix would invite silent cascade collisions the day a host page embeds a report. The decision
- * is recorded in docs/reporting.md.
+ * is recorded in maintainers/report-review.md.
  *
  * The two renderers keep separate palettes. The bundle view is its own bounded projection with an
  * explicit `theme` option rather than the operating-system preference, and it is outside the

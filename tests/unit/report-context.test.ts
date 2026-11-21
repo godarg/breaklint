@@ -10,7 +10,7 @@ import { ALL_RULES } from "../../src/rules/index.ts";
 import { REPORT_SCHEMA_VERSION, READABLE_REPORT_SCHEMA_VERSIONS } from "../../src/core/enums.ts";
 import { renderReport, writeReportBundle } from "../../src/api/bundle.ts";
 import type { Report } from "../../src/core/types.ts";
-import type { PublicScreenReport } from "../../src/web/types.ts";
+import type { PublicScreenReportV1 } from "../../src/web/types.ts";
 import type { ReportComparison } from "../../src/api/compare.ts";
 import { findingsReportState } from "../fixtures/report-states.ts";
 
@@ -220,7 +220,7 @@ describe("bounded public report views", () => {
   });
 
   it("keeps a screen report in its own route and viewport semantics", () => {
-    const report: PublicScreenReport = {
+    const report: PublicScreenReportV1 = {
       schemaVersion: 1, profileKind: "screen", runId: "screen-run", runVerdict: "findings", exitCode: 1,
       scope: { projectId: "ds-os", documentId: null, scenario: "open-nav", url: "/cockpit", viewport: { width: 390, height: 844, deviceScaleFactor: 1 }, browserVersion: "test" }, trust: "host-controlled-page", networkPolicy: "host-owned",
       targetInventory: { complete: true, omittedCount: 0, reason: null }, coverage: { candidates: 1, measured: 1, excluded: 0, notMeasured: 0, allowedScrollContainers: [], intentionalOverlays: [] },
@@ -237,7 +237,7 @@ describe("bounded public report views", () => {
      * and nothing went red: `complete` still read false, so the pack looked honest while the
      * NUMBER an agent reads to learn how much it is missing had silently shrunk to zero.
      */
-    const capped: PublicScreenReport = {
+    const capped: PublicScreenReportV1 = {
       ...report,
       targetInventory: { complete: false, omittedCount: 7, reason: "screen/target-enumeration-capped" },
       evaluations: [{ ...report.evaluations[0]!, status: "not-measured", reason: "env/pixel-oracle-unavailable" }],

@@ -9,7 +9,7 @@ export const REVIEW_LEDGER_SCHEMA_VERSION: number;
 export const REQUIRED_BROWSER_RENDER_ARGS: readonly string[];
 export const DECLARED_ENVIRONMENT_FIELDS: readonly string[];
 export const OBSERVED_ENVIRONMENT_FIELDS: readonly string[];
-export const HUMAN_REVIEW_ROLES: readonly string[];
+export const ROSTERED_REVIEW_ROLES: readonly string[];
 export const REVIEWER_AUTHENTICATION_NOTE: string;
 
 export interface ReviewInput {
@@ -26,13 +26,14 @@ export function assertReviewEnvironment(environment: unknown, label: string, opt
 export function assertObservedEnvironment(observed: unknown, label: string): void;
 export const REVIEW_TIME_SKEW_MS: number;
 export function validateReviewLedger(ledger: unknown, options?: { cellCount?: number; now?: number }): { rounds: number; latest: ReviewRound };
-export function isRosteredHuman(reviewer: unknown): boolean;
+export const LAST_HUMAN_KIND_ROUND: number;
+export function isRosteredReviewer(reviewer: unknown): boolean;
 export function summarizeLatestRound(ledger: ReviewLedger): {
   latest: ReviewRound;
   reviewers: string[];
   passingCells: number;
-  humanPassingCells: number;
-  humanPass: boolean;
+  rosteredPassingCells: number;
+  rosteredPass: boolean;
   delegatedPassingCells: number;
   delegatedPass: boolean;
 };
@@ -43,17 +44,32 @@ export function latestBindingStatus(ledger: ReviewLedger, manifest: unknown, cur
   reason: string | null;
 };
 export function describeLatestRound(ledger: ReviewLedger, manifest: unknown, currentFingerprint: string): string;
-export function assessHumanGate(ledger: ReviewLedger, manifest: unknown, currentFingerprint: string): ReviewRound;
+export function assessRosterGate(ledger: ReviewLedger, manifest: unknown, currentFingerprint: string): ReviewRound;
 export function assertCurrentDelegationRelease(latest: ReviewRound, reviewInputRoot?: string): void;
-export function assessSightGate(ledger: ReviewLedger, manifest: unknown, currentFingerprint: string, reviewInputRoot?: string): { latest: ReviewRound; reviewKind: "human" | "delegatedAI" };
+export function assessSightGate(ledger: ReviewLedger, manifest: unknown, currentFingerprint: string, reviewInputRoot?: string): { latest: ReviewRound; reviewKind: "rostered" | "delegatedAI" };
 
-export interface FounderSightDelegation {
+export const LEGACY_LEDGER_ROUNDS: number;
+export const DELEGATION_STATEMENT: string;
+export const EXTERNAL_RECEIPT_PREFIX: string;
+
+/** Rounds 1–9: the verbatim session quote, as recorded. */
+export interface LegacyFounderSightDelegation {
   founder: "@Founder";
   date: string;
   sessionQuote: string;
   release: string;
   revoked: false;
 }
+/** From round 10 on: the quote's SHA-256 and the fixed neutral statement, never the quote. */
+export interface HashedFounderSightDelegation {
+  founder: "@Founder";
+  date: string;
+  sessionQuoteSha256: string;
+  statement: string;
+  release: string;
+  revoked: false;
+}
+export type FounderSightDelegation = LegacyFounderSightDelegation | HashedFounderSightDelegation;
 export interface DelegatedAIReviewer {
   kind: "delegated-ai";
   handle: string;
@@ -69,7 +85,7 @@ export interface ReviewRound {
   record: "current" | "historical" | "historical-reconstruction";
   outcome: "pass" | "fail" | "pending";
   reviewedAt: string | null;
-  reviewers: ({ handle: string | null; kind: "human" | "agent" | "not-recorded"; model?: string } | DelegatedAIReviewer)[];
+  reviewers: ({ handle: string | null; kind: "human" | "rostered" | "agent" | "not-recorded"; model?: string } | DelegatedAIReviewer)[];
   delegation?: FounderSightDelegation;
   binding: null | { reviewInputFingerprint: string; renderManifestGeneratedAt: string; reviewEnvironment: Record<string, unknown> };
   findings: { blocker: number; high: number; medium: number; low: number };
@@ -83,3 +99,6 @@ export interface ReviewLedger {
   rounds: ReviewRound[];
   [key: string]: unknown;
 }
+export const EXPECTED_PRINT_PAGES_BY_PLATFORM: Readonly<Record<string, Readonly<Record<string, number>>>>;
+export const EXPECTED_SCREEN_CELLS: number;
+export function assertSurfaceInventory(inventory: unknown, platform: string): void;

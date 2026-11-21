@@ -21,12 +21,9 @@ A late start above `maxTopGap` can warn independently, including at document end
 
 ## Why the rule remains experimental
 
-Net fill sums merged glyph/visual bands rather than occupied line boxes. Leading and margins
-make a page look fuller than this ratio. Historical collector experiments found full prose pages
-at 0.58–0.72 with `line-height: 1.5`, 0.51–0.54 at 2 and 0.34–0.36 at 3 (Chromium 141,
-Paged.js 0.4.3, the measuring host's default fonts). A purpose-built historical 40-document
-exercise fired on 37 documents. Those observations motivated default-off behavior; they do not
-measure the candidate's current accuracy or establish a fixed ceiling.
+Net fill sums merged glyph/visual bands rather than occupied line boxes, so leading and margins
+make a page look emptier than it is: full prose pages measured 0.58–0.72 at `line-height: 1.5` and
+0.34–0.36 at 3. That is why the rule is off by default; it is not an accuracy measurement.
 
 The two-line-height guard prevents one bounded class of low-ratio warning. It does not
 replace net fill with line-box occupancy, prove that a following block could fit, or identify an
@@ -40,16 +37,14 @@ page declines with `env/parity-blank-page`. Low coverage at an outgoing forced p
 without a late start declines with `env/forced-break`. That observation does not establish that
 the author wanted a short page. A late start remains measurable even when the ending is forced.
 
-A chapter ending, title/part page or deliberate empty page needs verified design context. The
-rule does not infer that intent from CSS. A smaller image, table or keep chain is a repair
-candidate only after its actual placement and source cause are checked. The message names the
-bottom-space measurement and paginator ending while leaving avoidability and author intent unknown.
+A chapter ending, title page or deliberate empty page needs design context the rule does not
+infer from CSS. The message names the bottom-space measurement and the paginator ending, and
+leaves avoidability and author intent unknown.
 
 ## Calibration
 
-`calibrated: false`. The candidate has not received the planned human example labels. Named
-fixture/renderer checks and a bounded human evaluation are separate from population calibration.
-Off in the default profile; strict, `--only` and explicit config enablement run it.
+`calibrated: false`. Off in the default profile; `--profile strict`, `--only` and explicit
+configuration run it.
 
 ## Remediation
 

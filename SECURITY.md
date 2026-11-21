@@ -53,7 +53,7 @@ intended, and each says what it does not cover:
   `columns: 1`) or a nonempty `display: contents` heading produces a fatal diagnostic and exit 3.
   This is conservative: a short heading that happens to print in full is refused too. It does not
   establish a general PDF/source text-completeness guarantee; other multicolumn and footnote
-  cases remain open in [limitations](docs/limitations.md).
+  cases remain open in [known limits](docs/known-limits.md).
 - **No browser-wide file-access switch.** The document is served from a loopback origin instead. A
   test measures that a document loaded this way cannot read a neighbouring file, because removing
   the reason for a switch and leaving the switch in place is a mistake that was actually made here
@@ -97,8 +97,12 @@ live, visual, consumer, licence, advisory and release-integrity gates before the
 GHSA-mrhx-c7xc-m3w5 (zod below 4.6.6, high, uncontrolled memory use while validating oversized
 collections) entered the GitHub Advisory Database on 2026-10-23. In 0.11.0 the consumer pin moved
 to `puppeteer-core@25.16.0` (Action, documented install commands, CI and release packed-consumer
-steps) and the peer floor rose to `>=25.16.0 <26`, whose transitive chain admits a fixed zod and
-audits clean under `npm run test:advisories`.
+steps) and the peer floor rose to `>=25.16.0 <26`. That floor does not by itself exclude the
+vulnerable zod: `puppeteer-core@25.16.0` depends on `chromium-bidi@157.0.8090-0`, which declares
+`zod: ^4.6.5`, a range that still admits 4.6.5. A fresh install resolves a fixed zod (this
+repository's lockfile: zod 4.6.7) and audits clean under `npm run test:advisories`. A consumer whose
+existing lockfile still holds zod 4.6.5 keeps it until that lockfile is re-resolved, for example
+with `npm update zod`.
 
 breaklint continues to drive Chrome over the Chrome DevTools Protocol (never WebDriver BiDi). The
 published runtime graph (`parse5`, `entities`) carries no advisory.
@@ -109,10 +113,15 @@ Advisories reach the dependency graph without a commit here. `npm run test:advis
 published runtime graph and the complete development graph and separates three outcomes: no
 advisory (exit 0), an advisory (exit 1, naming each package, its GHSA ids, the chain that pulls it
 in and whether a fix exists within the declared ranges) and an audit that did not run because the
-registry was unreachable or the time limit passed (exit 75, never 0). With Dependabot security
-updates enabled for the repository, `.github/dependabot.yml` makes them lockfile-only pull requests:
-they move locked versions inside the declared ranges, never change a range or a consumer pin, run
-the complete CI and are never merged automatically.
+registry was unreachable or the time limit passed (exit 75, never 0). It runs on every pull
+request, on every push to `main` and in the release workflow, so an advisory that appears between
+two commits turns the next run red.
+
+There is deliberately no `.github/dependabot.yml`: an automatic pull request would move
+`package-lock.json`, which every visual review round is bound to, without a release decision. The
+fix for an advisory is a maintainer's commit that moves the lockfile (or, where a range has to
+change, a release decision) and passes the complete CI. Dependabot alerts are switched on for the
+repository as a notification only.
 
 ## Scope
 

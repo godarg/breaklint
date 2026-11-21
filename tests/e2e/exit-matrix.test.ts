@@ -309,7 +309,7 @@ const rows: Row[] = [
     id: "P10",
     what: "a broken renderer on one document and a coverage gap on another — the renderer wins",
     // The edge `infrastructure` > `insufficient-coverage`, which had NO row for ten rounds. The
-    // matrix carried rows for every OTHER pair, and `docs/status.md` said "every precedence edge".
+    // matrix carried rows for every OTHER pair, and `maintainers/status.md` said "every precedence edge".
     // Measured: swapping the two entries in `VERDICT_PRECEDENCE` left 175/175, 15/15 mutants and
     // selfcheck green, and this run answered 4 instead of 3 — sending a reader into the document
     // while the renderer is what is broken, which is the exact misdirection the comment above
@@ -465,7 +465,7 @@ describe("exit matrix", () => {
   // table and all nine failOn rows. This used to assert exactly that — `rows.length >= 21` —
   // under a comment claiming that "deleting a row is a failure rather than a quiet reduction in
   // scope". With 27 rows present, six could vanish and the floor still held; an audit deleted one
-  // and the whole battery stayed green while `docs/status.md` went on saying 27. A floor cannot
+  // and the whole battery stayed green while `maintainers/status.md` went on saying 27. A floor cannot
   // make that claim. The literal can, and the contract's minimum is kept beside it so the reason
   // for the number does not disappear with it.
   const EXPECTED_ROWS = 28;
@@ -501,20 +501,20 @@ describe("exit matrix", () => {
     // Row ids must be unique, or two rows can collapse into one without the count moving. An
     // earlier audit found duplicate ids (P5, P6) in this table.
     assert.equal(new Set(rows.map((r) => r.id)).size, rows.length, "duplicate row id");
-    // And the row as `docs/status.md` prints it, matched WHOLE.
+    // And the row as `maintainers/status.md` prints it, matched WHOLE.
     //
     // This comment said "matched WHOLE" for one round while the code below it was a substring
     // match — the repair had been applied to the demo row and the comment here was updated to
     // describe a fix that was never made here. Measured: the row was replaced with
     // "27 rows over all five exit codes, NONE of which is executed; the row assertions were
     // removed and the exit codes are not checked" and the battery stayed at 175/175.
-    const status = readFileSync(new URL("../../docs/status.md", import.meta.url), "utf8");
+    const status = readFileSync(new URL("../../maintainers/status.md", import.meta.url), "utf8");
     const row = status.split("\n").find((l) => l.startsWith("| Exit matrix |"));
     assert.equal(
       row,
       `| Exit matrix | ${rows.length} rows over all five exit codes, all nine \`failOn\` rows and every ` +
         "precedence edge; each row asserts on exit code **and** verdict **and** `gateTriggeredBy` |",
-      "the docs/status.md row for the exit matrix does not match what the matrix is",
+      "the maintainers/status.md row for the exit matrix does not match what the matrix is",
     );
   });
 

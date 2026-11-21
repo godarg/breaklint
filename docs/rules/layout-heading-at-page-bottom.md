@@ -32,7 +32,7 @@ its last line does, and a block below it is placed the same way; so is a zero-si
 text prints outside its box. One whose recorded lines are all
 invisible is `excluded` (`rule/target-not-visible`); one with no line, or with lines the snapshot
 did not record, is declined as `env/invalid-measurement`, and the decline counts against coverage.
-Headings inside a margin box are not measured. See `docs/limitations.md`.
+Headings inside a margin box are not measured. See [known limits](../known-limits.md).
 
 ## Calibration
 

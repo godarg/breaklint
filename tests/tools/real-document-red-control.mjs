@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const DOCUMENT = join(ROOT, "corpus/public/robustness-v1/documents/project-gutenberg-gettysburg-address.html");
 const DOCUMENT_SHA256 = "2da09414df2cfbe8f48420abd73067e3e08182d152d3d13bcdd1d26ff30535d9";
-const EVIDENCE = JSON.parse(readFileSync(join(ROOT, "docs/validation/real-document-red-control-v0.2.3.json"), "utf8"));
+const EVIDENCE = JSON.parse(readFileSync(join(ROOT, "maintainers/validation/real-document-red-control-v0.2.3.json"), "utf8"));
 
 const cliIndex = process.argv.indexOf("--cli");
 const cliArgument = cliIndex >= 0 ? process.argv[cliIndex + 1] : process.env.BREAKLINT_023_CLI;

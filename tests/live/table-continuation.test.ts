@@ -158,4 +158,38 @@ th, td { border: 1px solid #333; padding: 5px; }</style></head>
     assert.ok(irrReport.notMeasured.some(n => n.reason === "env/table-structure-unsupported"));
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+it("measures a grouped [2,2] header over four data columns and a ragged figure table (P1/P2)", async () => {
+  const root = mkdtempSync(join(tmpdir(), "breaklint-table-grouped-live-"));
+  try {
+    const rows = Array.from({ length: 30 }, (_, i) => `<tr><td>R${i}</td><td>${i * 3}</td><td>${i * 7}</td><td>ok</td></tr>`).join("\n");
+    const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Grouped header</title>
+<style>@page { size: 120mm 135mm; margin: 10mm; } body { font: 13px/1.4 serif; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; } th, td { border: 1px solid #333; padding: 5px; }</style></head>
+<body><h1>Grouped header</h1><table><thead><tr><th colspan="2">First pair</th><th colspan="2">Second pair</th></tr></thead>
+<tbody>${rows}</tbody></table>
+<figure><table><tbody><tr><td>Item</td><td>Count</td><td>Note</td></tr><tr><td>Alpha</td><td>3</td><td>fine</td></tr>
+<tr><td>Total</td><td>3</td></tr></tbody></table><figcaption>Table 2. Ragged sum row.</figcaption></figure></body></html>`;
+    const path = join(root, "grouped.html"); writeFileSync(path, html);
+    const rendered = await renderDocuments([path], {
+      outDir: root, evidenceBinding: true, sourceMapInjection: true, locale: "en-US", network: { mode: "offline", allowed: [] },
+    });
+    assert.equal(rendered.fatal, null);
+    const input = rendered.documents[0]!;
+    assert.ok(input.snapshot, JSON.stringify(input.infrastructure));
+    const report = runDocument(input, { activeRules: [tableColumnDrift, captionSeparated], optionsByRule: {}, coverageFloors: {}, failOn: "warn" }).report;
+    const grouped = input.snapshot.tableIndex!.tables[0]!;
+    assert.ok(grouped.fragments.filter(f => f.visible).length >= 2, "the grouped table must continue onto a later page");
+    const ragged = input.snapshot.tableIndex!.tables[1]!;
+    const driftEvaluations = report.evaluations.filter(e => e.ruleId === tableColumnDrift.id);
+    const groupedEvaluations = driftEvaluations.filter(e => e.targetRef?.sid === grouped.sid);
+    assert.ok(groupedEvaluations.length >= 2);
+    assert.ok(groupedEvaluations.every(e => e.status === "measured"), JSON.stringify(report.notMeasured));
+    // The ragged figure table has no column grid: column drift still declines it explicitly.
+    const raggedDrift = driftEvaluations.filter(e => e.targetRef?.sid === ragged.sid);
+    assert.ok(raggedDrift.length >= 1 && raggedDrift.every(e => e.status === "not-measured"));
+    assert.equal(report.findings.filter(f => f.ruleId === tableColumnDrift.id).length, 0);
+    assert.equal(report.coverage[captionSeparated.id]!.notMeasuredCount, 0, JSON.stringify(report.notMeasured));
+    assert.equal(report.coverage[captionSeparated.id]!.measured, 1);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 });

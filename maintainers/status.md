@@ -214,7 +214,7 @@ source or supported figure measurements are unavailable, including non-image fig
 unsupported source constructs or `--no-source-map`. The authored target inventory covers
 `id`, not legacy `<a name>` targets. The outside-coverage next-check count wording also remains
 a known limitation; JSON keeps the separate accounted values. These were accepted release advisories
-recorded as G-142, G-143 and G-144 in [the work register](../planning/open-work.md).
+recorded as G-142, G-143 and G-144 in the maintainers' work register (kept outside this repository).
 
 The maintainer's focused completion authorization of 2026-10-07 governs this release. Publication
 does not establish the former exhaustive all-product precision/recall study, blind A/B,
@@ -575,7 +575,7 @@ unchanged.
 The six documents are recorded, not published. They are chapters of a paid product, so
 `corpus/public/pagination-residue-v1` carries their SHA-256 values, rights and privacy review and
 exact expected residue while the bytes stay outside this repository — the
-`private_nonredistributable` shape of `docs/validation/corpus-contract-v1.md`. At the time, without
+`private_nonredistributable` shape of `maintainers/validation/corpus-contract-v1.md`. At the time, without
 `BREAKLINT_RESIDUE_CORPUS_ROOT` that gate printed `SKIPPED` and claimed nothing; the record has since
 become historical and is no longer a CI step (see the current release above). What held the class
 in CI then, and still does, is the public `tests/fixtures/fragmentainer-residue.html`, reduced from
@@ -622,7 +622,7 @@ measures 9/13 rules and exits 0. The first-party Dargel document separately exer
 packaging and produces exactly 6 pages, measures 11/13 rules and exits 0. The published 0.2.3 package
 makes the third-party gate fail with Exit 3; the exact registry integrity, environment,
 deterministic observation and reproduction command are retained in
-`docs/validation/real-document-red-control-v0.2.3.json` as the recorded red control.
+`maintainers/validation/real-document-red-control-v0.2.3.json` as the recorded red control.
 
 Live input is explicitly `.html`/`.htm`. Standalone SVG, PDF, Markdown and directories are rejected
 as usage with Exit 2 before the browser starts. Inline SVG remains supported for the released
@@ -711,7 +711,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=782 aggregateTests=948 liveTests=123 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=900 aggregateTests=1067 liveTests=146 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against
@@ -1089,7 +1089,7 @@ unreviewed input drift; it is resolved and must not be rerun or reclassified as 
 
 **M3-0 foundation is implemented, calibration is still unfinished.** The versioned independent
 oracle, strict corpus/annotation schemas, real Chrome/Paged.js SVG Validation Lab, semantic readiness
-validator, leakage/holdout checks and negative controls are documented under `docs/validation/`.
+validator, leakage/holdout checks and negative controls are documented under `maintainers/validation/`.
 The lab is additive and runs through the existing `npm test` E2E discovery path. Its synthetic
 fixtures validate the apparatus and known boundaries; they do not count as real calibration data.
 Claim readiness now fails closed without a separate trust ledger, previous immutable holdout
@@ -1207,7 +1207,7 @@ break token names, in the paginator's parsed source, with the paginator's limite
 walk, and only where that node is the one the layout walker handed out last. The live region
 documents check every boundary against Paged.js' own `shouldBreak()` answers, recorded by a
 test-only wrapper; the remaining limits are in
-[limitations.md](limitations.md#the-break-cause-of-a-page-boundary).
+[burden-of-proof.md](burden-of-proof.md#the-break-cause-of-a-page-boundary).
 
 **A page the paginator never reported is `unknown`, not a page with default values.** A final page
 with no `afterPageLayout` record used to receive a fabricated record and be counted nowhere, so a

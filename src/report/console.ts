@@ -111,7 +111,8 @@ export function renderConsole(report: Report, opts: { colour?: boolean } = {}): 
   if (decisions.declines.length > 0) {
     out.push("Declined candidates (including when coverage meets its floor)");
     for (const decline of decisions.declines) {
-      out.push(`  ${decline.document} · ${decline.ruleId ?? "no rule"} · ${decline.scope} · ${decline.reason}: ${decline.count}`);
+      out.push(`  ${decline.document} · ${decline.ruleId ?? "no rule"} · ${decline.scope} · ${decline.reason}: ${decline.count}` +
+        (decline.detail ? ` (observed: ${decline.detail})` : ""));
     }
     out.push("");
   }

@@ -339,6 +339,11 @@ export interface NotMeasured {
   target: { keyType: KeyType; nodeKey: string; sid: string | null } | null;
   /** At least 1. Aggregated: a 2 000-page multi-column document must not produce 10 000 rows. */
   count: number;
+  /**
+   * Optional observed sub-cause of `reason`, e.g. "script mutated DOM: 3 records before pagination"
+   * or "rowSpan > 1 in thead". Human-readable only; `reason` stays the machine-readable code.
+   */
+  detail?: string;
 }
 
 export interface InputIdentity {
@@ -474,6 +479,8 @@ export interface Snapshot {
   };
   /** Absent on stored Snapshot 5: enabled figure rules explicitly decline the unknown inventory. */
   figureIndex?: FigureIndex;
+  /** Observed sub-cause when a live run withheld `figureIndex`; carried into the decline detail. */
+  figureIndexDecline?: string;
   /** Legacy snapshots lack this inventory; enabled table checks decline, never guess. */
   tableIndex?: TableIndex;
   pages: PageRecord[];

@@ -102,7 +102,7 @@ export const captionSeparated = defineRule({
   remediation: { advice: "Inspect the measured body boundary and caption on the named pages. For a short image or table with a short caption, try 'break-inside: avoid' on the figure or remove an unintended forced break on its caption. For a multi-page table, keep only the caption with the nearest body rows rather than keeping the entire table. These are untested suggestions: deliberate separation can be acceptable, and the rule does not prove the pagination cause or that a keep will fit.", tested: false },
 }, (snapshot, ctx) => {
   const index = snapshot.figureIndex;
-  if (!index?.complete) return unavailable(ID);
+  if (!index?.complete) return unavailable(ID, snapshot.figureIndexDecline);
   const findings = []; const notMeasured = []; const evaluations = [];
   let candidates = 0; let measured = 0;
   for (const figure of index.figures) for (const captionSid of figure.captionSids) {

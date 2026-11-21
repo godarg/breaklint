@@ -1086,7 +1086,9 @@ export const SNAPSHOT_SOURCE = `(() => {
   }));
   const figureBodies = [];
   pagesEls.forEach((page, pageIndex) => P.all(page, "figure[data-bl-sid] img,figure[data-bl-sid] svg").forEach((el) => {
-    if (!inFlow(el) || P.closest(el, "figcaption") || (el.tagName.toLowerCase() === "svg" && P.closest(P.parent(el), "svg"))) return;
+    // Anything inside an SVG, including HTML in <foreignObject>, is part of that SVG body, never a
+    // body of its own: the same rule as the static source index and the runtime figure probe.
+    if (!inFlow(el) || P.closest(el, "figcaption") || P.closest(P.parent(el), "svg")) return;
     const owner = P.closest(el, "figure[data-bl-sid]");
     if (!owner) return;
     const tag = el.tagName.toLowerCase();
@@ -1177,7 +1179,7 @@ export interface AssembleSnapshotInput {
    * Runtime proof that a script-bearing document produced zero DOM mutations and preserved the
    * exact static figure/ID/anchor/reference-link tree before and after pagination.
    */
-  runtimeFigureVerification?: { verified: boolean };
+  runtimeFigureVerification?: { verified: boolean; detail?: string | null };
 }
 
 export interface SnapshotInvariantValidation {
@@ -1540,6 +1542,15 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
     input.sourceModel.figureIndex.figures.every(figure =>
       hasFigureSource(figure.sid) && figure.captionSids.every(hasFigureSource)) &&
     input.sourceModel.figureIndex.referenceBlocks.every(block => hasFigureSource(block.sid));
+  // The first observed condition that withheld the inventory. Diagnostic only: availability above
+  // is decided without it.
+  const figureIndexDecline = figureIndexAvailable ? null
+    : !input.sourceMapInjection ? "source-id injection is off"
+    : !figureScriptsVerified ? (input.runtimeFigureVerification?.detail
+      || (input.runtimeFigureVerification ? "executable scripts present; runtime figure tree not verified"
+        : "executable scripts present; no runtime verification ran"))
+    : !figureStructurallyComplete ? "figure markup outside the indexable structure"
+    : "a figure, caption or reference block has no source id";
 
   // HTML rowspan="0" is valid row-group growth, not a unit span. Raw authored values can also
   // be NaN, zero or fractional even when the browser recovers. Snapshot 7 represents positive
@@ -1582,6 +1593,7 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
       provenance: sourceProvenance,
       ...(input.sourceFiles === undefined ? {} : { files: input.sourceFiles }),
     },
+    ...(figureIndexDecline ? { figureIndexDecline } : {}),
     ...(figureIndexAvailable ? { figureIndex: {
       ...input.sourceModel.figureIndex,
       complete: input.sourceMapInjection && figureStructurallyComplete && figureScriptsVerified && input.raw.figureBodies !== undefined,

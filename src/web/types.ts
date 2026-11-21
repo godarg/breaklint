@@ -34,9 +34,13 @@ export interface NamedScreenException {
 }
 
 export interface ScreenOptInRules {
+  /** `web/sibling-overlap` is uncalibrated and off unless set to true. Off, the sibling pass never runs. */
+  siblingOverlap?: boolean;
   smallText?: boolean | { minFontSizePx?: number };
   smallTouchTarget?: boolean | { minSizePx?: number };
 }
+
+export type ScreenFailOn = "warn" | "error";
 
 export interface HostBuildContainer { selector: string; file: string; }
 
@@ -49,6 +53,12 @@ export interface HostBuildContainerBinding {
   buildOutputReceiptPath?: string;
   compiledBuildSelector: string;
   compiledBuildAttribute: string;
+  /**
+   * Attribute of the `compiledBuildSelector` element that renders the output build id (the output
+   * receipt's `buildId`, or `nextBuildId` for output receipt 1). Without it, or when the rendered id
+   * differs from the receipt, the binding stays `declared`: nothing ties the receipt to the page.
+   */
+  compiledOutputAttribute?: string;
   containers: readonly HostBuildContainer[];
 }
 
@@ -59,6 +69,8 @@ export interface CheckPageOptions {
   projectId?: string;
   documentId?: string;
   runId?: string;
+  /** Lowest finding severity that turns the verdict into `findings`. Default `warn` (every finding gates). */
+  failOn?: ScreenFailOn;
   output: { dir: string; screenshot: "viewport" | "full-page" };
   geometry?: {
     allowedScrollContainers?: readonly NamedScreenException[];
@@ -146,8 +158,9 @@ export interface ScreenCoverage {
   intentionalOverlays: { selector: string; reason: string; scope: "scenario" | "suite"; count: number }[];
 }
 
+/** The emitted screen report (Screen 2). Readers take `ReadableScreenReport`. */
 export interface PublicScreenReport {
-  schemaVersion: 1 | 2;
+  schemaVersion: typeof SCREEN_REPORT_SCHEMA_VERSION;
   profileKind: "screen";
   runId: string;
   runVerdict: RunVerdict;
@@ -162,6 +175,8 @@ export interface PublicScreenReport {
   };
   trust: "host-controlled-page";
   networkPolicy: "host-owned";
+  /** The finding gate that decided between `findings` and `clean` (absent in reports before 0.11.1). */
+  failOn?: ScreenFailOn;
   rulesEnabled?: ScreenRuleId[];
   targetInventory: { complete: boolean; omittedCount: number; reason: string | null };
   coverage: ScreenCoverage;
@@ -174,6 +189,10 @@ export interface PublicScreenReport {
     drifted: boolean;
     stabilized?: boolean;
     stabilizationAttempts?: number;
+    /** Why the stabilization loop ended: two identical samples, the time budget, or the attempt limit (0.11.1). */
+    stabilizationEndedBy?: "stable" | "timeout" | "attempt-limit";
+    /** Duration of the first page sample in ms; the stabilization budget starts after it (0.11.1). */
+    firstSampleMs?: number;
     driftDetails?: ScreenDriftDetail[];
   };
   artifact: ScreenArtifact;
@@ -182,6 +201,22 @@ export interface PublicScreenReport {
   infrastructure: ScreenInfrastructureEvent[];
   events: { kind: string; detail: string }[];
 }
+
+/** A named exception counter as 0.10.0 (Screen 1) wrote it: without `scope`. */
+export interface ScreenExceptionCountV1 { selector: string; reason: string; count: number }
+
+/** The Screen 1 report 0.10.0 wrote. Accepted by readers only; checkPage never emits it. */
+export interface PublicScreenReportV1 extends Omit<PublicScreenReport, "schemaVersion" | "failOn" | "rulesEnabled" | "coverage" | "capture"> {
+  schemaVersion: 1;
+  coverage: Omit<ScreenCoverage, "allowedScrollContainers" | "intentionalOverlays"> & {
+    allowedScrollContainers: ScreenExceptionCountV1[];
+    intentionalOverlays: ScreenExceptionCountV1[];
+  };
+  capture: { before: string; stable: string; after: string; fontsReady: boolean; timedOut: boolean; drifted: boolean };
+}
+
+/** Every screen report a reader (context, bundle, CLI) accepts: Screen 1 and Screen 2. */
+export type ReadableScreenReport = PublicScreenReportV1 | PublicScreenReport;
 
 export type ScreenCheckResult =
   | { ok: true; report: PublicScreenReport }

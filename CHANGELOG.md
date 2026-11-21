@@ -1,81 +1,107 @@
 # Changelog
 
+## 0.11.1 — TBD-at-tag
+
+The first 0.11 release on npm; changes are listed against 0.10.0. 0.11.0 was tagged but never
+published to npm, so the Action pinned to `@v0.11.0` fails with its default installation
+(`use-project-install` and `breaklint-tarball` are not affected); use 0.11.1.
+
+### New in 0.11
+
+- Documents with scripts are checked instead of aborted, and the browser's automatic favicon
+  request no longer stops a run.
+- Table and figure checks work on real manuals: tables with `colspan` group rows and grouped
+  headers, and responsive figures with several image variants.
+- `checkPage` for Playwright now also reports SVG labels cut off by their viewport, measures full
+  pages, can opt in to overlap, small-text and touch-target checks, and gates with `failOn`.
+
+### Upgrading from 0.10
+
+- **Peers:** `puppeteer-core` must be `>=25.16.0 <26`:
+  `npm i -D puppeteer-core@^25.16.0 pagedjs@0.4.3 pdfjs-dist@6.2.108`. A lockfile that still
+  holds zod 4.6.5 keeps it until re-resolved, for example with `npm update zod` (see SECURITY.md).
+- **Screen reports** have `schemaVersion: 2`; readers accept Screen 1 and 2. In TypeScript,
+  `PublicScreenReport` is now the emitted form only; type stored 0.10 reports as
+  `PublicScreenReportV1` or `ReadableScreenReport`.
+- **`allowedScrollContainers` exempts only the container:** its own horizontal overflow and the
+  clipping it causes. Its descendants are measured, so a wide child, such as a long `<pre>` line,
+  can now be reported; name it too, or fix it. An exception that matches `html` or `body` emits
+  `screen-exception-too-broad` and makes the run `insufficient-coverage`.
+- **Selectors** in exceptions and `sourceBinding` that the browser cannot parse are rejected with
+  a `TypeError` before the first measurement.
+- **Source binding:** `verified-container-only` now also requires the output build ID the page
+  renders in the new `sourceBinding.compiledOutputAttribute`. Without it, existing bindings report
+  `declared`. With an output receipt of version 2, name a `buildMarkerPath` so the page can render
+  that ID; without one, the receipt's build ID must equal its `filesSha256`.
+- **Stabilization:** `checkPage` now waits for two identical layout samples, and
+  `stabilizationTimeoutMs` (default 2000) bounds that whole loop, not only the wait for fonts. Let
+  loading states and animations finish before calling it; a page still moving ends as
+  `screen-stabilization-timeout` and `insufficient-coverage`.
+- **Releases** are published only through npm Trusted Publishing, each with provenance.
+
+### Print
+
+- Documents with scripts can use the figure checks when breaklint observes that the scripts did
+  not change figures, IDs or links before pagination; data-only scripts (`application/json`,
+  `application/ld+json`) do not count as scripts. HTML inside an SVG `<foreignObject>` counts as
+  part of that SVG figure.
+- Responsive figures with several image variants are measured when exactly one variant is
+  rendered and the others are `display: none`.
+- The table continuation checks measure tables with simple `colspan` rows (group and separator
+  rows, grouped headers); `layout/table-column-drift` compares continuations against the edges it
+  observed on the first page. An edge never seen there is declined on its own while the observed
+  edges are still compared; irregular spans and `rowspan` stay declined.
+- A declined check names what it observed (`notMeasured[].detail`; console: `(observed: …)`), for
+  example `rowSpan > 1 in thead` or the number of script mutations before pagination.
+- The browser's default `/favicon.ico` request is answered with 204 when the document declares no
+  icon, statically or by a script; declared icons and other missing resources still stop a run.
+- Absolutely positioned elements that Chrome reports at a shifted position after PDF output no
+  longer stop a run when the element, its offset parent and its geometry styles are unchanged.
+- Blank pages that Paged.js inserts for page parity, and split fragments ending exactly at the
+  bottom of the content area, are bound to evidence instead of being refused.
+
+### Screen
+
+- New rule `web/svg-text-overflows-viewport` (on by default): SVG text is measured against the
+  SVG viewport that clips it, including nested SVGs; one clipped label is one finding.
+- New opt-in rules: `web/sibling-overlap` (`geometry.rules.siblingOverlap: true`),
+  `web/small-text` and `web/small-touch-target`.
+- `checkPage` takes `failOn`: `"warn"` by default, the 0.10 rule (any finding makes the verdict
+  `findings`, though new default rules can add findings); `"error"` keeps warnings in the report
+  without the verdict `findings`.
+- Full-page coverage, and exceptions scoped to a scenario or a suite.
+- Content that is not rendered is excluded instead of judged: the body of a closed `<details>`,
+  content the browser skips under `content-visibility`, and elements with an effective opacity
+  of 0.
+- Geometry is measured with CSS Color 4 colours, semi-transparent opacity, `filter` and
+  `backdrop-filter`; masks, clip paths, unsupported transforms and running animations stay
+  not measured, except animations of shadows, box colours and background position.
+- `checkPage` waits for two identical layout samples, reports what drifted, and reports timeouts,
+  the attempt limit, loading fonts and real drift as separate events
+  (`capture.stabilizationEndedBy`, `capture.firstSampleMs`); `stabilizationTimeoutMs: 0` waits
+  for nothing, as in 0.10. A browser call that fails, on a closed page for example, ends as
+  `infrastructure` with a report instead of throwing.
+- Build output receipts can come from any framework, not only Next.js.
+- Capture signatures are keyed per run and no longer allow conclusions about page text.
+
+### CLI and reports
+
+- New subcommands `breaklint compare`, `breaklint context` and `breaklint bundle`. Each help
+  lists its options, ranges and exit codes. Input that is not a readable breaklint report, an
+  `--out` that would overwrite an input, and a non-empty `bundle --out-dir` end with 2; a failed
+  write ends with 3 and leaves the previous output in place. `compare` ends with 4 when the after
+  report is `insufficient-coverage` or no finding can be matched, which includes two reports with
+  findings from a plain CLI run and two reports of different documents; `compare --fail-on-new`
+  ends with 1 when a result is `new`, and `--repository <dir>` reads the ancestry for
+  producer-bound reports.
+- SARIF rules link to the rule page of the exact release tag.
+- HTML reports escape every report value where it is written and print `unavailable` for a
+  number that is not one; they name an ambiguity partner only when it is in the same document,
+  and word declines, coverage and the finding gate more clearly.
+
 ## 0.11.0 — 2026-11-21
 
-Print measurement improvements, Screen Profile v2 (`PublicScreenReport` schema 2), CLI subcommands
-for existing public APIs, Round-8 report-surface follow-ups (`G-148`–`G-151`), and the
-`puppeteer-core@25.16.0` consumer-pin update.
-
-### Print profile
-- **Runtime-verified figure index & responsive multi-variant `<figure>` bodies**: non-executing data
-  scripts (`<script type="application/ld+json">`, `<script type="application/json">`) no longer mark
-  a document `scriptBearing`. Documents with executable scripts or inline `on*` handlers unlock
-  `figure/caption-separated` and `figure/dangling-reference` only when the pre-pagination
-  `MutationObserver` observes zero script mutations, post-pagination mutations remain at baseline,
-  `data-bl-*` attributes are untouched, and both the DOM element count and the pre-pagination
-  figure/ID/anchor/reference-link tree fingerprint match the static `parse5` source tree exactly.
-  Responsive `<figure>` elements with multiple authored body candidates (`img`/`svg`/`table`) are
-  now measurable when **exactly one** authored candidate renders visible with a verified source
-  identity and every other authored candidate is witnessed non-rendered (`display: none` with zero
-  layout boxes); 0 or >=2 rendered candidates, non-`display: none` hidden/broken variants, dropped
-  or mismatched candidates, DOM mutations, and structural disqualifiers (`<base>`, authored
-  `data-ref` / `data-next-break-before` / `data-undisplayed`) remain strictly fail-closed.
-- **Tables with simple regular `colspan` rows**: `layout/table-header-not-repeated` and
-  `layout/table-column-drift` now measure tables whose rows have `rowSpan === 1` and uniform total
-  column width (supporting full-width group/separator rows and grouped headers). Irregular spans
-  and `rowSpan > 1` remain explicitly declined (`env/table-structure-unsupported`).
-- **Implicit `/favicon.ico` & post-PDF OOF freeze**: unreferenced browser-default `/favicon.ico`
-  requests (`resourceType === "other"` without an authored `<link rel="icon">` or asset) receive
-  `204 No Content` instead of blocking the document; explicitly referenced `/favicon.ico` and
-  stylesheet/script/image requests remain strictly fail-closed (`403`). Chrome's post-`page.pdf()`
-  out-of-flow (`position: absolute`) coordinate-cache artifact is tolerated only when `offsetParent`,
-  computed `left`/`top`, element dimensions, fragmentainer residue (`0`), and DOM mutations (`0`)
-  are all verified unchanged.
-- **Evidence binding (`G-78` & bottom-edge area-bound monotonicity)**: confirmed parity-blank pages
-  with zero flow blocks, zero unplaced marks, zero stray `BLSID*` tokens in the PDF text stream,
-  and verified document-level mark conformance now bind cleanly (`pdfConformance: "verified"`).
-  Observed fragment edges strictly inside the content area (`relativeY <= areaBox.height`, closing
-  the former 0.5–1.0 px bottom-band dead zone) as well as continuation end edges and zero-height
-  opening wrappers within 0.5 px of `areaBox.bottom` inside the physical page box (strictly outside
-  `.pagedjs_footnote_area`, preserving `G-100`) are placed instead of emitting false
-  `env/evidence-fragment-outside-page`, while genuine overflows below `areaBox.bottom + 0.5` stay refused.
-
-### Screen profile (`checkPage`, `PublicScreenReport` schema 2)
-- **Screen schema 2** (`SCREEN_REPORT_SCHEMA_VERSION = 2`): `createContextPack()`, `renderReport()`,
-  and `writeReportBundle()` accept both screen schema 1 and schema 2.
-- **CSS Color 4 & geometry-correct paint evaluation**: `parseCssColorAlpha()` parses CSS Color 3
-  and CSS Color 4 solid colors (`oklch()`, `oklab()`, `lab()`, `lch()`, `hwb()`, `color(srgb|display-p3|...)`,
-  modern space+`/` alpha, `%` alpha, `none`, `transparent`). Semi-transparent opacity (`0 < opacity < 1`),
-  `filter`, and `backdrop-filter` are measured normally for geometry rules; `opacity: 0` stays
-  `evidence/target-not-visible`, and `mask-image`, `clip-path`, `clip`, unsupported transforms, and
-  running animations stay `not-measured`.
-- **Stabilization loop & structured drift diff**: `checkPage()` waits for two consecutive identical
-  layout samples within `stabilizationTimeoutMs` and reports concrete drifted fields/selectors in
-  `capture.driftDetails` and the `screen-capture-drift` diagnostic detail.
-- **Framework-agnostic output receipts**: `verifyOutputReceipt()` accepts both legacy Next.js
-  schema 1 (`.next/BUILD_ID`) and generic output-directory manifests in schema 2 (`buildId`,
-  optional `buildMarkerPath`, `files`, `filesSha256`).
-- **New screen rules, full-page coverage & exception scopes**: adds `web/sibling-overlap` (`warn`,
-  uncalibrated, HTML siblings only), `web/svg-text-overflows-viewport` (`error`, uncalibrated),
-  full-page target coverage in `css-document-pixels` when `output.screenshot === "full-page"`,
-  opt-in `web/small-text` and `web/small-touch-target` (`geometry.rules`, `warn`, uncalibrated),
-  and `scope: "scenario" | "suite"` on `NamedScreenException` (suppressing per-scenario
-  `screen-exception-unused` noise for suite-scoped exceptions while preserving counts).
-
-### CLI, Report surfaces & Security
-- **CLI subcommands**: adds `breaklint compare`, `breaklint context`, and `breaklint bundle`
-  exposing `compareReports()`, `createContextPack()`, and `writeReportBundle()` directly from the
-  command line.
-- **Round-8 report follow-ups (`G-148`–`G-151`)**: adds explicit `decline`/`declines` units in
-  run facts, singular `1 applicable evaluation` accounting grammar, `"No candidates"` result labels
-  for zero-candidate coverage rows, inside/outside coverage-base tags on declined candidates,
-  state-qualified finding-gate wording and partial-run table captions, mono slash-only wrapping for
-  rule/reason IDs in Next checks and Declined candidates, page-consistent fixture evidence, partner
-  cross-references on ambiguous findings, and print hiding of `.finding-navigation`.
-- **Consumer pin update (`SECURITY.md`)**: raises `peerDependencies["puppeteer-core"]` from
-  `>=25.8.0 <26` to `>=25.16.0 <26` and moves the Action, CI, release workflow, and documented
-  install commands to `puppeteer-core@25.16.0`, closing the `GHSA-mrhx-c7xc-m3w5` consumer-pin
-  exception. Also retains the `npm run test:advisories` and lockfile-only Dependabot checks.
+*Tagged, not published to npm.* Its changes are listed under 0.11.1.
 
 ## 0.10.0 — 2026-10-08
 
@@ -201,8 +227,8 @@ Behavior on unchanged documents:
   leaves and wait for the injected control page. The Freeze assertion itself is unchanged.
 - Document the Action's Bash 4 globstar prerequisite and skip its Bash-dependent unit tests with an explicit reason on older shells. Keep every assertion active when Bash 4+ is available.
 - Make the report font mutation assert the platform's actual undeclared sans face and report a missing Python `fontTools` dependency before running the mark-font generator.
-- <!-- review-state --> `npm run test:report-surfaces`, the human gate, is green on ledger round 4:
-  the Founder reported a completed 32-cell sight review without remarks on the PR #33 merge
+- <!-- review-state --> `npm run test:report-surfaces`, the rostered review gate, is green on ledger round 4:
+  the maintainer reported a completed 32-cell sight review without remarks on the PR #33 merge
   commit's render on 2026-09-28. Ubuntu font resolution remains NEEDS-CI.
 
 ## 0.7.0 — 2026-09-25
@@ -621,12 +647,12 @@ These change how this repository is checked and released, not what the package d
   its source commit and sha256); JUnit and Markdown get structural checks. breaklint's SARIF needed
   no change. A new `action` CI job runs the Action from the same commit's tarball in seven arms.
 - **The report-surface gates.** The review ledger can record a failed review (ledger schema 4 → 5),
-  a human pass is recorded only by the closed roster `@Brand`, `@Neo` and `@Founder`, rounds are
+  a pass is recorded only by a closed roster of reviewer roles, rounds are
   ordered in time and a review time in the future is refused; the render manifest declares the
   review environment (schema 4 → 5, artifact contract 3 → 4); the technical gate accepts any
   Chromium-based browser; and the verifier re-measures the print checks independently and proves
-  its own checks with red controls on broken copies of real evidence. `npm run test:report-surfaces`, the human gate, was green for 0.7.0: ledger
-  round 3, a rostered human review on 2026-09-25, passed all 32 cells on the release commit's render.
+  its own checks with red controls on broken copies of real evidence. `npm run test:report-surfaces`, the rostered review gate, was green for 0.7.0: ledger
+  round 3, a rostered review on 2026-09-25, passed all 32 cells on the release commit's render.
 - **The live late-mutation test no longer depends on when a timer fires;** it requires what the
   product guarantees — an event, or neither the measured snapshot nor the delivered PDF carrying
   the late text.
@@ -938,7 +964,7 @@ rather than moved, and no `breaklint@0.3.0` package or GitHub Release was create
 
 - Added a mandatory real-document gate over two frozen, rights- and privacy-reviewed public HTML
   artifacts. The third-party Project Gutenberg document was not authored for this repository; it
-  produces exactly 9 pages, measures 9/13 rules and exits 0. The first-party Dargel document
+  produces exactly 9 pages, measures 9/13 rules and exits 0. A first-party document
   separately exercises absent-resource packaging: exactly 6 pages, 11/13 rules measured and Exit 0.
   Both admitted SHA-256 values, exact semantic counts and infrastructure contracts are pinned. The
   published 0.2.3 package is the recorded red control: the third-party document ends Exit 3 before
@@ -998,7 +1024,7 @@ rather than moved, and no `breaklint@0.3.0` package or GitHub Release was create
 ## 0.2.3 — 2026-08-29
 
 Released from annotated tag `v0.2.3` after the independent verifier passed the complete state with
-no open Blocker/High finding. The Founder reviewed and accepted the 21 changed rendered views and
+no open Blocker/High finding. The maintainer reviewed and accepted the 21 changed rendered views and
 the complete PDF set, and the ledger is bound to that review. The tag workflow exercised one
 checksum-bound tarball in clean Node 22.13.0 and Node 24 consumers before publishing those exact
 bytes to npm with signed provenance and attaching them to the GitHub Release.

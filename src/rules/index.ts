@@ -76,7 +76,7 @@ if (errorRules.length !== 2) {
   throw new Error(
     `${errorRules.length} rules carry severity "error"; two do so by construction ` +
       `(${errorRules.map((r) => r.id).join(", ")}). Changing this number is a decision about ` +
-      `the burden of proof, not a refactoring — argue it in docs/limitations.md first.`,
+      `the burden of proof, not a refactoring — argue it in maintainers/burden-of-proof.md first.`,
   );
 }
 

@@ -35,8 +35,12 @@ function exceptions(value: unknown, label: string): readonly NamedScreenExceptio
 function optInRules(value: unknown): ScreenOptInRules | undefined {
   if (value === undefined) return undefined;
   if (!isRecord(value)) throw new TypeError("geometry.rules must be an object");
-  keys(value, ["smallText", "smallTouchTarget"], "geometry.rules");
+  keys(value, ["siblingOverlap", "smallText", "smallTouchTarget"], "geometry.rules");
   const out: ScreenOptInRules = {};
+  if (value.siblingOverlap !== undefined) {
+    if (typeof value.siblingOverlap !== "boolean") throw new TypeError("geometry.rules.siblingOverlap must be a boolean");
+    out.siblingOverlap = value.siblingOverlap;
+  }
   if (value.smallText !== undefined) {
     if (typeof value.smallText === "boolean") {
       out.smallText = value.smallText;
@@ -78,12 +82,13 @@ function optInRules(value: unknown): ScreenOptInRules | undefined {
 function binding(value: unknown): HostBuildContainerBinding | undefined {
   if (value === undefined) return undefined;
   if (!isRecord(value)) throw new TypeError("sourceBinding must be an object");
-  keys(value, ["kind", "root", "receiptPath", "buildOutputReceiptPath", "compiledBuildSelector", "compiledBuildAttribute", "containers"], "sourceBinding");
+  keys(value, ["kind", "root", "receiptPath", "buildOutputReceiptPath", "compiledBuildSelector", "compiledBuildAttribute", "compiledOutputAttribute", "containers"], "sourceBinding");
   if (value.kind !== "host-build-container") throw new TypeError("sourceBinding.kind must be host-build-container");
   if (!Array.isArray(value.containers) || value.containers.length > 200) throw new TypeError("sourceBinding.containers must be a bounded array");
   return {
     kind: "host-build-container", root: string(value.root, "sourceBinding.root", 4_096), receiptPath: string(value.receiptPath, "sourceBinding.receiptPath"), ...(value.buildOutputReceiptPath === undefined ? {} : { buildOutputReceiptPath: string(value.buildOutputReceiptPath, "sourceBinding.buildOutputReceiptPath") }),
     compiledBuildSelector: string(value.compiledBuildSelector, "sourceBinding.compiledBuildSelector"), compiledBuildAttribute: string(value.compiledBuildAttribute, "sourceBinding.compiledBuildAttribute"),
+    ...(value.compiledOutputAttribute === undefined ? {} : { compiledOutputAttribute: string(value.compiledOutputAttribute, "sourceBinding.compiledOutputAttribute") }),
     containers: value.containers.map((entry, index) => {
       if (!isRecord(entry)) throw new TypeError(`sourceBinding.containers[${index}] must be an object`);
       keys(entry, ["selector", "file"], `sourceBinding.containers[${index}]`);
@@ -95,7 +100,9 @@ function binding(value: unknown): HostBuildContainerBinding | undefined {
 /** Strict, closed input validation before any host-page call. */
 export function validateCheckPageOptions(value: unknown): CheckPageOptions {
   if (!isRecord(value)) throw new TypeError("checkPage options must be an object");
-  keys(value, ["trust", "networkPolicy", "scenario", "projectId", "documentId", "runId", "output", "geometry", "sourceBinding"], "checkPage options");
+  keys(value, ["trust", "networkPolicy", "scenario", "projectId", "documentId", "runId", "failOn", "output", "geometry", "sourceBinding"], "checkPage options");
+  if (value.failOn !== undefined && value.failOn !== "warn" && value.failOn !== "error") throw new TypeError("failOn must be warn or error");
+  const failOn = value.failOn as CheckPageOptions["failOn"];
   if (value.trust !== "host-controlled-page") throw new TypeError("trust must be host-controlled-page");
   if (value.networkPolicy !== "host-owned") throw new TypeError("networkPolicy must be host-owned");
   if (!isRecord(value.output)) throw new TypeError("output must be an object");
@@ -125,7 +132,7 @@ export function validateCheckPageOptions(value: unknown): CheckPageOptions {
   }
   const optionalId = (name: "projectId" | "documentId" | "runId"): string | undefined => value[name] === undefined ? undefined : string(value[name], name, 256);
   const projectId = optionalId("projectId"), documentId = optionalId("documentId"), runId = optionalId("runId"), sourceBinding = binding(value.sourceBinding);
-  return { trust: "host-controlled-page", networkPolicy: "host-owned", scenario: string(value.scenario, "scenario"), output: output as CheckPageOptions["output"], ...(projectId !== undefined ? { projectId } : {}), ...(documentId !== undefined ? { documentId } : {}), ...(runId !== undefined ? { runId } : {}), ...(geometry !== undefined ? { geometry } : {}), ...(sourceBinding !== undefined ? { sourceBinding } : {}) };
+  return { trust: "host-controlled-page", networkPolicy: "host-owned", scenario: string(value.scenario, "scenario"), output: output as CheckPageOptions["output"], ...(projectId !== undefined ? { projectId } : {}), ...(documentId !== undefined ? { documentId } : {}), ...(runId !== undefined ? { runId } : {}), ...(failOn !== undefined ? { failOn } : {}), ...(geometry !== undefined ? { geometry } : {}), ...(sourceBinding !== undefined ? { sourceBinding } : {}) };
 }
 
 // Mirrors string(): at least one non-whitespace character and no NUL. minLength alone accepted
@@ -140,6 +147,7 @@ const EXCEPTION_SCHEMA = {
 const SCREEN_RULES_SCHEMA = {
   type: "object", additionalProperties: false,
   properties: {
+    siblingOverlap: { type: "boolean" },
     smallText: {
       oneOf: [
         { type: "boolean" },
@@ -161,9 +169,9 @@ export const SCREEN_OPTIONS_SCHEMA: Readonly<Record<string, unknown>> = Object.f
   properties: {
     trust: { const: "host-controlled-page" }, networkPolicy: { const: "host-owned" },
     scenario: text(512), projectId: text(256),
-    documentId: text(256), runId: text(256),
+    documentId: text(256), runId: text(256), failOn: { enum: ["warn", "error"] },
     output: { type: "object", additionalProperties: false, required: ["dir", "screenshot"], properties: { dir: text(4096), screenshot: { enum: ["viewport", "full-page"] } } },
     geometry: { type: "object", additionalProperties: false, properties: { allowedScrollContainers: { type: "array", maxItems: 100, items: EXCEPTION_SCHEMA }, intentionalOverlays: { type: "array", maxItems: 100, items: EXCEPTION_SCHEMA }, maxTargets: { type: "integer", minimum: 1, maximum: MAX_TARGETS }, stabilizationTimeoutMs: { type: "integer", minimum: 0, maximum: MAX_TIMEOUT_MS }, rules: SCREEN_RULES_SCHEMA } },
-    sourceBinding: { type: "object", additionalProperties: false, required: ["kind", "root", "receiptPath", "compiledBuildSelector", "compiledBuildAttribute", "containers"], properties: { kind: { const: "host-build-container" }, root: text(4096), receiptPath: text(512), buildOutputReceiptPath: text(512), compiledBuildSelector: text(512), compiledBuildAttribute: text(512), containers: { type: "array", maxItems: 200, items: { type: "object", additionalProperties: false, required: ["selector", "file"], properties: { selector: text(512), file: text(512) } } } } },
+    sourceBinding: { type: "object", additionalProperties: false, required: ["kind", "root", "receiptPath", "compiledBuildSelector", "compiledBuildAttribute", "containers"], properties: { kind: { const: "host-build-container" }, root: text(4096), receiptPath: text(512), buildOutputReceiptPath: text(512), compiledBuildSelector: text(512), compiledBuildAttribute: text(512), compiledOutputAttribute: text(512), containers: { type: "array", maxItems: 200, items: { type: "object", additionalProperties: false, required: ["selector", "file"], properties: { selector: text(512), file: text(512) } } } } },
   },
 });

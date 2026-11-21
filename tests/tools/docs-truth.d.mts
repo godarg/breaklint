@@ -37,10 +37,27 @@ export function scanText(file: string, text: string, stamps: Stamps): string[];
 
 export function shippedDocuments(packageDir: string): string[];
 
+export function statusIssues(file: string, text: string): string[];
+
+export function specInterval(spec: string): { min: number[]; max: number[] | null } | null;
+
+export function peerCommandIssues(file: string, text: string, peers: Record<string, string>): string[];
+
+export function pinIssues(file: string, text: string, packageVersion: string): string[];
+
+export function internalNameIssues(file: string, text: string): string[];
+
+export function commentLines(text: string): string[];
+
+export function sourceCommentIssues(file: string, text: string): string[];
+
+export function shippedCodeFiles(packageDir: string): string[];
+
 export function checkDocsTruth(input: {
   packageDir: string;
   docsRoot?: string;
   extra?: string[];
+  maintainers?: string | null;
   pending?: PendingCorrection[];
   stamps?: Stamps;
 }): { valid: boolean; issues: string[]; scanned: number; stamps: Stamps };

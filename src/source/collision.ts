@@ -15,7 +15,7 @@
  * false refusal is diagnosable in one line rather than mysterious.
  *
  * WHAT IT SEES AND WHAT IT DOES NOT — measured, not assumed, because this is the point an earlier
- * design review (Gemini, Z1) left open and explicitly refused to grant:
+ * external design review (item Z1) left open and explicitly refused to grant:
  *
  *   SEEN    the document text: inline `<style>`, every attribute, every text node, comments
  *   SEEN    the text of every stylesheet the caller hands in — the loader reads `<link href>`

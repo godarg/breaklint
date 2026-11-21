@@ -55,7 +55,7 @@ to satisfy one.
 What separates the two `error` rules from the fifteen candidate warnings is `measurement.proofSource`, not
 calibration: their threshold is structural — zero occurrences, or the page box itself — rather than
 chosen. `svg/text-overflows-viewport` and `layout/unbreakable-block-too-tall` are the two, and they
-are the only rules that gate by default. See `docs/limitations.md` for what "uncalibrated" carries.
+are the only rules that gate by default. See `docs/known-limits.md` for what "uncalibrated" carries.
 
 ### Whitespace findings need a cause check
 
@@ -86,8 +86,8 @@ checks require exact source/runtime row/cell membership and content, visible exi
 `rowSpan === 1` with uniform column-grid width (supporting simple regular `colspan` rows) and
 supported flow; they do not invent headers or accept a wrapper as cell geometry.
 
-Ten selected examples received actual human labels on 2026-10-07; see
-[`evaluation-0.10.md`](evaluation-0.10.md) for selection, results and limits.
+Ten selected examples received human labels; the maintainers record their selection, results and
+limits in [`maintainers/evaluation-0.10.md`](https://github.com/godarg/breaklint/blob/v0.11.1/maintainers/evaluation-0.10.md).
 Selected-example labels, rules adjusted from those labels, bounded validation and population
 calibration must be reported separately. `calibrated: false` remains the contract.
 
