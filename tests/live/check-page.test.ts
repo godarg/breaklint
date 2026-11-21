@@ -263,5 +263,26 @@ describe("screen checkPage host-page adapter, live", () => {
     assert.equal(res.report.coverage.allowedScrollContainers[0]?.count, 0);
     assert.equal(res.report.events.some((e) => e.kind === "screen-exception-unused" && e.detail.includes(".unused-suite-grid")), false);
     assert.equal(res.report.events.some((e) => e.kind === "screen-exception-unused" && e.detail.includes(".unused-scenario-modal")), true);
+
+    // Broad exception on html/body must exclude targets rather than reporting measured+clean (Opus HIGH).
+    const broadRes = await inspect(
+      '<p id="only">hello</p>',
+      "broad-body-exception-fail-closed",
+      { intentionalOverlays: [{ selector: "html", reason: "overbroad overlay" }] },
+    );
+    assert.equal(broadRes.ok, false);
+    assert.equal(broadRes.report.runVerdict, "insufficient-coverage");
+    assert.equal(broadRes.report.coverage.measured, 0);
+
+    // filter: opacity(0) must be classified evidence/target-not-visible (not-measured), never bindsFinding=true (Codex #6).
+    const hiddenFilter = await inspect(
+      '<button id="ghost" style="width:16px;height:16px;filter:opacity(0)">x</button>',
+      "filter-opacity-zero-not-visible",
+      { rules: { smallTouchTarget: { minSizePx: 24 } } },
+    );
+    assert.equal(hiddenFilter.ok, false);
+    assert.equal(hiddenFilter.report.runVerdict, "insufficient-coverage");
+    assert.ok(hiddenFilter.report.evaluations.some((e) => e.target.selector === "#ghost" && e.status === "not-measured" && e.reason === "evidence/target-not-visible"));
+    assert.equal(hiddenFilter.report.findings.some((f) => f.target.selector === "#ghost"), false);
   });
 });

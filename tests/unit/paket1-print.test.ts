@@ -280,6 +280,35 @@ describe("Paket 1: G-78 parity-blank page evidence verification", () => {
         options: { outDir, documentKey: "stray", binding: true, blankPages: new Set([2]) },
       });
       assert.equal(strayMark.evidence[1]!.bindsFinding, false);
+
+      // Negative control 4: blank page with visible non-mark PDF text stays unverified (Codex #4).
+      const visibleText = await produceEvidence({
+        page: fakePage(marks),
+        closePage: async () => {},
+        rasterizer: fakeRasterizer([textPages[0]!, { pageNumber: 2, widthPt: 595, heightPt: 842, items: [{ text: "Visible generated text", x: 72, y: 770 }] }]),
+        options: { outDir, documentKey: "visibletext", binding: true, blankPages: new Set([2]) },
+      });
+      assert.equal(visibleText.evidence[1]!.bindsFinding, false);
+
+      // With blankPageContentBoxes: margin-box running header (yMm=10 < topMm=20) is allowed,
+      // while text inside the content area (yMm=40 inside [20..277]) stays rejected.
+      const contentBoxes = new Map([[2, { leftMm: 20, topMm: 20, rightMm: 190, bottomMm: 277 }]]);
+      const runningHeaderY = 842 - (10 / (25.4 / 72));
+      const inContentY = 842 - (40 / (25.4 / 72));
+      const marginHeaderOk = await produceEvidence({
+        page: fakePage(marks),
+        closePage: async () => {},
+        rasterizer: fakeRasterizer([textPages[0]!, { pageNumber: 2, widthPt: 595, heightPt: 842, items: [{ text: "Running Header", x: 72, y: runningHeaderY }] }]),
+        options: { outDir, documentKey: "marginhdr", binding: true, blankPages: new Set([2]), blankPageContentBoxes: contentBoxes },
+      });
+      assert.equal(marginHeaderOk.evidence[1]!.bindsFinding, true);
+      const inContentText = await produceEvidence({
+        page: fakePage(marks),
+        closePage: async () => {},
+        rasterizer: fakeRasterizer([textPages[0]!, { pageNumber: 2, widthPt: 595, heightPt: 842, items: [{ text: "Unmarked body text", x: 72, y: inContentY }] }]),
+        options: { outDir, documentKey: "incontent", binding: true, blankPages: new Set([2]), blankPageContentBoxes: contentBoxes },
+      });
+      assert.equal(inContentText.evidence[1]!.bindsFinding, false);
     } finally {
       rmSync(outDir, { recursive: true, force: true });
     }

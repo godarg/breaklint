@@ -102,7 +102,7 @@ export function parseCssColorAlpha(color: string): number | null {
 
 type RawTarget = {
   selector: string; domPath: string; tag: string; id: string; className: string; textLength: number; directTextSha256: string | null;
-  hasDirectText: boolean; isSvg: boolean; isSvgText: boolean; isInteractiveControl: boolean;
+  hasDirectText: boolean; isSvg: boolean; isSvgText: boolean; isInteractiveControl: boolean; siblingEligible: boolean;
   fontSizePx: number; siblingOverlapPx: number; svgTextOverflowPx: number;
   paintSignature: string; ancestorSignatureComplete: boolean;
   box: { x: number; y: number; width: number; height: number } | null;
@@ -137,7 +137,7 @@ function safeUrl(raw: string): string {
   catch { return "about:invalid"; }
 }
 function sourcePath(path: string): boolean {
-  return !!path && !path.includes("\\") && !path.includes("\0") && !path.startsWith("/") && path.split("/").every((part) => part && part !== "." && part !== "..");
+  return !!path && !path.includes("\\") && !path.includes("\0") && !path.startsWith("/") && path.split("/").every((part) => part && part !== "." && part !== ".." && part !== "__proto__" && part !== "constructor" && part !== "prototype");
 }
 function canonicalFiles(files: Record<string, { sha256: string; byteLength: number; role: string }>): string {
   return JSON.stringify(Object.entries(files).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([file, entry]) => [file, entry.sha256, entry.byteLength, entry.role]));
@@ -145,7 +145,7 @@ function canonicalFiles(files: Record<string, { sha256: string; byteLength: numb
 function receiptFiles(value: unknown, allowedRoles: readonly string[], label: string, maxFiles: number, maxTotal: number): Record<string, { sha256: string; byteLength: number; role: string }> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} files are invalid`);
   const entries = Object.entries(value as Record<string, unknown>); if (entries.length === 0 || entries.length > maxFiles) throw new Error(`${label} file inventory is invalid`);
-  const normalized: Record<string, { sha256: string; byteLength: number; role: string }> = {}; let total = 0;
+  const normalized: Record<string, { sha256: string; byteLength: number; role: string }> = Object.create(null); let total = 0;
   for (const [file, candidate] of entries) {
     if (!sourcePath(file) || !candidate || typeof candidate !== "object" || Array.isArray(candidate)) throw new Error(`${label} file path is invalid`);
     const entry = candidate as Record<string, unknown>; const byteLength = entry.byteLength;
@@ -153,6 +153,7 @@ function receiptFiles(value: unknown, allowedRoles: readonly string[], label: st
     total += byteLength; if (total > maxTotal) throw new Error(`${label} byte budget exceeded`);
     normalized[file] = { sha256: entry.sha256, byteLength, role: String(entry.role) };
   }
+  if (Object.keys(normalized).length === 0) throw new Error(`${label} file inventory is invalid`);
   return normalized;
 }
 
@@ -444,7 +445,7 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
             state = "not-measured"; reason = "evidence/paint-unsupported"; paint = reason; break;
           }
           effectiveOpacity *= op;
-          if (effectiveOpacity === 0) {
+          if (effectiveOpacity === 0 || /\bopacity\(\s*0+(?:\.0+)?%?\s*\)/iu.test(ps.filter)) {
             state = "not-measured"; reason = "evidence/target-not-visible"; paint = reason; break;
           }
           // Geometry rules remain valid under semi-transparent opacity (0 < opacity < 1), filter,
@@ -498,7 +499,7 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
         record: {
           selector: selector(node, fallback), domPath: path, tag, id: node.id, className,
           textLength: node.textContent?.length ?? 0, directText: includeDirectText ? directText : null,
-          hasDirectText, isSvg, isSvgText, isInteractiveControl: isInteractiveControl(node, tag),
+          hasDirectText, isSvg, isSvgText, isInteractiveControl: isInteractiveControl(node, tag), siblingEligible: false,
           fontSizePx: Math.round(fontSizePx * 100) / 100, siblingOverlapPx: 0, svgTextOverflowPx,
           paintSignature: JSON.stringify([targetPaintSignature, ancestorSignature]),
           ancestorSignatureComplete: targetAncestorSignatureComplete, box, coordinateSystem: coordSystem,
@@ -531,6 +532,7 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
     const byParent = new Map<Element, { node: Element; rec: BrowserRawTarget; rect: DOMRect; rects: readonly DOMRect[] }[]>();
     for (const item of rawRecords) {
       if (!siblingEligible(item.node, item.record)) continue;
+      item.record.siblingEligible = true;
       const parent = item.node.parentElement;
       if (!parent) continue;
       const st = stylesByNode.get(item.node)!;
@@ -569,9 +571,10 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
       }
     }
 
+    const safeHref = (() => { try { const u = new URL(location.href); u.search = ""; u.hash = ""; return u.toString(); } catch { return "about:invalid"; } })();
     const targets: BrowserRawTarget[] = rawRecords.map((item) => item.record);
     const signature: RawSampleSignature = {
-      url: location.href,
+      url: safeHref,
       viewport: [innerWidth, innerHeight, devicePixelRatio],
       scroll: [sx, sy],
       document: [document.documentElement.scrollWidth, document.documentElement.scrollHeight, document.documentElement.clientWidth, document.documentElement.clientHeight, nodes.length],
@@ -587,7 +590,8 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
     target.selector, target.domPath, target.tag, target.id, target.className, target.textLength, target.directTextSha256,
     target.paintSignature, target.ancestorSignatureComplete, target.box?.x ?? null, target.box?.y ?? null, target.box?.width ?? null, target.box?.height ?? null,
     target.state, target.reason, target.paint, target.transform, target.horizontalOverflow, target.clipped,
-    target.siblingOverlapPx, target.svgTextOverflowPx, target.fontSizePx, target.allowedScroll, target.overlay, target.sourceContainer,
+    target.siblingOverlapPx, target.svgTextOverflowPx, target.fontSizePx, target.hasDirectText, target.isInteractiveControl, target.siblingEligible,
+    target.allowedScroll, target.overlay, target.sourceContainer,
   ]));
   return { ...sampled, signature: { ...sampled.signature, targetDigest }, targets };
 }
@@ -609,8 +613,9 @@ function buildEvaluation(
   measurement: ScreenMeasurement,
   violated: boolean,
   overrideReason: string | null = null,
+  overrideStatus: "excluded" | null = null,
 ): ScreenTargetEvaluation {
-  const status = raw.state === "candidate" ? "measured" : raw.state;
+  const status = raw.state === "candidate" ? (overrideStatus ?? "measured") : raw.state;
   const reason = raw.state === "candidate" ? overrideReason : raw.reason;
   return {
     id: `screen-evaluation-${index}-${ruleId}`,
@@ -676,12 +681,35 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
   let before = await samplePage(page, sampleInput);
   let settled = before;
   let stabilized = false;
+  let stabilizationTimedOut = false;
   let stabilizationAttempts = 0;
   let prev = before;
   let prevHash = sha(stable(prev.signature));
   for (let attempt = 1; attempt <= MAX_STABILIZATION_ATTEMPTS; attempt++) {
-    await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
-    const curr = await samplePage(page, sampleInput);
+    const remainingForRaf = deadline - Date.now();
+    if (remainingForRaf <= 0) {
+      stabilizationTimedOut = true;
+      break;
+    }
+    const raf = await withTimeout(
+      page.evaluate(() => new Promise<boolean>((resolve) => requestAnimationFrame(() => resolve(true)))),
+      remainingForRaf,
+    );
+    if (raf.timedOut) {
+      stabilizationTimedOut = true;
+      break;
+    }
+    const remainingForSample = deadline - Date.now();
+    if (remainingForSample <= 0) {
+      stabilizationTimedOut = true;
+      break;
+    }
+    const sampledCurr = await withTimeout(samplePage(page, sampleInput), remainingForSample);
+    if (sampledCurr.timedOut || sampledCurr.value === null) {
+      stabilizationTimedOut = true;
+      break;
+    }
+    const curr = sampledCurr.value;
     const currHash = sha(stable(curr.signature));
     stabilizationAttempts = attempt;
     if (currHash === prevHash) {
@@ -692,7 +720,10 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
     }
     before = prev;
     settled = curr;
-    if (Date.now() >= deadline) break;
+    if (Date.now() >= deadline) {
+      stabilizationTimedOut = true;
+      break;
+    }
     prev = curr;
     prevHash = currHash;
   }
@@ -715,10 +746,11 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
     ...(postScreenshotDrifted ? computeScreenDriftDetails(settled, after, "post-screenshot") : []),
   ].slice(0, MAX_DRIFT_DETAILS);
 
+  const timedOut = fonts.timedOut || stabilizationTimedOut;
   const completeSignature = before.signatureTextComplete && settled.signatureTextComplete && after.signatureTextComplete && before.ancestorSignatureComplete && settled.ancestorSignatureComplete && after.ancestorSignatureComplete;
-  const stableCapture = !fonts.timedOut && !drifted && completeSignature;
+  const stableCapture = !timedOut && !drifted && completeSignature;
 
-  if (fonts.timedOut) infrastructure.push({ kind: "screen-font-layout-timeout", detail: "document fonts/layout did not settle within the configured bound", fatal: false });
+  if (timedOut) infrastructure.push({ kind: "screen-font-layout-timeout", detail: "document fonts/layout did not settle within the configured bound", fatal: false });
   if (drifted) infrastructure.push({ kind: "screen-capture-drift", detail: summarizeDriftDetails(driftDetails), fatal: false });
   if (!before.signatureTextComplete || !settled.signatureTextComplete || !after.signatureTextComplete) infrastructure.push({ kind: "screen-dom-signature-incomplete", detail: `direct child text exceeded the ${MAX_SIGNATURE_TEXT_BYTES}-byte capture bound or browser hashing was unavailable`, fatal: false });
   if (!before.ancestorSignatureComplete || !settled.ancestorSignatureComplete || !after.ancestorSignatureComplete) infrastructure.push({ kind: "screen-paint-signature-incomplete", detail: `a target ancestor chain exceeded the ${MAX_SIGNATURE_ANCESTORS}-ancestor capture bound`, fatal: false });
@@ -745,12 +777,14 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
 
   for (const raw of settled.targets) {
     const exceptionReason = raw.overlay ? "target/intentional-overlay" : raw.allowedScroll ? "target/allowed-scroll-container" : null;
+    const exceptionStatus = exceptionReason !== null ? ("excluded" as const) : null;
     // 1. web/unexpected-horizontal-overflow
     evaluations.push(buildEvaluation(
       raw, "web/unexpected-horizontal-overflow", i++, effectiveBinding, stableCapture, relativePath,
       { name: "horizontal-overflow", value: raw.horizontalOverflow, unit: "css-px", operator: ">", threshold: 0, calibrated: false },
       raw.state === "candidate" && !raw.overlay && !raw.allowedScroll && raw.horizontalOverflow > 0,
       exceptionReason,
+      exceptionStatus,
     ));
     // 2. web/content-clipped
     const clippedVal = raw.clipped === "partial" ? 1 : 0;
@@ -759,14 +793,22 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
       { name: "clipped-content", value: clippedVal, unit: "count", operator: ">", threshold: 0, calibrated: false },
       raw.state === "candidate" && !raw.overlay && !raw.allowedScroll && clippedVal > 0,
       exceptionReason,
+      exceptionStatus,
     ));
     // 3. web/sibling-overlap (HTML elements only; SVG shapes overlap by design)
     if (!raw.isSvg) {
+      const siblingExcluded = !raw.siblingEligible;
+      const siblingReason = raw.overlay
+        ? "target/intentional-overlay"
+        : siblingExcluded
+          ? "rule/target-not-applicable"
+          : null;
       evaluations.push(buildEvaluation(
         raw, "web/sibling-overlap", i++, effectiveBinding, stableCapture, relativePath,
         { name: "sibling-overlap-depth", value: raw.siblingOverlapPx, unit: "css-px", operator: ">", threshold: SIBLING_OVERLAP_THRESHOLD_PX, calibrated: false },
-        raw.state === "candidate" && !raw.overlay && raw.siblingOverlapPx > SIBLING_OVERLAP_THRESHOLD_PX,
-        raw.overlay ? "target/intentional-overlay" : null,
+        raw.state === "candidate" && raw.siblingEligible && !raw.overlay && raw.siblingOverlapPx > SIBLING_OVERLAP_THRESHOLD_PX,
+        siblingReason,
+        siblingExcluded || raw.overlay ? "excluded" : null,
       ));
     }
     // 4. web/svg-text-overflows-viewport (SVG <text> targets)
@@ -851,7 +893,7 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
       stable: captureStable,
       after: captureAfter,
       fontsReady: fonts.value === true && settled.fontsReady,
-      timedOut: fonts.timedOut,
+      timedOut,
       drifted,
       stabilized,
       stabilizationAttempts,

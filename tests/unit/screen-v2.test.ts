@@ -107,6 +107,14 @@ describe("Paket 2: framework-agnostic SourceBinding output receipt verification"
       // Negative control: tampered output file fails closed
       writeFileSync(join(root, "dist/index.html"), Buffer.from("<!doctype html><h1>Tampered!!</h1>"));
       assert.throws(() => verifyOutputReceipt(setupBinding(root), sourceBuildId), /build output mismatch/);
+
+      // Negative control: __proto__ key in schema-2 receipt fails closed without passing an empty inventory
+      const protoFilesSha = sha("[]");
+      writeFileSync(
+        join(root, ".breaklint/output.json"),
+        `{"schemaVersion":2,"sourceBuildId":${JSON.stringify(sourceBuildId)},"buildId":${JSON.stringify(protoFilesSha)},"files":{"__proto__":{"sha256":${JSON.stringify("a".repeat(64))},"byteLength":1,"role":"build-output"}},"filesSha256":${JSON.stringify(protoFilesSha)}}`,
+      );
+      assert.throws(() => verifyOutputReceipt(setupBinding(root), sourceBuildId), /invalid|inventory/i);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -117,7 +125,7 @@ describe("Paket 2: screen capture drift diff & schemaVersion 2 context/bundle co
   it("reports concrete drifted fields and selectors bounded to 10 entries", () => {
     const baseTarget = {
       selector: "#card", domPath: "html:nth-child(1)>body:nth-child(2)>div:nth-child(1)", tag: "div", id: "card", className: "",
-      textLength: 5, directTextSha256: "abc", hasDirectText: true, isSvg: false, isSvgText: false, isInteractiveControl: false,
+      textLength: 5, directTextSha256: "abc", hasDirectText: true, isSvg: false, isSvgText: false, isInteractiveControl: false, siblingEligible: true,
       fontSizePx: 16, siblingOverlapPx: 0, svgTextOverflowPx: 0, paintSignature: "p1", ancestorSignatureComplete: true,
       box: { x: 0, y: 0, width: 100, height: 40 }, coordinateSystem: "css-viewport-pixels" as const,
       state: "candidate" as const, reason: null, paint: null, transform: null, clipped: "none" as const,
@@ -193,6 +201,27 @@ describe("Paket 2: screen capture drift diff & schemaVersion 2 context/bundle co
       const svgHtml = readFileSync(bundle.htmlPath, "utf8");
       assert.ok(svgHtml.includes("&lt;text&gt;"), "screen repair text must HTML-escape <text>");
       assert.equal(svgHtml.includes("rendered <text> bounding box"), false, "raw <text> tag must not appear in HTML");
+
+      // Malicious string injected into a numeric viewport field must be HTML-escaped.
+      const xssReport = {
+        ...svgReport,
+        scope: { ...svgReport.scope, viewport: { ...svgReport.scope.viewport, width: "<b>injected</b>" as unknown as number } },
+      };
+      const xssBundle = writeReportBundle(xssReport, { outDir: bundleDir });
+      const xssHtml = readFileSync(xssBundle.htmlPath, "utf8");
+      assert.ok(xssHtml.includes("&lt;b&gt;injected&lt;/b&gt;"));
+      assert.equal(xssHtml.includes("<b>injected</b>"), false);
+
+      // Failed bundle write (mismatched comparison) must NOT overwrite existing report.json on disk.
+      const priorReportJson = readFileSync(join(bundleDir, "report.json"), "utf8");
+      assert.throws(() => writeReportBundle(
+        { ...svgReport, runId: "new-run-should-not-write" },
+        {
+          outDir: bundleDir,
+          comparison: { schemaVersion: 1, identityContract: "logical-source-value-v1", beforeRunId: "b", afterRunId: "other-run", results: [] },
+        },
+      ), /comparison does not refer/);
+      assert.equal(readFileSync(join(bundleDir, "report.json"), "utf8"), priorReportJson);
     } finally {
       rmSync(bundleDir, { recursive: true, force: true });
     }

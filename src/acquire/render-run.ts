@@ -1493,7 +1493,6 @@ function integritySourceWithCapability(expectedSids: readonly string[], capabili
 function prePaginationFigureProbeSource(capability: string): string {
   return `(() => {
   const P = window.__blPrimitives;
-  P.integrityMarkPaginationStart(${JSON.stringify(capability)});
   const prePaginationScriptMutations = P.integrityStatus(${JSON.stringify(capability)}).prePaginationScriptMutations;
   const ids = Object.create(null);
   const namedAnchors = Object.create(null);
@@ -1567,7 +1566,12 @@ function prePaginationFigureProbeSource(capability: string): string {
       figure.captionPosition = before === 0 ? "before" : after === 0 ? "after" : null;
     }
   }
-  return { ids, namedAnchors, figures, referenceBlocks: [...refGroups.values()], prePaginationScriptMutations, elementCount: P.all(document, "*").length };
+  const allElements = P.all(document, "*");
+  let elementCount = 0;
+  for (let i = 0; i < allElements.length; i += 1) {
+    if (P.attr(allElements[i], "data-breaklint-intervention") !== "animations-disabled") elementCount += 1;
+  }
+  return { ids, namedAnchors, figures, referenceBlocks: [...refGroups.values()], prePaginationScriptMutations, elementCount };
 })()`;
 }
 
@@ -1659,8 +1663,11 @@ async function isVerifiedPostPdfOofCoordinateArtifact(
     const elToIndex = new Map();
     const indexToEl = new Map();
     const indexToPage = new Map();
+    const pageToIndex = new Map();
     let idx = 0;
-    for (const pageEl of pages) {
+    for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
+      const pageEl = pages[pageIndex];
+      pageToIndex.set(pageEl, pageIndex);
       for (const el of P.all(pageEl, "*")) {
         const s = P.style(el, null);
         if (s.display === "none") continue;
@@ -1669,6 +1676,7 @@ async function isVerifiedPostPdfOofCoordinateArtifact(
         idx += 1;
       }
     }
+    const pageDyByPage = new Map();
     for (const item of driftedInput) {
       const el = indexToEl.get(item.index);
       const pageEl = indexToPage.get(item.index);
@@ -1686,6 +1694,7 @@ async function isVerifiedPostPdfOofCoordinateArtifact(
       const parentRect = P.rect(parent);
       const parentStyle = P.style(parent, null);
       const contentRect = P.rect(content);
+      const pageIndex = pageToIndex.get(pageEl) ?? 0;
       const leftPx = parseFloat(style.left);
       const topPx = parseFloat(style.top);
       const bl = parseFloat(parentStyle.borderLeftWidth) || 0;
@@ -1695,7 +1704,21 @@ async function isVerifiedPostPdfOofCoordinateArtifact(
       const expectedY = parentRect.y + bt + topPx;
       if (Math.abs(expectedX - item.before.x) > 2 || Math.abs(expectedY - item.before.y) > 2) return { ok: false };
       const dx = item.before.x - item.after.x;
-      if (Math.abs(dx - contentRect.x) > 1.5) return { ok: false };
+      const dy = item.before.y - item.after.y;
+      // Chrome's print-mode fragmentainer rounds subpixel CSS page heights (e.g. A4 1122.52 px ->
+      // 1123 px), so pageIndex preceding pages accumulate up to <= 1 px/page difference between
+      // screen contentRect.y and the print fragmentainer's Y origin, while all drifted OOF elements
+      // on the same page lose the identical fragmentainer Y offset.
+      const maxPrintRoundingDrift = pageIndex * 1.0 + 2.5;
+      if (Math.abs(dx - contentRect.x) > 1.5 || Math.abs(dy - contentRect.y) > maxPrintRoundingDrift) {
+        return { ok: false };
+      }
+      const prevPageDy = pageDyByPage.get(pageEl);
+      if (prevPageDy === undefined) {
+        pageDyByPage.set(pageEl, dy);
+      } else if (Math.abs(dy - prevPageDy) > 0.5) {
+        return { ok: false };
+      }
     }
     return { ok: true };
   })(${JSON.stringify(drifted)})`);
@@ -2018,7 +2041,7 @@ async function openContentPage(
     await page.goto(`${origin}${documentRoute}`, { waitUntil: "networkidle0", timeout: PAGINATION_TIMEOUT_MS });
     if (pageErrors.length > 0) throw new Error(`content page error before apparatus install: ${pageErrors.join(" | ")}`);
     await enforceOperationalLimits(page, network, 0, "pre-pagination");
-    const prePaginationFigureTree = capturePrePaginationFigureTree
+    const prePaginationFigureTreeBefore = capturePrePaginationFigureTree
       ? await page.evaluate<RawRuntimeFigureTree>(prePaginationFigureProbeSource(apparatusCapability))
       : null;
     await page.evaluate<void>(paginationBundleSource(context.pagedjsSource));
@@ -2026,8 +2049,22 @@ async function openContentPage(
     await page.evaluate<void>(paginationApparatusSource(apparatusCapability));
     await page.evaluate<void>(ANIMATION_FREEZE_SOURCE);
     await verifyAnimationIntervention(page, "pre-pagination");
+    // Re-sample the figure/ID/anchor/reference tree AFTER installing the animation-freeze style
+    // (before Paged.js runs) so a page MutationObserver reacting to the style insertion cannot
+    // mutate href/id/figure links undetected after the first probe.
+    const prePaginationFigureTreeAfter = capturePrePaginationFigureTree
+      ? await page.evaluate<RawRuntimeFigureTree>(prePaginationFigureProbeSource(apparatusCapability))
+      : null;
+    const prePaginationFigureTree = prePaginationFigureTreeBefore && prePaginationFigureTreeAfter &&
+      prePaginationFigureTreeBefore.elementCount === prePaginationFigureTreeAfter.elementCount &&
+      JSON.stringify(prePaginationFigureTreeBefore.ids) === JSON.stringify(prePaginationFigureTreeAfter.ids) &&
+      JSON.stringify(prePaginationFigureTreeBefore.namedAnchors) === JSON.stringify(prePaginationFigureTreeAfter.namedAnchors) &&
+      JSON.stringify(prePaginationFigureTreeBefore.figures) === JSON.stringify(prePaginationFigureTreeAfter.figures) &&
+      JSON.stringify(prePaginationFigureTreeBefore.referenceBlocks) === JSON.stringify(prePaginationFigureTreeAfter.referenceBlocks)
+      ? prePaginationFigureTreeAfter
+      : null;
     const prePagination = await page.evaluate<RuntimeIntegrityStatus>(integrityStatusSource(apparatusCapability));
-    const prePaginationScriptMutations = prePaginationFigureTree?.prePaginationScriptMutations ?? 0;
+    const prePaginationScriptMutations = prePaginationFigureTreeBefore?.prePaginationScriptMutations ?? 0;
     const sidIssues = validateRuntimeSidState(expectedSids, prePagination);
     if (sidIssues.length > 0) throw new Error(`runtime source-id integrity failed: ${sidIssues.join("; ")}`);
     // Print-only font faces do not enter the FontFaceSet until the print media query applies.
@@ -2658,6 +2695,17 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
       return pdf;
     };
     const blankPages = new Set(snapshot.pages.filter((p) => p.blank).map((p) => p.pageNumber));
+    const pxPerMm = 96 / 25.4;
+    const blankPageContentBoxes = new Map<number, { leftMm: number; topMm: number; rightMm: number; bottomMm: number }>();
+    for (const p of snapshot.pages) {
+      if (!p.blank || !p.pageBox) continue;
+      blankPageContentBoxes.set(p.pageNumber, {
+        leftMm: (p.contentBox.x - p.pageBox.x) / pxPerMm,
+        topMm: (p.contentBox.y - p.pageBox.y) / pxPerMm,
+        rightMm: (p.contentBox.x + p.contentBox.width - p.pageBox.x) / pxPerMm,
+        bottomMm: (p.contentBox.y + p.contentBox.height - p.pageBox.y) / pxPerMm,
+      });
+    }
     const evidence = await produceEvidence({
       page,
       apparatusCapability: opened.apparatusCapability,
@@ -2669,6 +2717,7 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
         documentKey,
         binding: context.options.evidenceBinding && context.options.sourceMapInjection,
         blankPages,
+        blankPageContentBoxes,
       },
     });
     if (evidence.overlayInstalled) {

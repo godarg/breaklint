@@ -75,20 +75,22 @@ function check(snapshot: Snapshot, ctx: Parameters<typeof makeFinding>[0]["ctx"]
         const refRow = unspannedHeader ?? leadHeaderRows[leadHeaderRows.length - 1]!;
         const refLefts = refRow.cells.map(c => c.box.x - lead!.box.x);
         const refRights = refRow.cells.map(c => c.box.x + c.box.width - lead!.box.x);
+        const refSpanLeft = (start: number, end: number): number => Math.min(refLefts[start]!, refLefts[end]!);
+        const refSpanRight = (start: number, end: number): number => Math.max(refRights[start]!, refRights[end]!);
         for (const row of dataRows) {
           if (unspannedHeader) {
             let colStart = 0;
             for (const cell of row.cells) {
               const colEnd = colStart + cell.colSpan - 1;
-              const left = (cell.box.x - fragment.box.x) - refLefts[colStart]!;
-              const right = (cell.box.x + cell.box.width - fragment.box.x) - refRights[colEnd]!;
+              const left = (cell.box.x - fragment.box.x) - refSpanLeft(colStart, colEnd);
+              const right = (cell.box.x + cell.box.width - fragment.box.x) - refSpanRight(colStart, colEnd);
               maxDelta = Math.max(maxDelta, Math.abs(left), Math.abs(right));
               colStart += cell.colSpan;
             }
           } else if (row.cells.length === 1 && row.cells[0]!.colSpan === gridColumns) {
             const cell = row.cells[0]!;
-            const left = (cell.box.x - fragment.box.x) - refLefts[0]!;
-            const right = (cell.box.x + cell.box.width - fragment.box.x) - refRights[refRights.length - 1]!;
+            const left = (cell.box.x - fragment.box.x) - refSpanLeft(0, refLefts.length - 1);
+            const right = (cell.box.x + cell.box.width - fragment.box.x) - refSpanRight(0, refRights.length - 1);
             maxDelta = Math.max(maxDelta, Math.abs(left), Math.abs(right));
           } else {
             for (const [i, cell] of row.cells.entries()) {

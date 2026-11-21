@@ -29,10 +29,50 @@ function requirePathValue(raw: string | undefined, flag: string): string {
 }
 
 function requireTextValue(raw: string | undefined, flag: string): string {
-  if (raw === undefined || raw.trim() === "") {
+  if (raw === undefined || raw.trim() === "" || raw.startsWith("-")) {
     throw new UsageError(`${flag} needs a value.`);
   }
   return raw;
+}
+
+function isIoError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "string" && /^(?:EACCES|EPERM|ENOENT|EISDIR|ENOTDIR|ENOSPC|EROFS|EBUSY|EMFILE|ENFILE|EIO|EEXIST|ENAMETOOLONG)$/u.test(code);
+}
+
+function validateComparisonInput(raw: unknown, label: string): ReportComparison {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new UsageError(`${label} must be a JSON object.`);
+  }
+  const obj = raw as Record<string, unknown>;
+  if (
+    obj.schemaVersion !== 1 ||
+    obj.identityContract !== "logical-source-value-v1" ||
+    typeof obj.beforeRunId !== "string" || obj.beforeRunId.length === 0 ||
+    typeof obj.afterRunId !== "string" || obj.afterRunId.length === 0 ||
+    !Array.isArray(obj.results)
+  ) {
+    throw new UsageError(`${label} is not a valid ReportComparison (schemaVersion 1).`);
+  }
+  for (const item of obj.results) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      throw new UsageError(`${label} contains an invalid comparison result entry.`);
+    }
+    const r = item as Record<string, unknown>;
+    if (
+      typeof r.status !== "string" ||
+      !["new", "persisting", "resolved", "unmatchable", "not-sufficiently-measured"].includes(r.status) ||
+      !(r.beforeRunFindingId === null || typeof r.beforeRunFindingId === "string") ||
+      !Array.isArray(r.afterRunFindingIds) ||
+      !r.afterRunFindingIds.every((id) => typeof id === "string") ||
+      !Array.isArray(r.reasons) ||
+      !r.reasons.every((reason) => typeof reason === "string")
+    ) {
+      throw new UsageError(`${label} contains a malformed comparison result entry.`);
+    }
+  }
+  return raw as ReportComparison;
 }
 
 function parsePositiveInt(raw: string | undefined, flag: string): number {
@@ -92,9 +132,19 @@ export async function runSubcommand(name: string, argv: readonly string[]): Prom
       try {
         comparison = await compareReports(before, after);
       } catch (error) {
+        if (isIoError(error)) {
+          err(`breaklint: compare failed: ${error instanceof Error ? error.message : String(error)}\n`);
+          return 3;
+        }
         throw new UsageError(`compare failed: ${error instanceof Error ? error.message : String(error)}`);
       }
       emitJson(comparison, outFile, "comparison");
+      if (before.runVerdict === "infrastructure" || after.runVerdict === "infrastructure") {
+        return 3;
+      }
+      if (before.runVerdict === "insufficient-coverage" || after.runVerdict === "insufficient-coverage") {
+        return 4;
+      }
       return 0;
     }
 
@@ -124,7 +174,7 @@ export async function runSubcommand(name: string, argv: readonly string[]): Prom
         throw new UsageError("context requires exactly one report file: breaklint context <report.json>");
       }
       const report = readJsonFile(files[0]!, "report");
-      const comparison = comparisonPath ? (readJsonFile(comparisonPath, "comparison") as ReportComparison) : undefined;
+      const comparison = comparisonPath ? validateComparisonInput(readJsonFile(comparisonPath, "comparison"), "comparison") : undefined;
       let pack;
       try {
         pack = createContextPack(report, {
@@ -133,6 +183,10 @@ export async function runSubcommand(name: string, argv: readonly string[]): Prom
           ...(comparison === undefined ? {} : { comparison }),
         });
       } catch (error) {
+        if (isIoError(error)) {
+          err(`breaklint: context failed: ${error instanceof Error ? error.message : String(error)}\n`);
+          return 3;
+        }
         throw new UsageError(`context failed: ${error instanceof Error ? error.message : String(error)}`);
       }
       emitJson(pack, outFile, "context pack");
@@ -176,7 +230,7 @@ export async function runSubcommand(name: string, argv: readonly string[]): Prom
         throw new UsageError("bundle requires --out-dir <dir>.");
       }
       const report = readJsonFile(files[0]!, "report") as Report | PublicScreenReport;
-      const comparison = comparisonPath ? (readJsonFile(comparisonPath, "comparison") as ReportComparison) : undefined;
+      const comparison = comparisonPath ? validateComparisonInput(readJsonFile(comparisonPath, "comparison"), "comparison") : undefined;
       let result;
       try {
         result = writeReportBundle(report, {
@@ -188,6 +242,10 @@ export async function runSubcommand(name: string, argv: readonly string[]): Prom
           ...(maxFindings === undefined ? {} : { maxFindings }),
         });
       } catch (error) {
+        if (isIoError(error)) {
+          err(`breaklint: bundle failed: ${error instanceof Error ? error.message : String(error)}\n`);
+          return 3;
+        }
         throw new UsageError(`bundle failed: ${error instanceof Error ? error.message : String(error)}`);
       }
       notice(`breaklint: bundle written to ${relative(process.cwd(), result.outDir) || "."} (${result.assets.length} verified asset${result.assets.length === 1 ? "" : "s"})\n`);
@@ -199,6 +257,10 @@ export async function runSubcommand(name: string, argv: readonly string[]): Prom
     if (error instanceof UsageError) {
       err(`breaklint: ${error.message}\n`);
       return 2;
+    }
+    if (isIoError(error)) {
+      err(`breaklint: ${error instanceof Error ? error.message : String(error)}\n`);
+      return 3;
     }
     throw error;
   }

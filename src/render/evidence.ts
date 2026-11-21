@@ -172,6 +172,8 @@ export interface EvidenceOptions {
   binding: boolean;
   /** 1-based page numbers confirmed blank in the measured snapshot (e.g. Paged.js parity blanks, G-78). */
   blankPages?: ReadonlySet<number>;
+  /** Page-local content box in mm for each confirmed blank page so margin-box running headers remain distinct from content-area text. */
+  blankPageContentBoxes?: ReadonlyMap<number, { leftMm: number; topMm: number; rightMm: number; bottomMm: number }>;
 }
 
 export interface EvidenceOutcome {
@@ -798,21 +800,36 @@ async function finish(input: FinishInput): Promise<EvidenceOutcome> {
               pageConf.targetsTotal > 0 && pageConf.targetsBound === pageConf.targetsTotal,
           );
         const blankTextPage = input.textPages?.[i];
-        const blankPdfHasNoMarks = blankTextPage !== undefined && blankTextPage.items.every(
-          item => !/^BLSID\d+[AE]$/u.test(item.text.replace(/\s+/gu, "")),
-        );
+        const blankContentBoxMm = options.blankPageContentBoxes?.get(i + 1);
+        const blankPdfContentIsEmpty = blankTextPage !== undefined && blankTextPage.items.every((item) => {
+          const compact = item.text.replace(/\s+/gu, "");
+          if (compact === "") return true;
+          if (/^BLSID\d+[AE]$/u.test(compact)) return false;
+          if (!blankContentBoxMm) return false;
+          const xMm = item.x * MM_PER_PT;
+          const yMm = (blankTextPage.heightPt - item.y) * MM_PER_PT;
+          // Reject any visible PDF text inside the page's content box (with 0.5 mm safety margin),
+          // while allowing CSS @page running headers/footers located strictly in page margin boxes.
+          const insideContentBox =
+            xMm >= blankContentBoxMm.leftMm - 0.5 &&
+            xMm <= blankContentBoxMm.rightMm + 0.5 &&
+            yMm >= blankContentBoxMm.topMm - 0.5 &&
+            yMm <= blankContentBoxMm.bottomMm + 0.5;
+          return !insideContentBox;
+        });
         // G-78: a confirmed parity-blank page carries zero flow blocks and zero marks. When the
         // rest of the document has verified mark conformance, zero raster diff, zero unplaced
-        // marks on this page, and no stray mark tokens in the PDF page, the blank page itself is
-        // verified rather than failing required page coverage. An all-blank document or a
-        // non-blank page without source blocks remains unverified.
+        // marks on this page, and zero visible text inside the content area (and no stray mark
+        // tokens anywhere on the page), the blank page itself is verified rather than failing
+        // required page coverage. An all-blank document or a non-blank page without source blocks
+        // remains unverified.
         const verifiedBlankPage =
           input.bindingPossible &&
           options.blankPages?.has(i + 1) === true &&
           unplacedHere.length === 0 &&
           perPage === null &&
           hasVerifiedDocumentConformance &&
-          blankPdfHasNoMarks;
+          blankPdfContentIsEmpty;
         const pageBound =
           verifiedBlankPage ||
           (input.bindingPossible &&
