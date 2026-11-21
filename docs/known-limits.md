@@ -85,8 +85,8 @@ Screen checks are uncalibrated; start in report mode.
   0 are excluded, never reported as fine.
 - **No clean claim** with non-axis-aligned transforms, masks, clip paths, active animations (other
   than of shadows and box colours), capture drift, a font timeout or a truncated inventory.
-- **Overflow** is measured on HTML boxes, not inside an `<svg>`; SVG text is judged against its
-  viewport, and clipping by an HTML ancestor is still reported.
+- **Overflow** is measured on HTML boxes; SVG text is judged against its viewport, and clipping
+  by an HTML ancestor is still reported.
 - **Small text and touch targets** are measured in CSS pixels; scaling through an SVG `viewBox` or
   a transform is not taken into account.
 - **Overlap between siblings** is off by default (`geometry.rules.siblingOverlap`), because
