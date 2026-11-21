@@ -45,24 +45,34 @@ interface StubPlan {
   screenshotHangs?: boolean;
   /** The option-selector preflight (an evaluate over the selector list) never resolves. */
   preflightHangs?: boolean;
+  /** The option-selector preflight reports the first selector as invalid. */
+  preflightInvalid?: boolean;
+  /** Browser calls that reject the way a closed page or a destroyed context does. */
+  reject?: { preflight?: boolean; fonts?: boolean; frame?: boolean; sampleIndex?: number; screenshot?: boolean };
 }
 
 function stubPage(plan: StubPlan): { page: StructuralPage; calls: { samples: number; screenshots: number; preflights: number } } {
   const calls = { samples: 0, screenshots: 0, preflights: 0 };
   const delay = <T>(ms: number, value: T): Promise<T> => ms === Infinity ? new Promise<T>(() => undefined) : new Promise<T>((resolve) => setTimeout(() => resolve(value), ms));
+  const closed = (): Promise<never> => Promise.reject(new Error("Target page, context or browser has been closed"));
   const page: StructuralPage = {
     evaluate: (async (fn: (...args: unknown[]) => unknown, arg?: unknown) => {
       if (arg && typeof arg === "object" && "maxTargets" in (arg as object)) {
         const index = calls.samples++;
+        if (plan.reject?.sampleIndex === index) return closed();
         return delay(plan.sampleDelayMs?.(index) ?? 0, sample(index, plan.fonts?.(index) ?? "loaded", plan.changing === true));
       }
-      if (Array.isArray(arg)) { calls.preflights++; return plan.preflightHangs ? new Promise<number>(() => undefined) : -1; }
+      if (Array.isArray(arg)) {
+        calls.preflights++;
+        if (plan.reject?.preflight) return closed();
+        return plan.preflightHangs ? new Promise<number>(() => undefined) : plan.preflightInvalid ? 0 : -1;
+      }
       const source = String(fn);
-      if (source.includes("requestAnimationFrame")) return delay(1, true);
-      if (source.includes("document.fonts")) return true;
+      if (source.includes("requestAnimationFrame")) return plan.reject?.frame ? closed() : delay(1, true);
+      if (source.includes("document.fonts")) return plan.reject?.fonts ? closed() : true;
       return null;
     }) as StructuralPage["evaluate"],
-    screenshot: async () => { calls.screenshots++; return plan.screenshotHangs ? new Promise<Uint8Array>(() => undefined) : png(); },
+    screenshot: async () => { calls.screenshots++; if (plan.reject?.screenshot) return closed(); return plan.screenshotHangs ? new Promise<Uint8Array>(() => undefined) : png(); },
     url: () => "https://host.test/page",
     viewportSize: () => ({ width: 640, height: 400 }),
     context: () => ({ browser: () => ({ version: () => "stub" }) }),
@@ -177,5 +187,33 @@ describe("screen checkPage stabilization budget", () => {
     assert.equal(result.report.runVerdict, "infrastructure");
     assert.equal(result.report.artifact.relativePath, null);
     assert.ok(result.report.infrastructure.some((e) => e.kind === "screen-screenshot-timeout" && e.fatal), JSON.stringify(result.report.infrastructure));
+  });
+
+  it("turns a browser call that rejects (a closed page) into an infrastructure report in every phase, and still throws for an invalid selector", async () => {
+    const withSelectors = (scenario: string) => ({ ...options(scenario, 2_000), geometry: { stabilizationTimeoutMs: 2_000, allowedScrollContainers: [{ selector: "#grid", reason: "data grid" }] } });
+    const phases: [string, StubPlan, string][] = [
+      ["preflight", { reject: { preflight: true } }, "option selector preflight"],
+      ["fonts", { reject: { fonts: true } }, "font wait"],
+      ["first-sample", { reject: { sampleIndex: 0 } }, "first sample"],
+      ["frame", { reject: { frame: true } }, "stabilization"],
+      ["stabilization-sample", { reject: { sampleIndex: 1 } }, "stabilization"],
+      ["screenshot", { reject: { screenshot: true } }, "screenshot"],
+      ["post-capture-sample", { reject: { sampleIndex: 2 } }, "post-capture sample"],
+    ];
+    for (const [name, plan, phase] of phases) {
+      const { page } = stubPage(plan);
+      const result = await bounded(checkPage(page, withSelectors(`driver-rejects-${name}`)), 20_000);
+      const infra = JSON.stringify(result.report.infrastructure);
+      assert.equal(result.ok, false, name);
+      assert.equal(result.report.runVerdict, "infrastructure", `${name}: ${infra}`);
+      assert.equal(result.report.exitCode, 3, name);
+      assert.ok(result.report.infrastructure.some((e) => e.kind === "screen-driver-error" && e.fatal && e.detail.includes(phase) && e.detail.includes("has been closed")), `${name}: ${infra}`);
+      assert.equal(result.report.infrastructure.some((e) => e.kind === "screen-stabilization-timeout"), false, `${name}: a driver error is not a timeout: ${infra}`);
+    }
+
+    // An option selector the page cannot parse is a usage error, not an infrastructure result.
+    const { page: invalid, calls } = stubPage({ preflightInvalid: true });
+    await assert.rejects(checkPage(invalid, withSelectors("invalid-selector-still-throws")), (error: unknown) => error instanceof TypeError && error.message.includes("geometry.allowedScrollContainers[0].selector"));
+    assert.equal(calls.samples, 0);
   });
 });

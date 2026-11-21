@@ -126,7 +126,8 @@ inert/ARIA alone do not hide geometry. CSS Color 4 solid colors (`oklch()`, `okl
 `hwb()`, `color(...)`) are parsed for alpha visibility; semi-transparent opacity (`0 < opacity < 1`),
 `filter`, and `backdrop-filter` do not disqualify geometry rules, while an effective opacity of 0
 (`opacity` and `filter: opacity()` multiplied along the ancestors) is excluded as
-`target/not-visible`. Non-axis-aligned transforms, masks, clip-paths, active animations,
+`target/not-visible`. Non-axis-aligned transforms, masks, clip-paths, active animations (other than
+of shadows, box colours or background position),
 capture drift (reported via `capture.driftDetails` after the bounded stabilization loop), font timeout,
 and truncated inventory prevent a clean claim.
 

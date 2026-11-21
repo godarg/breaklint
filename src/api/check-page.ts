@@ -115,9 +115,20 @@ function safeUrl(raw: string): string {
   try { const url = new URL(raw); url.search = ""; url.hash = ""; return url.toString(); }
   catch { return "about:invalid"; }
 }
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<{ value: T | null; timedOut: boolean }> {
+/** First line of a driver error, bounded, with query strings and fragments cut from URLs. */
+function driverErrorText(error: unknown): string {
+  const raw = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  const line = (raw.split("\n")[0] ?? "").replace(/(https?:\/\/[^\s?#]*)[?#]\S*/gu, "$1");
+  return line.length > 200 ? `${line.slice(0, 199)}…` : line;
+}
+/**
+ * Waits for one driver call within a bound. A call that rejects (a closed page, a destroyed
+ * context) is reported as `error`, never thrown: it becomes an infrastructure result.
+ */
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<{ value: T | null; timedOut: boolean; error: string | null }> {
   let timer: NodeJS.Timeout | null = null;
-  try { const value = await Promise.race([promise, new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), timeoutMs); })]); return { value, timedOut: value === null }; }
+  try { const value = await Promise.race([promise, new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), timeoutMs); })]); return { value, timedOut: value === null, error: null }; }
+  catch (error) { return { value: null, timedOut: false, error: driverErrorText(error) }; }
   finally { if (timer) clearTimeout(timer); }
 }
 
@@ -320,8 +331,9 @@ export async function samplePage(page: StructuralPage, input: SampleInput): Prom
     };
 
     // The clipping viewport of an <svg> in client CSS pixels: the content box of an outer <svg>;
-    // for a nested <svg>, its x/y/width/height mapped through the parent's screen CTM. null when
-    // the browser cannot provide the mapping.
+    // for a nested <svg>, its x/y/width/height, which are in the user space of its parent element
+    // (a transformed <g> included), mapped through that parent's screen CTM. null when the browser
+    // cannot provide the mapping.
     const svgViewport = (svg: SVGSVGElement): { left: number; top: number; right: number; bottom: number } | null => {
       const owner = svg.ownerSVGElement;
       if (!owner) {
@@ -329,12 +341,43 @@ export async function samplePage(page: StructuralPage, input: SampleInput): Prom
         const px = (v: string): number => Number.parseFloat(v) || 0;
         return { left: r.left + px(st.borderLeftWidth) + px(st.paddingLeft), top: r.top + px(st.borderTopWidth) + px(st.paddingTop), right: r.right - px(st.borderRightWidth) - px(st.paddingRight), bottom: r.bottom - px(st.borderBottomWidth) - px(st.paddingBottom) };
       }
-      const ctm = owner.getScreenCTM();
+      const parent = svg.parentElement;
+      const ctm = parent instanceof SVGGraphicsElement ? parent.getScreenCTM() : owner.getScreenCTM();
       if (!ctm) return null;
       const x = svg.x.animVal.value, y = svg.y.animVal.value, w = svg.width.animVal.value, h = svg.height.animVal.value;
       const corners = [[x, y], [x + w, y], [x, y + h], [x + w, y + h]].map(([cx, cy]) => [ctm.a * cx! + ctm.c * cy! + ctm.e, ctm.b * cx! + ctm.d * cy! + ctm.f]);
       const xs = corners.map((c) => c[0]!), ys = corners.map((c) => c[1]!);
       return { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };
+    };
+
+    // SVG text whose own box lies outside the capture area, but which an enclosing clipping SVG
+    // viewport inside the capture area cuts: a label cut off at the screen edge. It stays a
+    // candidate for web/svg-text-overflows-viewport instead of being excluded as off-viewport.
+    const cutBySvgViewportOnScreen = (node: Element, rect: DOMRect): boolean => {
+      for (let part = node.parentElement; part instanceof SVGElement; part = part.parentElement) {
+        if (!(part instanceof SVGSVGElement) || getComputedStyle(part).overflow === "visible") continue;
+        const viewport = svgViewport(part);
+        if (!viewport) continue;
+        const area = new DOMRect(viewport.left, viewport.top, viewport.right - viewport.left, viewport.bottom - viewport.top);
+        const inCapture = contained(visibleArea, options.fullPage ? new DOMRect(area.x + sx, area.y + sy, area.width, area.height) : area) !== "outside";
+        if (inCapture && contained(area, rect) !== "none") return true;
+      }
+      return false;
+    };
+
+    // A running animation that changes only these properties moves no box and no text or SVG
+    // paint the rules read (a glowing badge, a loading shimmer). Any other animated property, an
+    // effect without keyframes, or a non-keyframe effect fails closed.
+    const MEASUREMENT_NEUTRAL_ANIMATED = new Set([
+      "boxShadow", "textShadow", "backgroundColor", "backgroundPosition", "backgroundPositionX", "backgroundPositionY",
+      "borderColor", "borderTopColor", "borderRightColor", "borderBottomColor", "borderLeftColor", "outlineColor", "textDecorationColor", "caretColor",
+    ]);
+    const KEYFRAME_META = new Set(["offset", "computedOffset", "easing", "composite"]);
+    const changesMeasurement = (animation: Animation): boolean => {
+      const effect = animation.effect;
+      if (!(effect instanceof KeyframeEffect)) return true;
+      const keyframes = effect.getKeyframes();
+      return keyframes.length === 0 || keyframes.some((frame) => Object.keys(frame).some((key) => !KEYFRAME_META.has(key) && !MEASUREMENT_NEUTRAL_ANIMATED.has(key)));
     };
 
     const rectsByNode = new Map<Element, DOMRect>();
@@ -365,7 +408,7 @@ export async function samplePage(page: StructuralPage, input: SampleInput): Prom
       if (style.display === "none" || style.visibility === "hidden" || !!node.closest("dialog:not([open])") || notRendered(node)) { state = "excluded"; reason = "target/not-rendered"; }
       else if (effectiveOpacity(node) === 0) { state = "excluded"; reason = "target/not-visible"; }
       else if (style.position === "absolute" && box && box.width <= 1 && box.height <= 1 && (style.clip !== "auto" || style.clipPath !== "none")) { state = "excluded"; reason = "target/visually-hidden"; }
-      else if (!box || box.width === 0 || box.height === 0 || contained(visibleArea, checkRect) === "outside") { state = "excluded"; reason = "target/off-viewport"; }
+      else if (!box || box.width === 0 || box.height === 0 || (contained(visibleArea, checkRect) === "outside" && !(isSvgText && cutBySvgViewportOnScreen(node, domRect)))) { state = "excluded"; reason = "target/off-viewport"; }
       else if (skippedByContentVisibilityAuto(node)) { state = "excluded"; reason = "target/not-rendered"; }
 
       const directTextNodes = [...node.childNodes].filter((child): child is Text => child.nodeType === Node.TEXT_NODE);
@@ -405,15 +448,30 @@ export async function samplePage(page: StructuralPage, input: SampleInput): Prom
       }
       let ancestor: Element | null = node.parentElement;
       if (isSvgText || svgInterior) while (ancestor instanceof SVGElement) ancestor = ancestor.parentElement;
-      while (state === "candidate" && ancestor) {
-        const ps = getComputedStyle(ancestor); const clip = [ps.overflow, ps.overflowX, ps.overflowY].some((v) => v === "hidden" || v === "clip");
-        if (clip && box) {
-          const outcome = contained(ancestor.getBoundingClientRect(), domRect);
+      // The first box that is not an allowed scroll container and cuts the visible part of the
+      // target decides. An allowed scroll container exempts only the clipping it causes: the search
+      // goes on with the part it shows, so a second clip further out is still found, and an own
+      // clip of the target is not overruled by it. A scroll container (overflow auto or scroll)
+      // hides nothing a reader cannot scroll to, so it narrows the visible part without a finding.
+      let visiblePart: DOMRect = domRect;
+      while (state === "candidate" && ancestor && box) {
+        const ps = getComputedStyle(ancestor); const axes = [ps.overflow, ps.overflowX, ps.overflowY];
+        const clip = axes.some((v) => v === "hidden" || v === "clip");
+        const scrolls = !clip && axes.some((v) => v === "auto" || v === "scroll");
+        if (clip || scrolls) {
+          const ancestorRect = ancestor.getBoundingClientRect();
+          const outcome = contained(ancestorRect, visiblePart);
           if (outcome !== "none") {
-            clipped = outcome; clipByAllowed = isSelf(ancestor, options.allowed);
-            // Content scrolled out of an allowed scroll container is intended, not missing evidence.
-            if (outcome === "outside" && !clipByAllowed) { state = "not-measured"; reason = "evidence/target-clipped-outside"; }
-            break;
+            if (clip && !isSelf(ancestor, options.allowed)) {
+              clipped = outcome; clipByAllowed = false;
+              if (outcome === "outside") { state = "not-measured"; reason = "evidence/target-clipped-outside"; }
+              break;
+            }
+            if (clip && clipped === "none") { clipped = outcome; clipByAllowed = true; }
+            // Content scrolled out of a scroll container is intended, not missing evidence.
+            if (outcome === "outside") break;
+            const left = Math.max(ancestorRect.left, visiblePart.left), top = Math.max(ancestorRect.top, visiblePart.top);
+            visiblePart = new DOMRect(left, top, Math.min(ancestorRect.right, visiblePart.right) - left, Math.min(ancestorRect.bottom, visiblePart.bottom) - top);
           }
         }
         ancestor = ancestor.parentElement;
@@ -434,14 +492,14 @@ export async function samplePage(page: StructuralPage, input: SampleInput): Prom
           // Effective opacity 0 was excluded above as target/not-visible.
           // Geometry rules remain valid under semi-transparent opacity (0 < opacity < 1), filter,
           // and backdrop-filter; only geometry-altering masks, clip-paths, unsupported transforms,
-          // and running animations stay not-measured.
+          // and running animations of anything but shadows and colours of boxes stay not-measured.
           if (ps.maskImage !== "none" || ps.webkitMaskImage !== "none" || ps.clipPath !== "none" || ps.clip !== "auto") {
             state = "not-measured"; reason = "evidence/paint-unsupported"; paint = reason; break;
           }
           if (transform(ps)) {
             state = "not-measured"; reason = "evidence/transform-unsupported"; paint = reason; break;
           }
-          if (part.getAnimations({ subtree: false }).some((a) => a.playState === "running")) {
+          if (part.getAnimations({ subtree: false }).some((a) => a.playState === "running" && changesMeasurement(a))) {
             state = "not-measured"; reason = "evidence/animation-active"; paint = reason; break;
           }
         }
@@ -464,12 +522,16 @@ export async function samplePage(page: StructuralPage, input: SampleInput): Prom
 
       const fontSizePx = Number.parseFloat(style.fontSize) || 0;
       const className = typeof node.className === "string" ? node.className : node.getAttribute("class") ?? "";
-      const directText = directTextNodes.map((child) => child.textContent ?? "").join("\u0000");
+      // Text the browser does not render cannot be in the screenshot: it stays out of the stability
+      // signature and of the text bound (its length is taken off this target and its ancestors below).
+      const unrendered = state === "excluded" && reason === "target/not-rendered";
+      const directText = unrendered ? "" : directTextNodes.map((child) => child.textContent ?? "").join("\u0000");
       const directTextBytes = new TextEncoder().encode(directText).byteLength;
-      const includeDirectText = signatureTextBytes + directTextBytes <= 1_048_576;
-      if (includeDirectText) signatureTextBytes += directTextBytes; else signatureTextComplete = false;
+      const includeDirectText = !unrendered && signatureTextBytes + directTextBytes <= 1_048_576;
+      if (includeDirectText) signatureTextBytes += directTextBytes; else if (!unrendered) signatureTextComplete = false;
       return {
         node,
+        unrenderedTextLength: unrendered ? directTextNodes.reduce((sum, child) => sum + (child.textContent?.length ?? 0), 0) : 0,
         record: {
           selector: selector(node, fallback), domPath: path, tag, id: node.id, className,
           textLength: node.textContent?.length ?? 0, directText: includeDirectText ? directText : null,
@@ -550,6 +612,15 @@ export async function samplePage(page: StructuralPage, input: SampleInput): Prom
       }
     }
 
+    const recordByNode = new Map(rawRecords.map((item) => [item.node, item.record]));
+    for (const item of rawRecords) {
+      if (item.unrenderedTextLength === 0) continue;
+      for (let part: Element | null = item.node; part; part = part.parentElement) {
+        const record = recordByNode.get(part);
+        if (record) record.textLength -= item.unrenderedTextLength;
+      }
+    }
+
     const safeHref = (() => { try { const u = new URL(location.href); u.search = ""; u.hash = ""; return u.toString(); } catch { return "about:invalid"; } })();
     const targets: BrowserRawTarget[] = rawRecords.map((item) => item.record);
     const signature: RawSampleSignature = {
@@ -591,15 +662,13 @@ function selectorFields(options: CheckPageOptions): { field: string; selector: s
   ];
 }
 
-/** Throws a TypeError naming the first option field whose selector the page cannot parse. */
-async function preflightSelectors(page: StructuralPage, options: CheckPageOptions): Promise<void> {
-  const fields = selectorFields(options);
-  if (fields.length === 0) return;
-  const invalid = await page.evaluate((selectors: string[]) => {
+/** The index of the first selector the page cannot parse, or -1. */
+async function invalidSelectorIndex(page: StructuralPage, fields: readonly { selector: string }[]): Promise<number> {
+  if (fields.length === 0) return -1;
+  return page.evaluate((selectors: string[]) => {
     for (let i = 0; i < selectors.length; i++) { try { document.querySelector(selectors[i]!); } catch { return i; } }
     return -1;
   }, fields.map((entry) => entry.selector));
-  if (invalid >= 0) throw new TypeError(`${fields[invalid]!.field} is not a valid selector in this page`);
 }
 
 /** Observe one existing host-owned page; it never navigates, mutates, closes, or imports a driver. */
@@ -648,9 +717,9 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
       projectId: options.projectId ?? null,
       documentId: options.documentId ?? null,
       scenario: options.scenario,
-      url: safeUrl(page.url()),
+      url: (() => { try { return safeUrl(page.url()); } catch { return "about:invalid"; } })(),
       viewport: { width: viewport?.width ?? 0, height: viewport?.height ?? 0, deviceScaleFactor },
-      browserVersion: await Promise.resolve(page.context().browser()?.version() ?? null),
+      browserVersion: await (async () => { try { return await Promise.resolve(page.context().browser()?.version() ?? null); } catch { return null; } })(),
     },
     trust: "host-controlled-page" as const,
     networkPolicy: "host-owned" as const,
@@ -677,22 +746,30 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
     };
     return { ok: false, report };
   };
+  // A driver call that rejects (a closed page, a destroyed context) is a fatal infrastructure
+  // event in every phase, so the caller always gets a report.
+  const driverError = (phase: string, error: string): void => { infrastructure.push({ kind: "screen-driver-error", detail: `the ${phase} failed: ${error}`, fatal: true }); };
   // An invalid option selector still throws a TypeError; a preflight that does not finish is
   // an infrastructure result like a first sample that does not arrive.
-  const preflight = await withTimeout(preflightSelectors(page, options).then(() => true), phaseBoundMs);
+  const fields = selectorFields(options);
+  const preflight = await withTimeout(invalidSelectorIndex(page, fields), phaseBoundMs);
+  if (preflight.error !== null) { driverError("option selector preflight", preflight.error); return noSampleReport(0); }
   if (preflight.timedOut) {
     infrastructure.push({ kind: "screen-preflight-timeout", detail: `the option selector preflight did not finish within ${phaseBoundMs} ms`, fatal: true });
     return noSampleReport(0);
   }
+  if (preflight.value !== null && preflight.value >= 0) throw new TypeError(`${fields[preflight.value]!.field} is not a valid selector in this page`);
   // stabilizationTimeoutMs 0 keeps its 0.10 meaning: fonts and layout are not awaited, which is a
   // timeout (no clean claim), and no drift is claimed without two differing samples.
   const fonts = timeout === 0
-    ? { value: null, timedOut: true }
+    ? { value: null, timedOut: true, error: null }
     : await withTimeout(page.evaluate(async () => { if (!document.fonts) return false; await document.fonts.ready; return document.fonts.status === "loaded"; }), timeout);
+  if (fonts.error !== null) { driverError("font wait", fonts.error); return noSampleReport(0); }
 
   const firstStart = performance.now();
   const first = await withTimeout(samplePage(page, sampleInput), phaseBoundMs);
   const firstSampleMs = Math.round(performance.now() - firstStart);
+  if (first.error !== null) { driverError("first sample", first.error); return noSampleReport(firstSampleMs); }
   if (first.value === null) {
     infrastructure.push({ kind: "screen-sample-timeout", detail: `the first page sample did not finish within ${phaseBoundMs} ms`, fatal: true });
     return noSampleReport(firstSampleMs);
@@ -706,6 +783,7 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
   let endedBy: "stable" | "timeout" | "attempt-limit" = "timeout";
   let stabilizationAttempts = 0;
   let lastPairDiffered = false;
+  let driverFailed = false;
   let prev = before;
   let prevHash = sha(stable(prev.signature));
   const stabilizationStart = performance.now();
@@ -715,10 +793,12 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
     const remainingForRaf = deadline - performance.now();
     if (remainingForRaf <= 0) { endedBy = "timeout"; break; }
     const raf = await withTimeout(page.evaluate(() => new Promise<boolean>((resolve) => requestAnimationFrame(() => resolve(true)))), remainingForRaf);
+    if (raf.error !== null) { driverError("stabilization", raf.error); driverFailed = true; break; }
     if (raf.timedOut) { endedBy = "timeout"; break; }
     const remainingForSample = deadline - performance.now();
     if (remainingForSample <= 0) { endedBy = "timeout"; break; }
     const sampledCurr = await withTimeout(samplePage(page, sampleInput), remainingForSample);
+    if (sampledCurr.error !== null) { driverError("stabilization", sampledCurr.error); driverFailed = true; break; }
     if (sampledCurr.value === null) { endedBy = "timeout"; break; }
     stabilizationAttempts++;
     const curr = sampledCurr.value;
@@ -731,17 +811,21 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
     prevHash = currHash;
   }
   const stabilizationMs = Math.round(performance.now() - stabilizationStart);
-  const stabilizationTimedOut = !stabilized && endedBy === "timeout";
+  // A driver error is not a timeout: it is reported as screen-driver-error.
+  const stabilizationTimedOut = !stabilized && endedBy === "timeout" && !driverFailed;
 
   const readBuildIds = async (): Promise<DomBuildIds> => (await withTimeout(readDomBuildIds(page, options.sourceBinding), phaseBoundMs)).value ?? { buildId: null, outputId: null };
   const domIds = await readBuildIds();
   const bindingBefore = verifyBinding(options.sourceBinding, domIds.buildId, domIds.outputId);
-  const shot = await withTimeout(page.screenshot({ fullPage }), phaseBoundMs);
-  const bytes = shot.value;
-  if (bytes === null) infrastructure.push({ kind: "screen-screenshot-timeout", detail: `the host screenshot did not finish within ${phaseBoundMs} ms`, fatal: true });
+  // After a driver error during stabilization the page is not captured.
+  const shot = driverFailed ? null : await withTimeout(page.screenshot({ fullPage }), phaseBoundMs);
+  const bytes = shot?.value ?? null;
+  if (shot?.error) driverError("screenshot", shot.error);
+  else if (shot?.timedOut) infrastructure.push({ kind: "screen-screenshot-timeout", detail: `the host screenshot did not finish within ${phaseBoundMs} ms`, fatal: true });
   const afterSample = bytes === null ? null : await withTimeout(samplePage(page, sampleInput), phaseBoundMs);
   const after = afterSample?.value ?? null;
-  const postCaptureTimedOut = afterSample !== null && after === null;
+  if (afterSample?.error) driverError("post-capture sample", afterSample.error);
+  const postCaptureTimedOut = afterSample?.timedOut === true;
   if (postCaptureTimedOut) infrastructure.push({ kind: "screen-post-capture-timeout", detail: `the sample after the screenshot did not finish within ${phaseBoundMs} ms`, fatal: false });
   const domIdsAfter = await readBuildIds();
   const bindingAfter = verifyBinding(options.sourceBinding, domIdsAfter.buildId, domIdsAfter.outputId);

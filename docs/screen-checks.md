@@ -113,7 +113,8 @@ reports why — `screen-stabilization-timeout`, `screen-stabilization-attempt-li
 `screen-fonts-not-ready` or `screen-capture-drift` (two samples really differed) — and does not
 claim a clean result. `capture.stabilizationEndedBy` names how the wait ended. `0` waits for
 nothing and is reported as a timeout. A page that does not answer the first sample ends as
-`infrastructure`, without a screenshot.
+`infrastructure`, without a screenshot. A browser call that fails, on a closed page for example,
+ends as `infrastructure` with a report (`screen-driver-error`) instead of throwing.
 
 Capture signatures (`capture.before`, `stable`, `after`) are keyed per run: they compare within
 one run, not across runs. A text change in the drift details records only the text lengths.
@@ -154,7 +155,8 @@ would report them. [`reporting.md`](reporting.md) describes the formats.
   closed `<details>`, content under `content-visibility: hidden`, and elements whose effective
   opacity is 0. They are excluded, never reported as fine.
 - Non-axis-aligned transforms, masks, clip paths and running animations: the affected targets are
-  not measured, and the page gets no clean verdict.
+  not measured, and the page gets no clean verdict. An animation that changes only shadows,
+  background colour or position, or border and outline colours is measured.
 - Ordinary vertical scrolling and general visual occlusion.
 - Colour contrast and accessibility in general; use an accessibility checker for that.
 

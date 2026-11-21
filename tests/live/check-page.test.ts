@@ -709,4 +709,101 @@ describe("screen checkPage host-page adapter, live", () => {
     assert.ok(hiddenFilter.report.evaluations.some((e) => e.target.selector === "#ghost" && e.status === "excluded" && e.reason === "target/not-visible"));
     assert.equal(hiddenFilter.report.findings.some((f) => f.target.selector === "#ghost"), false);
   });
+
+  it("maps a nested <svg> viewport through a transformed parent group and judges a label cut off at the screen edge by its SVG viewport", async (t) => {
+    if (missingBrowser && optional) return t.skip("missing browser");
+    type Report = Awaited<ReturnType<typeof inspect>>["report"];
+    const svgEvals = (report: Report, selector: string) => JSON.stringify(report.evaluations.filter((e) => e.target.selector === selector).map((e) => [e.ruleId, e.status, e.reason, e.measurements[0]?.value]));
+    // A nested <svg> inside a translated <g>: its x/y/width/height are in the group's user space.
+    const fits = await inspect('<div><svg width="300" height="100"><g transform="translate(150,0)"><svg x="0" y="10" width="100" height="40"><text id="g-fits" x="5" y="25" font-size="14">Fits</text></svg></g></svg></div>', "svg-nested-in-translated-group");
+    assert.equal(fits.report.runVerdict, "clean", svgEvals(fits.report, "#g-fits"));
+    // Positive control: the same group with a label wider than the nested viewport.
+    const cut = await inspect('<div><svg width="300" height="100"><g transform="translate(150,0)"><svg x="0" y="10" width="60" height="40"><text id="g-cut" x="5" y="25" font-size="14">Does not fit at all</text></svg></g></svg></div>', "svg-nested-in-translated-group-cut");
+    const cutFinding = cut.report.findings.find((f) => f.ruleId === "web/svg-text-overflows-viewport" && f.target.selector === "#g-cut");
+    assert.ok(cutFinding, svgEvals(cut.report, "#g-cut"));
+    assert.ok(Number(cutFinding.measurement.value) < 120, `overflow is measured from the translated viewport: ${cutFinding.measurement.value}`);
+
+    // A visible <svg> at the right edge of the screen whose label lies wholly outside its viewport
+    // (and therefore off screen) is a cut label, not an off-viewport target.
+    const edge = await inspect('<div style="padding-left:540px"><svg width="100" height="40"><text id="edge-gone" x="150" y="20" font-size="16">Gone</text></svg></div>', "svg-label-cut-at-screen-edge");
+    assert.equal(edge.report.runVerdict, "findings", svgEvals(edge.report, "#edge-gone"));
+    assert.ok(edge.report.findings.some((f) => f.ruleId === "web/svg-text-overflows-viewport" && f.target.selector === "#edge-gone"), svgEvals(edge.report, "#edge-gone"));
+    // Negative controls: an <svg> wholly below the fold stays off-viewport, and an overflow:visible
+    // <svg> draws its label, so a label beyond the screen edge stays off-viewport too.
+    const below = await inspect('<div style="height:600px">spacer</div><svg width="100" height="40"><text id="below-gone" x="150" y="20" font-size="16">Gone</text></svg>', "svg-label-below-the-fold");
+    assert.ok(below.report.evaluations.filter((e) => e.target.selector === "#below-gone").every((e) => e.status === "excluded" && e.reason === "target/off-viewport"), svgEvals(below.report, "#below-gone"));
+    const drawn = await inspect('<div style="padding-left:540px"><svg width="100" height="40" style="overflow:visible"><text id="edge-drawn" x="150" y="20" font-size="16">Drawn</text></svg></div>', "svg-label-drawn-beyond-screen-edge");
+    assert.ok(drawn.report.evaluations.filter((e) => e.target.selector === "#edge-drawn").every((e) => e.status === "excluded" && e.reason === "target/off-viewport"), svgEvals(drawn.report, "#edge-drawn"));
+  });
+
+  it("keeps text the browser does not render out of the stability signature, while rendered text changes still drift", async (t) => {
+    if (missingBrowser && optional) return t.skip("missing browser");
+    const ticker = (wrapper: (inner: string) => string) => `<p id="vis">Visible text</p>${wrapper('<p id="price">Price <span id="v">1</span></p>')}` +
+      '<script>let n = 0; (function tick() { n++; document.getElementById("v").textContent = String(n); requestAnimationFrame(tick); })();</script>';
+    // A counter updating every frame inside a closed <details> (its length changes too).
+    const closed = await inspect(ticker((inner) => `<details><summary>Prices</summary>${inner}</details>`), "not-rendered-ticker-closed-details");
+    assert.equal(closed.report.capture.stabilized, true, JSON.stringify(closed.report.infrastructure));
+    assert.equal(closed.report.capture.drifted, false);
+    assert.equal(closed.report.runVerdict, "clean", JSON.stringify(closed.report.infrastructure));
+    // A document title that an app updates (rendered nowhere on the page).
+    const title = await inspect('<title>Inbox</title><p id="vis">Visible text</p><script>let n = 0; (function tick() { n++; document.title = "(" + n + ") Inbox"; requestAnimationFrame(tick); })();</script>', "not-rendered-ticker-title");
+    assert.equal(title.report.runVerdict, "clean", JSON.stringify(title.report.infrastructure));
+    // Positive control: the same counter in an open <details> is rendered and drifts.
+    const opened = await inspect(ticker((inner) => `<details open><summary>Prices</summary>${inner}</details>`), "not-rendered-ticker-open-details");
+    assert.equal(opened.report.runVerdict, "insufficient-coverage");
+    assert.equal(opened.report.capture.drifted, true);
+    assert.ok((opened.report.capture.driftDetails ?? []).some((d) => d.field === "text" && d.selector === "#v"), JSON.stringify(opened.report.capture.driftDetails));
+  });
+
+  it("measures targets whose running animations change neither geometry nor visibility, and keeps moving targets unclaimed", async (t) => {
+    if (missingBrowser && optional) return t.skip("missing browser");
+    const keyframes = "<style>@keyframes glow{from{box-shadow:0 0 0 #f00}to{box-shadow:0 0 8px #f00}}@keyframes shimmer{from{background-position:0 0}to{background-position:100px 0}}@keyframes pulse{from{transform:scale(1)}to{transform:scale(1.1)}}</style>";
+    const badge = (animation: string) => `${keyframes}<div style="position:relative;width:200px"><img id="photo" alt="product" width="200" height="100" src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22100%22/%3E"><span id="badge" style="position:absolute;top:8px;right:8px;background:#fff;animation:${animation}">NEW</span></div>`;
+    // A glowing badge over an image, without the overlap opt-in: stable and clean, the badge measured.
+    const glow = await inspect(badge("glow 1s infinite alternate"), "animated-overlap-glow-off");
+    assert.equal(glow.report.runVerdict, "clean", JSON.stringify(glow.report.evaluations.filter((e) => e.status === "not-measured").map((e) => [e.target.selector, e.reason])));
+    assert.equal(glow.report.capture.stabilized, true);
+    assert.ok(glow.report.evaluations.some((e) => e.target.selector === "#badge" && e.status === "measured"));
+    // With the opt-in, the same badge is a measured overlap.
+    const glowOn = await inspect(badge("glow 1s infinite alternate"), "animated-overlap-glow-on", { rules: { siblingOverlap: true } });
+    assert.ok(glowOn.report.findings.some((f) => f.ruleId === "web/sibling-overlap" && f.target.selector === "#badge"), JSON.stringify(glowOn.report.findings));
+    // A loading shimmer animates only its background position.
+    const shimmer = await inspect(`${keyframes}<p id="shimmer" style="background:linear-gradient(90deg,#eee,#ddd);animation:shimmer 1s infinite linear">Loading</p>`, "animated-shimmer");
+    assert.equal(shimmer.report.runVerdict, "clean", JSON.stringify(shimmer.report.evaluations.filter((e) => e.status === "not-measured").map((e) => [e.target.selector, e.reason])));
+    // Negative control: a badge that scales moves its geometry and gets no clean claim.
+    const pulse = await inspect(badge("pulse 1s infinite alternate"), "animated-overlap-pulse");
+    assert.equal(pulse.ok, false);
+    assert.equal(pulse.report.runVerdict, "insufficient-coverage");
+    assert.ok(pulse.report.evaluations.some((e) => e.target.selector === "#badge" && e.status === "not-measured" && e.reason === "evidence/animation-active"));
+  });
+
+  it("does not let an allowed scroll container hide a second clip by a non-allowed ancestor, nor report content scrolled out of view", async (t) => {
+    if (missingBrowser && optional) return t.skip("missing browser");
+    const allowed = { allowedScrollContainers: [{ selector: "#scroller", reason: "carousel" }] };
+    const clips = (report: Awaited<ReturnType<typeof inspect>>["report"]) => JSON.stringify(report.evaluations.filter((e) => e.ruleId === "web/content-clipped" && e.target.selector.startsWith("#")).map((e) => [e.target.selector, e.status, e.reason, e.predicate.violated]));
+    // An allowed carousel (overflow:hidden, scrolled by script) inside a box that cuts its rows.
+    const hidden = await inspect(
+      '<div id="outer" style="width:400px;height:30px;overflow:hidden"><div id="scroller" style="overflow:hidden;width:300px"><div id="rows" style="width:800px;line-height:20px">row one<br>row two<br>row three</div></div></div>',
+      "allowed-scroller-inside-cutting-box", allowed,
+    );
+    assert.ok(hidden.report.findings.some((f) => f.ruleId === "web/content-clipped" && f.target.selector === "#rows"), clips(hidden.report));
+    // An element that cuts its own text stays a defect inside an allowed carousel.
+    const own = await inspect(
+      '<div id="scroller" style="overflow:hidden;width:200px"><div id="cell" style="width:300px;overflow:hidden;white-space:nowrap">a cell whose own text is far wider than the cell itself</div></div>',
+      "own-clip-inside-allowed-scroller", allowed,
+    );
+    assert.ok(own.report.findings.some((f) => f.ruleId === "web/content-clipped" && f.target.selector === "#cell"), clips(own.report));
+    // Positive controls: a wide table in an allowed scroller inside a rounded card is clean, and the
+    // same carousel inside a box that only cuts what the carousel already hides is clean.
+    const card = await inspect(
+      '<div id="card" style="width:300px;overflow:hidden;border-radius:8px"><div id="scroller" style="overflow-x:auto;width:300px"><div id="wide" style="width:800px">a wide table row inside a rounded card</div></div></div>',
+      "allowed-scroller-in-rounded-card", allowed,
+    );
+    assert.equal(card.report.runVerdict, "clean", clips(card.report));
+    const roomy = await inspect(
+      '<div id="outer" style="width:400px;overflow:hidden"><div id="scroller" style="overflow:hidden;width:300px"><div id="rows" style="width:800px;line-height:20px">row one<br>row two</div></div></div>',
+      "allowed-scroller-inside-roomy-box", allowed,
+    );
+    assert.equal(roomy.report.runVerdict, "clean", clips(roomy.report));
+  });
 });
