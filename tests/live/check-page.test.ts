@@ -266,6 +266,60 @@ describe("screen checkPage host-page adapter, live", () => {
     assert.equal(quiet.report.runVerdict, "clean", JSON.stringify(quiet.report.infrastructure));
   });
 
+  it("excludes content that is not rendered (closed details, content-visibility) as target/not-rendered without swallowing visible defects", async (t) => {
+    if (missingBrowser && optional) return t.skip("missing browser");
+    const clippedBody = (id: string): string => `<div id="${id}" style="width:100px;overflow:hidden;white-space:nowrap">hidden body text that is far wider than its box</div>`;
+    const notRendered = (report: { evaluations: { target: { selector: string }; status: string; reason: string | null }[] }, selector: string): boolean =>
+      report.evaluations.filter((e) => e.target.selector === selector).every((e) => e.status === "excluded" && e.reason === "target/not-rendered");
+
+    // Closed <details>: the body is not rendered, the first direct <summary> stays measured.
+    const closed = await inspect(`<details id="closed"><summary id="closed-summary">More</summary>${clippedBody("closed-body")}</details>`, "details-closed");
+    assert.equal(closed.report.runVerdict, "clean", JSON.stringify(closed.report.findings));
+    assert.ok(notRendered(closed.report, "#closed-body"));
+    assert.ok(closed.report.evaluations.some((e) => e.target.selector === "#closed-summary" && e.status === "measured"));
+
+    // Open <details> with the same defect: findings.
+    const opened = await inspect(`<details open><summary>More</summary>${clippedBody("open-body")}</details>`, "details-open");
+    assert.equal(opened.report.runVerdict, "findings");
+    assert.ok(opened.report.findings.some((f) => f.target.selector === "#open-body"));
+
+    // Nested: open outer / closed inner keeps the inner summary measured and hides the inner body;
+    // closed outer hides an open inner details entirely.
+    const nested = await inspect(
+      `<details open><summary>Outer</summary><details id="inner-closed"><summary id="inner-summary">Inner</summary>${clippedBody("inner-body")}</details></details>` +
+      `<details><summary>Closed outer</summary><details open><summary id="hidden-summary">Inner open</summary>${clippedBody("deep-body")}</details></details>`,
+      "details-nested",
+    );
+    assert.equal(nested.report.runVerdict, "clean", JSON.stringify(nested.report.findings));
+    assert.ok(nested.report.evaluations.some((e) => e.target.selector === "#inner-summary" && e.status === "measured"));
+    for (const selector of ["#inner-body", "#hidden-summary", "#deep-body"]) assert.ok(notRendered(nested.report, selector), selector);
+
+    // content-visibility: hidden skips the element's contents, not the element itself.
+    const cvHidden = await inspect(`<div id="cv-host" style="content-visibility:hidden;width:300px;height:40px">${clippedBody("cv-body")}</div>`, "content-visibility-hidden");
+    assert.equal(cvHidden.report.runVerdict, "clean", JSON.stringify(cvHidden.report.findings));
+    assert.ok(notRendered(cvHidden.report, "#cv-body"));
+    assert.ok(cvHidden.report.evaluations.some((e) => e.target.selector === "#cv-host" && e.status === "measured"));
+
+    // display: contents is no reason to exclude: its child's defect is still found.
+    const contents = await inspect(`<div style="display:contents">${clippedBody("contents-child")}</div>`, "display-contents");
+    assert.equal(contents.report.runVerdict, "findings");
+    assert.ok(contents.report.findings.some((f) => f.target.selector === "#contents-child"));
+
+    // Positive control: a visible defect in the closed details' own summary is not swallowed.
+    const summaryDefect = await inspect(`<details><summary id="long-summary" style="width:100px;overflow:hidden;white-space:nowrap">a summary line far wider than its box</summary>${clippedBody("quiet-body")}</details>`, "details-summary-defect");
+    assert.equal(summaryDefect.report.runVerdict, "findings");
+    assert.ok(summaryDefect.report.findings.some((f) => f.target.selector === "#long-summary"));
+
+    // content-visibility: auto far below the fold is not painted into a full-page capture.
+    const page = await open(`<div style="height:2000px">spacer</div><section id="cv-auto" style="content-visibility:auto;contain-intrinsic-size:auto 200px">${clippedBody("cv-auto-body")}</section>`);
+    try {
+      const full = await checkPage(hostPage(page, 640), { trust: "host-controlled-page", networkPolicy: "host-owned", scenario: "content-visibility-auto-full-page", output: { dir: output, screenshot: "full-page" } });
+      assert.equal(full.report.runVerdict, "clean", JSON.stringify(full.report.findings));
+      assert.ok(notRendered(full.report, "#cv-auto-body"));
+      assert.ok(full.report.evaluations.some((e) => e.target.selector === "#cv-auto" && e.status === "measured"));
+    } finally { await page.close(); }
+  });
+
   it("measures below-the-fold targets in full-page screenshot mode using css-document-pixels", async (t) => {
     if (missingBrowser && optional) return t.skip("missing browser");
     const page = await open('<div style="height:650px">above fold spacer</div><div id="below-wide" style="width:300px;height:40px"><div style="width:900px;height:30px">below fold overflow</div></div>');

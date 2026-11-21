@@ -207,6 +207,29 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
       return false;
     };
 
+    // Content the browser does not render: the body of a closed <details> (its first direct
+    // <summary> stays rendered; every closed ancestor counts) and the contents of an element with
+    // content-visibility: hidden. display: contents is not a reason by itself (its children render).
+    const notRendered = (node: Element): boolean => {
+      let child: Element = node;
+      for (let ancestor = node.parentElement; ancestor; child = ancestor, ancestor = ancestor.parentElement) {
+        if (ancestor instanceof HTMLDetailsElement && !ancestor.open) {
+          const summary = [...ancestor.children].find((candidate) => candidate.tagName === "SUMMARY");
+          if (child !== summary) return true;
+        }
+        if (getComputedStyle(ancestor).contentVisibility === "hidden") return true;
+      }
+      return false;
+    };
+    // content-visibility: auto skips painting contents away from the viewport; a full-page capture
+    // does not paint them either, so inside the capture area they are not rendered evidence.
+    const skippedByContentVisibilityAuto = (node: Element): boolean => {
+      let ancestor = node.parentElement;
+      while (ancestor && getComputedStyle(ancestor).contentVisibility !== "auto") ancestor = ancestor.parentElement;
+      if (!ancestor || typeof node.checkVisibility !== "function") return false;
+      return node.checkVisibility() && !node.checkVisibility({ contentVisibilityAuto: true });
+    };
+
     const rectsByNode = new Map<Element, DOMRect>();
     const stylesByNode = new Map<Element, CSSStyleDeclaration>();
     const statesByNode = new Map<Element, "candidate" | "excluded" | "not-measured">();
@@ -230,9 +253,10 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
       const overlay = overlayByNode.get(node) ?? false;
 
       let state: "candidate" | "excluded" | "not-measured" = "candidate"; let reason: string | null = null; let paint: string | null = null;
-      if (style.display === "none" || style.visibility === "hidden" || !!node.closest("dialog:not([open])")) { state = "excluded"; reason = "target/not-rendered"; }
+      if (style.display === "none" || style.visibility === "hidden" || !!node.closest("dialog:not([open])") || notRendered(node)) { state = "excluded"; reason = "target/not-rendered"; }
       else if (style.position === "absolute" && box && box.width <= 1 && box.height <= 1 && (style.clip !== "auto" || style.clipPath !== "none")) { state = "excluded"; reason = "target/visually-hidden"; }
       else if (!box || box.width === 0 || box.height === 0 || contained(visibleArea, checkRect) === "outside") { state = "excluded"; reason = "target/off-viewport"; }
+      else if (skippedByContentVisibilityAuto(node)) { state = "excluded"; reason = "target/not-rendered"; }
 
       const directTextNodes = [...node.childNodes].filter((child): child is Text => child.nodeType === Node.TEXT_NODE);
       const hasDirectText = directTextNodes.some((t) => (t.textContent ?? "").trim().length > 0);
