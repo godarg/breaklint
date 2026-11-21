@@ -58,4 +58,34 @@ describe("dependency gate", () => {
     assert.doesNotMatch(drift, /dependabot\.yml` makes|lockfile-only pull requests:/u, "SECURITY.md still promises Dependabot pull requests");
     assert.match(drift, /no `\.github\/dependabot\.yml`/u, "SECURITY.md does not say that no Dependabot configuration exists");
   });
+
+  /*
+   * GHSA-mrhx-c7xc-m3w5 affects zod below 4.6.6. The 0.11.0 text said the new peer floor's chain
+   * "admits a fixed zod"; it also admits the vulnerable 4.6.5. The section must state what the
+   * lockfile proves — the range the chain declares and the version this repository resolves —
+   * read here from package-lock.json, not from the text under test.
+   */
+  it("SECURITY.md's zod paragraph states the declared range and the resolved version the lockfile proves", () => {
+    const lock = JSON.parse(readFileSync(join(ROOT, "package-lock.json"), "utf8")) as {
+      packages: Record<string, { version?: string; dependencies?: Record<string, string>; peerDependencies?: Record<string, string> }>;
+    };
+    const puppeteer = lock.packages["node_modules/puppeteer-core"]!;
+    const bidiVersion = puppeteer.dependencies?.["chromium-bidi"];
+    const bidi = lock.packages["node_modules/chromium-bidi"]!;
+    const zodRange = bidi.dependencies?.zod;
+    const zodResolved = lock.packages["node_modules/zod"]?.version;
+    assert.ok(bidiVersion && bidi.version === bidiVersion && zodRange && zodResolved, "the lockfile no longer carries the puppeteer-core -> chromium-bidi -> zod chain; this guard has lost its subject");
+    const floor = /^>=(\S+) </u.exec(lock.packages[""]!.peerDependencies?.["puppeteer-core"] ?? "")?.[1];
+    assert.equal(floor, puppeteer.version, "the peer floor is not the locked puppeteer-core; the paragraph would describe another chain");
+    const security = readFileSync(join(ROOT, "SECURITY.md"), "utf8");
+    const at = security.indexOf("GHSA-mrhx-c7xc-m3w5");
+    const section = security.slice(security.lastIndexOf("\n## ", at), security.indexOf("\n## ", at));
+    assert.ok(section.includes(`\`puppeteer-core@${floor}\``), `the paragraph does not name puppeteer-core@${floor}`);
+    assert.ok(section.includes(`\`chromium-bidi@${bidiVersion}\``), `the paragraph does not name chromium-bidi@${bidiVersion}`);
+    assert.ok(section.includes(`\`zod: ${zodRange}\``), `the paragraph does not name the declared range zod: ${zodRange}`);
+    assert.ok(section.includes(`zod ${zodResolved}`), `the paragraph does not name the resolved zod ${zodResolved}`);
+    // ^4.6.5 admits 4.6.5, which the advisory affects: the floor alone closes nothing.
+    if (/^\^4\.6\.[0-5]$/u.test(zodRange)) assert.match(section, /does not by itself exclude/u, "the paragraph claims more than the peer floor proves");
+    assert.doesNotMatch(section, /closing the|closes the/u, "the paragraph claims the exception is closed by the floor");
+  });
 });

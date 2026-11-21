@@ -97,8 +97,12 @@ live, visual, consumer, licence, advisory and release-integrity gates before the
 GHSA-mrhx-c7xc-m3w5 (zod below 4.6.6, high, uncontrolled memory use while validating oversized
 collections) entered the GitHub Advisory Database on 2026-10-23. In 0.11.0 the consumer pin moved
 to `puppeteer-core@25.16.0` (Action, documented install commands, CI and release packed-consumer
-steps) and the peer floor rose to `>=25.16.0 <26`, whose transitive chain admits a fixed zod and
-audits clean under `npm run test:advisories`.
+steps) and the peer floor rose to `>=25.16.0 <26`. That floor does not by itself exclude the
+vulnerable zod: `puppeteer-core@25.16.0` depends on `chromium-bidi@157.0.8090-0`, which declares
+`zod: ^4.6.5`, a range that still admits 4.6.5. A fresh install resolves a fixed zod (this
+repository's lockfile: zod 4.6.7) and audits clean under `npm run test:advisories`. A consumer whose
+existing lockfile still holds zod 4.6.5 keeps it until that lockfile is re-resolved, for example
+with `npm update zod`.
 
 breaklint continues to drive Chrome over the Chrome DevTools Protocol (never WebDriver BiDi). The
 published runtime graph (`parse5`, `entities`) carries no advisory.
