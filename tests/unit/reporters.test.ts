@@ -166,6 +166,21 @@ describe("output formats", () => {
     for (const control of controls) {
       assert.equal(checkReadmeDemo(control.text, demo.stdout, demo.code).valid, false, `a README with a corrupted ${control.name} still passed`);
     }
+
+    // The excerpt may shorten, but only where it says so. Each of these hides a shortening.
+    const excerpt = /```\n(error [\s\S]*?)\n```\n/u.exec(readme)?.[1] ?? "";
+    assert.ok(excerpt.includes("…"), "the README excerpt no longer shows its shortening");
+    const lines = excerpt.split("\n");
+    const hidden: Array<[string, string[]]> = [
+      ["the omission line removed", lines.filter((line) => line.trim() !== "…")],
+      ["a shortened line's mark removed", lines.map((line) => (line.startsWith("  detail ") ? line.replace(/ …$/u, "") : line))],
+      ["the counter line's closing mark removed", lines.map((line, i) => (i === lines.length - 1 ? line.replace(/ · …$/u, "") : line))],
+      ["a line quoted from another finding", lines.map((line) => (line.startsWith("  measured ") ? "  measured   848 px; threshold 606 px (uncalibrated)" : line))],
+      ["a line that keeps almost nothing of its own", lines.map((line) => (line.startsWith("  detail ") ? "  detail     This …" : line))],
+    ];
+    for (const [name, next] of hidden) {
+      assert.equal(checkReadmeDemo(readme.replace(excerpt, next.join("\n")), demo.stdout, demo.code).valid, false, `a README with ${name} still passed`);
+    }
   });
 
   for (const format of OUTPUT_FORMATS) {

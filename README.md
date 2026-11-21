@@ -2,15 +2,17 @@
 
 Find page-break and layout bugs in HTML-to-PDF output (Paged.js) and in your Playwright pages — measured on the rendered page, with source locations and CI-ready exit codes.
 
-breaklint reports what a browser preview hides — widows, orphans, blocks too tall for a page,
-tables that lose their header, clipped labels — with the measured value, the threshold and where
-to look.
+breaklint paginates your HTML itself, with Paged.js 0.4.3 in Chrome. If your PDF comes from
+another engine (Chrome's own print, WeasyPrint, Prince), its page breaks can differ from what
+breaklint measured.
+
+It reports what a browser preview hides: widows and orphans, blocks too tall for a page, tables that lose their header, clipped SVG labels.
 
 [![npm](https://img.shields.io/npm/v/breaklint.svg)](https://www.npmjs.com/package/breaklint)
 [![ci](https://github.com/godarg/breaklint/actions/workflows/ci.yml/badge.svg)](https://github.com/godarg/breaklint/actions/workflows/ci.yml)
 [![licence](https://img.shields.io/npm/l/breaklint.svg)](https://github.com/godarg/breaklint/blob/v0.11.1/LICENSE)
 
-[![“Perfect in the browser. Broken on page 47.”](https://raw.githubusercontent.com/godarg/breaklint/v0.11.1/assets/breaklint-film-poster.jpg)](https://dargel-solutions.de/en/breaklint/#film)
+![Before: page 2 of a sample report is empty below its heading; a table marked break-inside: avoid is 2013 px tall on a 650 px page, exit 1. After: the table breaks between rows, page 1 holds heading and rows, exit 0.](https://raw.githubusercontent.com/godarg/breaklint/v0.11.1/assets/breaklint-before-after.png)
 
 ## Try it
 
@@ -19,19 +21,17 @@ npx breaklint --demo
 ```
 
 It needs no browser: the real rules run over a stored page snapshot that contains findings on
-purpose, so the demo ends with exit 1. Below is one of its five findings, plus the closing counters, copied from that
-command's output:
+purpose, so the demo ends with exit 1. Below is one of its five findings and the closing counters,
+shortened where marked `…`, copied from that command's output:
 
 ```
 error svg/text-overflows-viewport  page 5
   measured   72 px; threshold 0 px (uncalibrated)
-  detail     This text extends 72.00 px beyond the SVG viewport and is not drawn. Coordinates are normalised through getScreenCTM().
-  remedy     Text rendered inside an SVG extends outside the SVG viewport bounds and is clipped. Enlarge the SVG 'viewBox' or its width/height, or adjust the <text> coordinates ('x', 'y', 'text-anchor'). 'overflow: visible' on the container also clears the finding, but it does not move the text: the viewport then no longer clips, the target becomes non-applicable and this rule stops measuring it. Use that only where the overflow is intended.
-             untested: no trigger/remedied pair in this package shows this advice removing this finding
-  source     unknown (node produced by the paginator)
-  render     unknown (no evidence produced)
+  detail     This text extends 72.00 px beyond the SVG viewport …
+  remedy     … Enlarge the SVG 'viewBox' or its width/height …
+  …
 
-inputs found: 1 · pages analysed: 5 · rules run: 12 · rules that measured something: 10 · not measured: 1 · verdict: findings · mode: demo · fail-on: error · gate triggered by: error
+… · pages analysed: 5 · rules run: 12 · … · verdict: findings · …
 ```
 
 **No threshold is calibrated.** Fixtures show that each rule does what it says, not that its
@@ -45,17 +45,22 @@ Node 22.13 or newer, macOS or Linux, and a Chromium-based browser:
 npm i -D breaklint puppeteer-core@^25.16.0 pagedjs@0.4.3 pdfjs-dist@6.2.108
 ```
 
-`--demo` needs only `breaklint`; without `pdfjs-dist`, findings carry no page image.
+breaklint finds an installed Chrome or Chromium; otherwise set
+`BREAKLINT_CHROME=/path/to/chrome`. For `checkPage` in Playwright tests, `npm i -D breaklint` is
+enough; the browser is Playwright's. `--demo` needs only `breaklint`; without `pdfjs-dist`,
+findings carry no page image.
 
-## Check printed HTML
+## Check HTML for PDF
 
 ```bash
-npx breaklint dist/print/*.html                          # the shell expands the glob
-npx breaklint --format json --out report.json book.html  # also html, sarif, junit, markdown
+npx breaklint dist/print/*.html      # the shell expands the glob
+npx breaklint --format json --out report.json book.html
 ```
 
-Each run writes one PNG per page and the checked PDF to `./breaklint-report`; `--out-dir` moves it.
-Options, profiles and `breaklint.config.json`:
+`--format` also takes html, sarif, junit and markdown. A finding names the file and line of its
+element in your HTML, except for elements the paginator creates. Each run writes one PNG per page
+and the checked PDF to `./breaklint-report`; `--out-dir` moves it. Options, profiles and
+`breaklint.config.json`:
 [configuration](https://github.com/godarg/breaklint/blob/v0.11.1/docs/configuration.md).
 
 ## Check Playwright pages
@@ -70,15 +75,20 @@ import { checkPage } from 'breaklint';
 test('dashboard layout', async ({ page }, testInfo) => {
   await page.goto('/dashboard');
   const { ok, report } = await checkPage(page, {
-    trust: 'host-controlled-page',
-    networkPolicy: 'host-owned',
+    trust: 'host-controlled-page',   // required: your test owns this page
+    networkPolicy: 'host-owned',     // required: your test owns the network
     scenario: 'dashboard',
     output: { dir: testInfo.outputPath('breaklint'), screenshot: 'viewport' },
     failOn: 'error',
   });
-  await testInfo.attach('breaklint.json', { body: JSON.stringify(report, null, 2), contentType: 'application/json' });
-  expect(ok).toBe(true);                       // report mode: measured enough to judge
-  // expect(report.runVerdict).toBe('clean');  // gate mode: no finding at or above failOn
+  await testInfo.attach('breaklint.json', {
+    body: JSON.stringify(report, null, 2),
+    contentType: 'application/json',
+  });
+  // report mode: measured enough to judge
+  expect(ok).toBe(true);
+  // gate mode: no finding at or above failOn
+  // expect(report.runVerdict).toBe('clean');
 });
 ```
 
@@ -135,15 +145,17 @@ permissions, pinning.
 
 ## Exit codes
 
-| code | `breaklint <files>` | `compare`, `context`, `bundle` |
-|---|---|---|
-| 0 | checked, coverage met, nothing reached the threshold | output written completely |
-| 1 | a non-experimental finding reached the threshold | `compare --fail-on-new`: at least one `new` result |
-| 2 | invalid invocation or input; no report is written | invalid invocation or input, or an output that would overwrite an input |
-| 3 | infrastructure: renderer, font, pagination or output failed | output not written, or the after report is `infrastructure` |
-| 4 | too little was measured to judge | `compare`: after report `insufficient-coverage`, or nothing matchable |
+| code | meaning |
+|---|---|
+| 0 | checked, coverage met, nothing reached the threshold |
+| 1 | a finding reached the threshold |
+| 2 | invalid invocation or input; no report is written |
+| 3 | infrastructure: renderer, font, pagination or output failed |
+| 4 | too little was measured to judge |
 
-`checkPage` does not exit; its report carries the same verdicts and codes.
+`checkPage` returns the same verdicts without exiting. The subcommands `compare`, `context` and
+`bundle` have their own codes:
+[reporting](https://github.com/godarg/breaklint/blob/v0.11.1/docs/reporting.md#exit-codes-of-the-subcommands).
 
 ## Untrusted HTML
 
@@ -155,20 +167,27 @@ access; see [SECURITY.md](https://github.com/godarg/breaklint/blob/v0.11.1/SECUR
 ## Limits
 
 - **Uncalibrated.** No threshold is backed by a labelled corpus of real documents.
-- **Paged.js exactly 0.4.3.** Any other version ends with exit 3.
+- **Paged.js 0.4.3 is the measured paginator.** Any other installed version ends with exit 3.
 - **Footnotes.** A document using Paged.js footnotes ends with exit 3.
 - **macOS and Linux.** Live runs do not work on Windows.
 - **Fonts must load.** A font that fails to load stops the run instead of producing phantom findings.
 - **Isolate foreign HTML.** The request blocking protects against mistakes, not against attacks.
 
-What else is declined rather than guessed: [known limits](https://github.com/godarg/breaklint/blob/v0.11.1/docs/known-limits.md).
+Not a PDF validator, visual diff or prose linter: use veraPDF, BackstopJS or vale for those. More
+limits: [known limits](https://github.com/godarg/breaklint/blob/v0.11.1/docs/known-limits.md).
 
 ## How this was made
 
 breaklint was written with AI assistance: code, tests and documentation. Rules that cite a CSS
 specification or the German orthography rules were checked against the published text, and their
-behaviour against measurements in a real browser. breaklint itself calls no model and no online
-service when it checks a document.
+behaviour against measurements in a real browser. breaklint contains no language model and sends
+no document anywhere.
+
+## Help calibrate it
+
+Found a page where breaklint and your eye disagree? The
+[community test](https://github.com/godarg/breaklint/blob/v0.11.1/docs/community-testing.md) takes
+about ten minutes; use only material you may publish.
 
 ## License
 
