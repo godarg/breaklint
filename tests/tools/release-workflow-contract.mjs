@@ -26,6 +26,9 @@
  *      verified in the publish job and nowhere else. On 2026-11-21 the 0.11.0 publish signed its
  *      provenance through OIDC and then failed the PUT with E404 on an expired token it had fallen
  *      back to: a tag on GitHub, nothing on npm.
+ *   6. in the publish job, an unconditional step proves with `release-recovery.mjs --assert-on-main`
+ *      that the tag commit is on origin/main before the step that runs npm publish, the step
+ *      that exchanges the job's OIDC token.
  *
  * WHEN IT FAILS. It runs in `npm run test:release-tag` on every CI run. A release-prep commit
  * that moves package.json, the lock and the trigger together passes; a commit that moves only the
@@ -127,6 +130,7 @@ const TRUSTED_PUBLISHING_NPM = [11, 5, 1];
 const NPM_PIN = /^\s*(?:-\s+)?(?:run:\s*)?npm install -g "npm@\$NPM_VERSION"\s*$/u;
 const NPM_PIN_CHECK = /^\s*(?:-\s+)?(?:run:\s*)?test "\$\(npm -v\)" = "\$NPM_VERSION"\s*$/u;
 const UNSET_TOKEN = /^\s*unset NODE_AUTH_TOKEN\s*$/u;
+const ASSERT_ON_MAIN = 'node tests/tools/release-recovery.mjs --assert-on-main "$release_commit" origin/main';
 
 function atLeast(parts, floor) {
   for (let i = 0; i < floor.length; i += 1) {
@@ -205,6 +209,16 @@ export function publishAuthIssues(lines) {
   if (publishAt === -1) {
     issues.push(`${WORKFLOW}: job ${job.name} runs npm publish outside a step this contract can read`);
     return issues;
+  }
+  // The job holds id-token: write from its first step; npm publish is what exchanges it. That
+  // exchange must come after the proof that the tag commit is on origin/main, never before it.
+  const mainAt = steps.findIndex((step) => exec(step).some((line) => line.trim() === ASSERT_ON_MAIN));
+  if (mainAt === -1 || mainAt > publishAt) {
+    issues.push(`${WORKFLOW}: job ${job.name} must prove the tag commit is on origin/main before npm publish, with exactly: ${ASSERT_ON_MAIN}`);
+  } else {
+    for (const { key, number } of conditionKeys(steps[mainAt])) {
+      issues.push(`${where(number)}: job ${job.name}: the origin/main check must be unconditional; it carries ${key}:`);
+    }
   }
   const publishLines = exec(steps[publishAt]);
   const commands = publishLines.filter((line) => /\bnpm publish\b/u.test(line));
@@ -389,6 +403,11 @@ function runSelfTest() {
   assert.ok(real.workflowText.includes(deriveRun), "the real workflow has no derive step to mutate");
   const publishIf = "        if: steps.registry.outputs.publish_needed == 'true'\n";
   const npmPin = "      - name: pin an npm that supports trusted publishing (OIDC)\n";
+  const assertOnMain = '          node tests/tools/release-recovery.mjs --assert-on-main "$release_commit" origin/main';
+  const identityStep = "      - name: verify package, tag, origin/main and the successful CI run for one commit\n";
+  const publishStep = "      - name: publish exactly the validated tarball through npm trusted publishing (OIDC)\n" +
+    `${publishIf}        run: |\n          unset NODE_AUTH_TOKEN\n` +
+    `          npm publish "./$PACKAGE_FILE" --provenance --access public --registry=${NPM_REGISTRY}\n`;
   /** A mutation of a literal the real workflow must contain once; a vanished subject fails loudly. */
   const mutate = (from, to) => {
     assert.equal(real.workflowText.split(from).length, 2, `self-test: the real workflow must contain ${JSON.stringify(from)} exactly once`);
@@ -437,6 +456,15 @@ function runSelfTest() {
       workflowText: mutate('          npm install -g "npm@$NPM_VERSION"\n', "") },
     { name: "the npm pin in a consumer job as well", expect: 1, match: /job clean-consumer pins npm/u,
       workflowText: mutate("    name: clean consumer (Node ${{ matrix.node }})\n", "    name: clean consumer (Node ${{ matrix.node }})\n    env:\n      NPM_VERSION: 11.21.2\n") },
+    // The OIDC exchange happens in npm publish; it must follow the proof that the tag commit is on main.
+    { name: "npm publish moved before the origin/main check", expect: 1, match: /must prove the tag commit is on origin\/main before npm publish/u,
+      workflowText: mutate(publishStep, "").replace(identityStep, `${publishStep}\n${identityStep}`) },
+    { name: "no origin/main check in the publish job", expect: 1, match: /must prove the tag commit is on origin\/main/u,
+      workflowText: mutate(`${assertOnMain}\n`, "") },
+    { name: "an origin/main check whose exit code is swallowed", expect: 1, match: /must prove the tag commit is on origin\/main/u,
+      workflowText: mutate(`${assertOnMain}\n`, `${assertOnMain} || true\n`) },
+    { name: "an origin/main check that may be skipped", expect: 1, match: /the origin\/main check must be unconditional; it carries if:/u,
+      workflowText: mutate("        id: identity\n", "        id: identity\n        if: ${{ false }}\n") },
   ];
   try {
     for (const [index, testCase] of cases.entries()) {
