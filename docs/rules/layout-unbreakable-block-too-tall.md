@@ -17,38 +17,23 @@ One of two rules that carry `error`. Two directly measured heights, a structural
 
 ## Limits and known false alarms
 
-Multi-column and vertical writing are declined rather than judged.
-
-A block the paginator split is judged on all of its fragments, joined by source id. A split block
-whose fragments cannot be joined — it has no source id (a `--no-source-map` run, or an element a
-script created), or its source id does not account for every fragment the snapshot counted — is
-declined as `env/invalid-measurement` rather than judged on one fragment, and the decline counts
-against the rule's coverage.
-
-Which records are fragments is decided by the page structure, not by coordinates. A fragment that
-bleeds into the page margin (negative margins, a full-bleed figure) still counts. Content in a page
-margin box is not part of the flow and is not measured: a `position: running(...)` element is
-represented only by its in-flow original, which Paged.js hides with `display: none`. That original
-is recorded as `excluded` (`rule/target-in-margin-box`), and a block the author hid as `excluded`
-(`rule/target-not-rendered`), both outside the coverage base and never as a measurement of 0 px.
-A `display: contents` block generates no box, and `break-inside` does not apply to it: it is
-`not-applicable` (`rule/target-generates-no-box`), outside coverage, and its children are
-candidates in their own right. A zero-size block that printed visible lines anyway
-(`overflow: visible`), or whose lines were not recorded, is declined as `env/invalid-measurement`,
-counted against coverage: its box's height is not the height of what printed.
-
-A split block is judged at its first fragment that printed — laid out with a box of its own and
-visible — not at fragment 0 as such. Hiding only the first fragment (`display: none`, moving it
-where it has no box, `visibility: hidden`) does not hide the block: the earlier fragments are
-recorded as `rule/fragment-not-rendered` and the block's height is still the sum over all its
-fragments. See `docs/limitations.md`.
+- Multi-column and vertical writing are declined rather than judged.
+- A split block is judged on all of its fragments, joined by source id. Fragments that cannot be
+  joined (no source id, for example after `--no-source-map`) are declined as
+  `env/invalid-measurement` and count against coverage.
+- A block split into exactly two fragments is reported only if the first fragment alone exceeds
+  the page; from three fragments on, the summed height is reported. See
+  [known limits](../known-limits.md).
+- Fragments are found by page structure, not coordinates: a fragment bleeding into the margin
+  still counts, while content in a page margin box is not measured. Hidden blocks and
+  `display: contents` blocks are outside coverage; a zero-size block that printed visible lines
+  anyway is declined.
+- A block is judged at its first fragment that printed; hiding only that fragment does not hide
+  the block.
 
 ## Calibration
 
-`calibrated: false`. The threshold has not been fitted to a corpus of real documents with
-human-checked truth; no such corpus exists for this project. Every finding says so, and the
-report says so in `measurement.calibrated`. That is the honest state, not a defect — but it is
-also why this rule ships with the severity it has.
+`calibrated: false`. The boundary is structural (the page's content box), not a fitted number.
 
 ## Remediation
 

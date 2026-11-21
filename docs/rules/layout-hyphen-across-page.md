@@ -17,35 +17,13 @@ Detected by the paginator's own class, never by comparing characters. The hyphen
 
 ## Limits and known false alarms
 
-A compound word at a page boundary without the paginator's class is not reported.
-
-Paged.js 0.4.3 sets the class only when the characters on both sides of its split are ASCII word
-characters or soft hyphens (`/^\w|\u00AD$/` in `hyphenateAtBreak`). A word split next to a letter
-such as `ü` or `ß` therefore carries neither the class nor a hyphen and is not reported —
-measured on Chromium 141 with a page split between `ü` and `ß` in an `overflow-wrap: anywhere`
-paragraph.
-
-A boundary hyphen inside an inline element is reported on the block that holds it. Paged.js puts its
-class on the parent of the text node it cut, so when the cut word sits inside `<em>`, `<a>` or
-`<span>` the class is on that element. The rule used to read the block's own classes and missed it
-(measured on patched Chromium 141: the same split reported without `<em>` and silent with it). The
-collector now records the mark per block (`boundaryHyphen`, retained in Snapshot 7), on the nearest source block
-around the marked element; a wrapper further out does not carry it. The mark is what Paged.js
-does, not the class alone: the fragment's LAST text node must end in the hyphen glyph Paged.js
-appends (U+2011; breaklint never configures another), and the element holding that text node, or
-one between it and the block, must carry the class. An author's `pagedjs_hyphen` class on an element
-that holds no cut word is not a boundary hyphen.
-
-The hyphen finding establishes a paginator-introduced word split, not its reader severity or
-a verified source repair. Inspect neighboring lines/pages before changing word wrapping;
-`remediation.tested` remains false.
-
-## Calibration
-
-`calibrated: false`. The threshold has not been fitted to a corpus of real documents with
-human-checked truth; no such corpus exists for this project. Every finding says so, and the
-report says so in `measurement.calibrated`. That is the honest state, not a defect — but it is
-also why this rule ships with the severity it has.
+- A compound word at a page boundary without the paginator's class is not reported.
+- Paged.js 0.4.3 sets the class only when both sides of its split are ASCII word characters or
+  soft hyphens, so a word split next to `ü` or `ß` is not reported.
+- A split inside an inline element (`<em>`, `<a>`, `<span>`) is reported on the block that holds
+  it. An author's own `pagedjs_hyphen` class on an element without a cut word is not a finding.
+- The finding establishes a paginator-introduced word split, not its severity for a reader.
+  Inspect the neighbouring lines and pages before changing word wrapping.
 
 ## Remediation
 
