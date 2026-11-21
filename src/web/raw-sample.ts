@@ -40,14 +40,16 @@ export type BrowserRawSample = Omit<RawSample, "targets"> & { targets: BrowserRa
  * host boundary only to become a digest. It is never retained in the public report, artifact,
  * events, or evidence metadata.
  */
-export function digestBrowserSample(sampled: BrowserRawSample): RawSample {
+export function digestBrowserSample(sampled: BrowserRawSample, siblingOverlap: boolean): RawSample {
   const targets = sampled.targets.map(({ directText, ...target }) => ({ ...target, directTextSha256: directText === null ? null : sha(directText) }));
+  // Fields of a rule that is not enabled never decide stability: without the sibling-overlap
+  // opt-in, its two fields are absent from the digest.
   const targetDigest = JSON.stringify(targets.map((target) => [
     target.selector, target.domPath, target.tag, target.id, target.className, target.textLength, target.directTextSha256,
     target.paintSignature, target.ancestorSignatureComplete, target.box?.x ?? null, target.box?.y ?? null, target.box?.width ?? null, target.box?.height ?? null,
     target.state, target.reason, target.paint, target.transform, target.horizontalOverflow, target.clipped,
-    target.siblingOverlapPx, target.svgTextOverflowPx, target.fontSizePx, target.hasDirectText, target.isInteractiveControl, target.siblingEligible,
-    target.allowedScroll, target.overlay, target.sourceContainer,
+    ...(siblingOverlap ? [target.siblingOverlapPx] : []), target.svgTextOverflowPx, target.fontSizePx, target.hasDirectText, target.isInteractiveControl,
+    ...(siblingOverlap ? [target.siblingEligible] : []), target.allowedScroll, target.overlay, target.sourceContainer,
   ]));
   return { ...sampled, signature: { ...sampled.signature, targetDigest }, targets };
 }

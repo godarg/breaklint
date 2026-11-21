@@ -21,7 +21,7 @@ export { SCREEN_REPORT_SCHEMA_VERSION, READABLE_SCREEN_REPORT_SCHEMA_VERSIONS } 
 export type {
   StructuralPage, CheckPageOptions, PublicScreenReport, ScreenCheckResult,
   ScreenTargetEvaluation, ScreenFinding, ScreenInfrastructureEvent, ScreenArtifact,
-  ScreenCoverage, NamedScreenException, ScreenRuleId, ScreenOptInRules,
+  ScreenCoverage, NamedScreenException, ScreenRuleId, ScreenOptInRules, ScreenFailOn,
   ScreenDriftDetail, HostBuildContainerBinding, HostBuildContainer,
 } from "./web/types.ts";
 export type { DocumentFontIdentity } from "./core/types.ts";

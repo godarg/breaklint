@@ -106,7 +106,7 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<{
   finally { if (timer) clearTimeout(timer); }
 }
 
-async function samplePage(page: StructuralPage, input: { maxTargets: number; allowed: string[]; overlays: string[]; containers: string[]; fullPage: boolean }): Promise<RawSample> {
+async function samplePage(page: StructuralPage, input: { maxTargets: number; allowed: string[]; overlays: string[]; containers: string[]; fullPage: boolean; siblingOverlap: boolean }): Promise<RawSample> {
   const sampled: BrowserRawSample = await page.evaluate(async (options) => {
     type Box = { x: number; y: number; width: number; height: number };
     const sx = window.scrollX;
@@ -323,15 +323,18 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
       };
     }));
 
-    // Second pass: compute direct HTML sibling overlap depth (excluding SVG internals,
-    // intentional overlays, fixed/sticky chrome, and pointer-events:none decorative layers).
+    // Second pass (only when web/sibling-overlap is opted in): compute direct HTML sibling overlap
+    // depth (excluding SVG internals, intentional overlays, fixed/sticky chrome, and
+    // pointer-events:none decorative layers). A wrapper whose only content is a replaced
+    // descendant (an image card) is content; position:absolute is deliberately not excluded.
+    const REPLACED_SELECTOR = [...REPLACED_TAGS].join(",");
     const siblingEligible = (node: Element, rec: BrowserRawTarget): boolean => {
       if (rec.isSvg || rec.state !== "candidate" || rec.overlay || !rec.box || rec.box.width <= 0 || rec.box.height <= 0) return false;
       if (node.closest("svg")) return false;
       const st = stylesByNode.get(node);
       if (!st) return false;
       if (st.position === "fixed" || st.position === "sticky" || st.pointerEvents === "none") return false;
-      const hasContent = (node.textContent?.trim().length ?? 0) > 0 || REPLACED_TAGS.has(rec.tag);
+      const hasContent = (node.textContent?.trim().length ?? 0) > 0 || REPLACED_TAGS.has(rec.tag) || node.querySelector(REPLACED_SELECTOR) !== null;
       return hasContent;
     };
     const fragmentRects = (node: Element, st: CSSStyleDeclaration, fallback: DOMRect): readonly DOMRect[] => {
@@ -342,7 +345,7 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
       return [fallback];
     };
     const byParent = new Map<Element, { node: Element; rec: BrowserRawTarget; rect: DOMRect; rects: readonly DOMRect[] }[]>();
-    for (const item of rawRecords) {
+    for (const item of options.siblingOverlap ? rawRecords : []) {
       if (!siblingEligible(item.node, item.record)) continue;
       item.record.siblingEligible = true;
       const parent = item.node.parentElement;
@@ -395,7 +398,7 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
     return { signature, fontsReady: document.fonts?.status === "loaded", deviceScaleFactor: devicePixelRatio, candidates: nodes.length, omittedCount: capped ? nodes.length - selected.length : 0, signatureTextComplete, ancestorSignatureComplete, exceptions: { allowed: allowedCounts, overlay: overlayCounts }, targets };
   }, input);
 
-  return digestBrowserSample(sampled);
+  return digestBrowserSample(sampled, input.siblingOverlap);
 }
 
 /** Reads the rendered build id the host declared; null when unbound, absent, or unreadable. */
@@ -417,6 +420,8 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
   const overlays = overlayEntries.map((x) => x.selector);
   const containers = options.sourceBinding?.containers.map((x) => x.selector) ?? [];
 
+  const siblingOverlapEnabled = options.geometry?.rules?.siblingOverlap === true;
+  const failOn = options.failOn ?? "warn";
   const smallTextOpt = options.geometry?.rules?.smallText;
   const smallTextEnabled = smallTextOpt !== undefined && smallTextOpt !== false;
   const smallTextThreshold = typeof smallTextOpt === "object" && smallTextOpt.minFontSizePx !== undefined ? smallTextOpt.minFontSizePx : DEFAULT_SMALL_TEXT_PX;
@@ -427,7 +432,7 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
   const rulesEnabled: ScreenRuleId[] = [
     "web/unexpected-horizontal-overflow",
     "web/content-clipped",
-    "web/sibling-overlap",
+    ...(siblingOverlapEnabled ? ["web/sibling-overlap" as const] : []),
     "web/svg-text-overflows-viewport",
     ...(smallTextEnabled ? ["web/small-text" as const] : []),
     ...(smallTouchEnabled ? ["web/small-touch-target" as const] : []),
@@ -435,7 +440,7 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
 
   const infrastructure: ScreenInfrastructureEvent[] = [];
   const events: { kind: string; detail: string }[] = [];
-  const sampleInput = { maxTargets, allowed, overlays, containers, fullPage };
+  const sampleInput = { maxTargets, allowed, overlays, containers, fullPage, siblingOverlap: siblingOverlapEnabled };
 
   const deadline = Date.now() + timeout;
   const fonts = await withTimeout(
@@ -540,17 +545,20 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
   const effectiveBinding: Binding = bindingStable ? bindingAfter : { status: options.sourceBinding ? "declared" : "unknown", files: new Set(), containerFiles: new Map(), detail: bindingAfter.detail };
   const evaluations = evaluateScreenTargets(settled.targets, {
     binding: effectiveBinding, stableCapture, artifactPath: relativePath,
+    siblingOverlap: siblingOverlapEnabled,
     smallText: { enabled: smallTextEnabled, thresholdPx: smallTextThreshold },
     smallTouch: { enabled: smallTouchEnabled, thresholdPx: smallTouchThreshold },
   });
   const findings = screenFindings(evaluations, relativePath);
+  // The gate mirrors the print profile: `error` lets warnings stay visible without failing the run.
+  const gatingFindings = findings.filter((finding) => failOn === "warn" || finding.severity === "error").length;
 
   const measured = evaluations.filter((entry) => entry.status === "measured").length;
   const excluded = evaluations.filter((entry) => entry.status === "excluded").length;
   const notMeasured = evaluations.filter((entry) => entry.status === "not-measured").length;
   // A page with candidates but no measurements has no positive observation to support Clean.
   const insufficient = !stableCapture || settled.omittedCount > 0 || notMeasured > 0 || measured === 0;
-  const verdict: RunVerdict = infrastructure.some((entry) => entry.fatal) ? "infrastructure" : insufficient ? "insufficient-coverage" : findings.length ? "findings" : "clean";
+  const verdict: RunVerdict = infrastructure.some((entry) => entry.fatal) ? "infrastructure" : insufficient ? "insufficient-coverage" : gatingFindings > 0 ? "findings" : "clean";
   const viewport = page.viewportSize();
   const browserVersion = await Promise.resolve(page.context().browser()?.version() ?? null);
 
@@ -570,6 +578,7 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
     },
     trust: "host-controlled-page",
     networkPolicy: "host-owned",
+    failOn,
     rulesEnabled,
     targetInventory: {
       complete: settled.omittedCount === 0 && completeSignature,

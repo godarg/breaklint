@@ -34,9 +34,13 @@ export interface NamedScreenException {
 }
 
 export interface ScreenOptInRules {
+  /** `web/sibling-overlap` is uncalibrated and off unless set to true. Off, the sibling pass never runs. */
+  siblingOverlap?: boolean;
   smallText?: boolean | { minFontSizePx?: number };
   smallTouchTarget?: boolean | { minSizePx?: number };
 }
+
+export type ScreenFailOn = "warn" | "error";
 
 export interface HostBuildContainer { selector: string; file: string; }
 
@@ -59,6 +63,8 @@ export interface CheckPageOptions {
   projectId?: string;
   documentId?: string;
   runId?: string;
+  /** Lowest finding severity that turns the verdict into `findings`. Default `warn` (every finding gates). */
+  failOn?: ScreenFailOn;
   output: { dir: string; screenshot: "viewport" | "full-page" };
   geometry?: {
     allowedScrollContainers?: readonly NamedScreenException[];
@@ -162,6 +168,8 @@ export interface PublicScreenReport {
   };
   trust: "host-controlled-page";
   networkPolicy: "host-owned";
+  /** The finding gate that decided between `findings` and `clean` (absent in reports before 0.11.1). */
+  failOn?: ScreenFailOn;
   rulesEnabled?: ScreenRuleId[];
   targetInventory: { complete: boolean; omittedCount: number; reason: string | null };
   coverage: ScreenCoverage;

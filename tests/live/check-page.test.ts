@@ -51,12 +51,12 @@ describe("screen checkPage host-page adapter, live", () => {
       context: () => ({ browser: () => ({ version: () => "local-live-host" }) }),
     };
   }
-  async function inspect(html: string, scenario: string, geometry: Record<string, unknown> = {}) {
+  async function inspect(html: string, scenario: string, geometry: Record<string, unknown> = {}, extra: Record<string, unknown> = {}) {
     const page = await open(html);
     try {
       return await checkPage(hostPage(page, 640), {
         trust: "host-controlled-page", networkPolicy: "host-owned", scenario,
-        output: { dir: output, screenshot: "viewport" }, geometry,
+        output: { dir: output, screenshot: "viewport" }, geometry, ...extra,
       });
     } finally { await page.close(); }
   }
@@ -201,6 +201,7 @@ describe("screen checkPage host-page adapter, live", () => {
       '<div style="width:300px;line-height:22px"><span id="inline-hit-a">Alpha inline</span><span id="inline-hit-b" style="margin-left:-36px">Overlap inline</span></div>' +
       '<svg width="100" height="40"><rect x="0" y="0" width="100" height="40" fill="#eee"/><rect x="10" y="5" width="80" height="30" fill="#ddd"/><text id="svg-over" x="70" y="24" font-size="20">WayTooWideLabel</text></svg>',
       "sibling-and-svg-overflow",
+      { rules: { siblingOverlap: true } },
     );
     assert.equal(overlap.ok, true);
     assert.equal(overlap.report.runVerdict, "findings");
@@ -212,6 +213,57 @@ describe("screen checkPage host-page adapter, live", () => {
     assert.ok(overlap.report.findings.some((f) => f.ruleId === "web/svg-text-overflows-viewport" && f.target.selector === "#svg-over" && f.severity === "error"));
     // Overlapping SVG <rect> shapes must never trigger web/sibling-overlap.
     assert.equal(overlap.report.findings.some((f) => f.ruleId === "web/sibling-overlap" && f.target.tag === "rect"), false);
+  });
+
+  it("keeps web/sibling-overlap opt-in: off by default and out of the stability digest, on for image cards and real absolute collisions, gated by failOn", async (t) => {
+    if (missingBrowser && optional) return t.skip("missing browser");
+    const badge = '<div style="position:relative;width:200px"><img id="photo" alt="product" width="200" height="100" src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22100%22/%3E"><span id="badge" style="position:absolute;top:8px;right:8px;background:#fff">NEW</span></div>';
+
+    // Default: the rule is not enabled, produces no evaluation, and the badge page is clean.
+    const off = await inspect(badge, "sibling-overlap-default-off");
+    assert.equal(off.report.runVerdict, "clean", JSON.stringify(off.report.findings));
+    assert.equal(off.report.rulesEnabled?.includes("web/sibling-overlap"), false);
+    assert.equal(off.report.evaluations.some((e) => e.ruleId === "web/sibling-overlap"), false);
+
+    // Opt-in: no blanket position:absolute exclusion, the real overlap is visible as a warning ...
+    const on = await inspect(badge, "sibling-overlap-opt-in-badge", { rules: { siblingOverlap: true } });
+    assert.equal(on.report.rulesEnabled?.includes("web/sibling-overlap"), true);
+    assert.equal(on.report.runVerdict, "findings");
+    assert.ok(on.report.findings.some((f) => f.ruleId === "web/sibling-overlap" && f.target.selector === "#badge" && f.severity === "warn"));
+    // ... failOn "error" keeps the warning in the report without failing the run ...
+    const gated = await inspect(badge, "sibling-overlap-fail-on-error", { rules: { siblingOverlap: true } }, { failOn: "error" });
+    assert.equal(gated.ok, true);
+    assert.equal(gated.report.runVerdict, "clean");
+    assert.equal(gated.report.exitCode, 0);
+    assert.ok(gated.report.findings.some((f) => f.ruleId === "web/sibling-overlap" && f.target.selector === "#badge"));
+    // ... and a named intentional overlay is the way to accept the badge.
+    const named = await inspect(badge, "sibling-overlap-named-badge", { rules: { siblingOverlap: true }, intentionalOverlays: [{ selector: "#badge", reason: "product badge" }] });
+    assert.equal(named.report.runVerdict, "clean", JSON.stringify(named.report.findings));
+
+    // Image cards: wrappers whose only content is a replaced descendant still count as content.
+    const cards = await inspect(
+      '<div style="display:flex;width:400px">' +
+      '<div id="card-a" style="width:150px"><img alt="first" width="150" height="80" src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22150%22 height=%2280%22/%3E"></div>' +
+      '<div id="card-b" style="width:150px;margin-left:-40px"><img alt="second" width="150" height="80" src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22150%22 height=%2280%22/%3E"></div></div>',
+      "sibling-overlap-image-cards", { rules: { siblingOverlap: true } },
+    );
+    assert.ok(cards.report.findings.some((f) => f.ruleId === "web/sibling-overlap" && f.target.selector === "#card-b"), JSON.stringify(cards.report.evaluations.filter((e) => e.ruleId === "web/sibling-overlap" && e.target.selector.startsWith("#card"))));
+
+    // A real collision of two absolutely positioned text blocks stays a finding.
+    const collision = await inspect(
+      '<div style="position:relative;height:80px;width:300px"><p id="abs-a" style="position:absolute;top:0;left:0;margin:0;height:30px">Heading text</p><p id="abs-b" style="position:absolute;top:12px;left:0;margin:0;height:30px">Colliding text</p></div>',
+      "sibling-overlap-absolute-collision", { rules: { siblingOverlap: true } },
+    );
+    assert.ok(collision.report.findings.some((f) => f.ruleId === "web/sibling-overlap" && f.target.selector === "#abs-b"));
+
+    // Overlap eligibility that flips every frame without any geometry change: without the opt-in
+    // the sibling fields are not part of the stability digest, so the capture is stable and clean.
+    const flipping = '<div style="width:300px"><p id="flip-a" style="margin:0;height:30px">First line</p><p id="flip-b" style="margin:-18px 0 0;height:30px">Second line</p></div>' +
+      '<script>let flip = false; (function tick() { flip = !flip; document.getElementById("flip-b").style.pointerEvents = flip ? "none" : "auto"; requestAnimationFrame(tick); })();</script>';
+    const quiet = await inspect(flipping, "sibling-overlap-flipping-off");
+    assert.equal(quiet.report.capture.stabilized, true);
+    assert.equal(quiet.report.capture.drifted, false);
+    assert.equal(quiet.report.runVerdict, "clean", JSON.stringify(quiet.report.infrastructure));
   });
 
   it("measures below-the-fold targets in full-page screenshot mode using css-document-pixels", async (t) => {

@@ -21,11 +21,12 @@ const result = await checkPage(page, {
   networkPolicy: "host-owned",
   scenario: "signed-in-dashboard",
   output: { dir: "artifacts/breaklint", screenshot: "viewport" },
+  failOn: "warn",
   geometry: {
     stabilizationTimeoutMs: 500,
     allowedScrollContainers: [{ selector: "[data-grid]", reason: "wide data grid", scope: "suite" }],
     intentionalOverlays: [{ selector: "[role=dialog]", reason: "open modal" }],
-    rules: { smallText: true, smallTouchTarget: true },
+    rules: { siblingOverlap: true, smallText: true, smallTouchTarget: true },
   },
 });
 ```
@@ -41,9 +42,14 @@ or `css-document-pixels` for `"full-page"` captures), browser version, before/st
 signatures with structured `capture.driftDetails` on drift, actual PNG hash and dimensions, target
 evaluations (including healthy, excluded, and not-measured targets), coverage counts, and typed
 events. Screen profile v2 checks unexpected horizontal overflow, content visibly cut by rectangular
-`overflow: hidden` or `clip` ancestors, visible HTML sibling overlap (`web/sibling-overlap`), SVG text
-overflowing its viewport (`web/svg-text-overflows-viewport`), and opt-in `web/small-text` /
-`web/small-touch-target` warnings. CSS Color 4 solid colors (`oklch()`, `oklab()`, `lab()`, `lch()`,
+`overflow: hidden` or `clip` ancestors, SVG text overflowing its viewport
+(`web/svg-text-overflows-viewport`), and the opt-in warnings `web/sibling-overlap` (visible HTML
+sibling overlap, `rules.siblingOverlap: true`), `web/small-text` and `web/small-touch-target`. Without
+its opt-in, the sibling pass does not run and its fields do not take part in the capture stability
+check. Absolutely positioned siblings are not excluded wholesale; name an intended overlay such as a
+badge in `intentionalOverlays`. `failOn` (`"warn"` by default, or `"error"`) is the lowest finding
+severity that turns the verdict into `findings`; with `"error"`, warnings stay in the report without
+failing the run. CSS Color 4 solid colors (`oklch()`, `oklab()`, `lab()`, `lch()`,
 `hwb()`, `color(...)`), semi-transparent opacity (`0 < opacity < 1`), `filter`, and `backdrop-filter`
 are measured normally for geometry; `opacity: 0`, masks, clip-paths, unsupported transforms, and
 running animations stay excluded or `not-measured`. Ordinary vertical scrolling and general visual

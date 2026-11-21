@@ -54,6 +54,7 @@ export interface ScreenEvaluationContext {
   binding: Binding;
   stableCapture: boolean;
   artifactPath: string;
+  siblingOverlap: boolean;
   smallText: { enabled: boolean; thresholdPx: number };
   smallTouch: { enabled: boolean; thresholdPx: number };
 }
@@ -83,8 +84,8 @@ export function evaluateScreenTargets(targets: readonly RawTarget[], ctx: Screen
       exceptionReason,
       exceptionStatus,
     ));
-    // 3. web/sibling-overlap (HTML elements only; SVG shapes overlap by design)
-    if (!raw.isSvg) {
+    // 3. Opt-in web/sibling-overlap (HTML elements only; SVG shapes overlap by design)
+    if (ctx.siblingOverlap && !raw.isSvg) {
       const siblingExcluded = !raw.siblingEligible;
       const siblingReason = raw.overlay
         ? "target/intentional-overlay"
