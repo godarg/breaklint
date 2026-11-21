@@ -14,6 +14,8 @@ export type RawTarget = {
   fontSizePx: number; siblingOverlapPx: number; svgTextOverflowPx: number;
   /** SVG text only: at least one ancestor <svg> viewport clips (overflow other than visible). */
   svgClipped: boolean;
+  /** Any element inside an <svg> (the outer <svg> itself is HTML-side content). */
+  svgInterior: boolean;
   paintSignature: string; ancestorSignatureComplete: boolean;
   box: { x: number; y: number; width: number; height: number } | null;
   coordinateSystem: "css-viewport-pixels" | "css-document-pixels";
@@ -50,7 +52,7 @@ export function digestBrowserSample(sampled: BrowserRawSample, siblingOverlap: b
     target.selector, target.domPath, target.tag, target.id, target.className, target.textLength, target.directTextSha256,
     target.paintSignature, target.ancestorSignatureComplete, target.box?.x ?? null, target.box?.y ?? null, target.box?.width ?? null, target.box?.height ?? null,
     target.state, target.reason, target.paint, target.transform, target.horizontalOverflow, target.clipped,
-    ...(siblingOverlap ? [target.siblingOverlapPx] : []), target.svgTextOverflowPx, target.svgClipped, target.fontSizePx, target.hasDirectText, target.isInteractiveControl,
+    ...(siblingOverlap ? [target.siblingOverlapPx] : []), target.svgTextOverflowPx, target.svgClipped, target.svgInterior, target.fontSizePx, target.hasDirectText, target.isInteractiveControl,
     ...(siblingOverlap ? [target.siblingEligible] : []), target.allowedScroll, target.overlay, target.sourceContainer,
   ]));
   return { ...sampled, signature: { ...sampled.signature, targetDigest }, targets };

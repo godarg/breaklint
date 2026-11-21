@@ -376,6 +376,19 @@ describe("screen checkPage host-page adapter, live", () => {
     assert.ok(clipFinding(v, "#html-cut"), "an outer HTML clip stays measurable");
   });
 
+  it("does not measure SVG content with scrollWidth for web/unexpected-horizontal-overflow, while real HTML overflow next to it is found", async (t) => {
+    if (missingBrowser && optional) return t.skip("missing browser");
+    const result = await inspect(
+      '<svg width="600" height="120" viewBox="0 0 100 20"><text id="big" x="2" y="12" font-size="8">Readable heading</text></svg>' +
+      '<div id="html-wide" style="width:200px;height:30px"><div style="width:500px;height:20px">wide html</div></div>',
+      "svg-scroll-width",
+    );
+    const r = result.report;
+    assert.equal(r.findings.some((f) => f.ruleId === "web/unexpected-horizontal-overflow" && f.target.selector === "#big"), false, JSON.stringify(r.findings));
+    assert.ok(r.evaluations.some((e) => e.ruleId === "web/unexpected-horizontal-overflow" && e.target.selector === "#big" && e.status === "excluded" && e.reason === "rule/target-not-applicable"));
+    assert.ok(r.findings.some((f) => f.ruleId === "web/unexpected-horizontal-overflow" && f.target.selector === "#html-wide"));
+  });
+
   it("measures below-the-fold targets in full-page screenshot mode using css-document-pixels", async (t) => {
     if (missingBrowser && optional) return t.skip("missing browser");
     const page = await open('<div style="height:650px">above fold spacer</div><div id="below-wide" style="width:300px;height:40px"><div style="width:900px;height:30px">below fold overflow</div></div>');

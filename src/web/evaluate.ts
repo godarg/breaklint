@@ -71,9 +71,9 @@ export function evaluateScreenTargets(targets: readonly RawTarget[], ctx: Screen
     evaluations.push(buildEvaluation(
       raw, "web/unexpected-horizontal-overflow", i++, binding, stableCapture, artifactPath,
       { name: "horizontal-overflow", value: raw.horizontalOverflow, unit: "css-px", operator: ">", threshold: 0, calibrated: false },
-      raw.state === "candidate" && !raw.overlay && !raw.allowedScroll && raw.horizontalOverflow > 0,
-      exceptionReason,
-      exceptionStatus,
+      raw.state === "candidate" && !raw.svgInterior && !raw.overlay && !raw.allowedScroll && raw.horizontalOverflow > 0,
+      raw.svgInterior ? "rule/target-not-applicable" : exceptionReason,
+      raw.svgInterior ? "excluded" : exceptionStatus,
     ));
     // 2. web/content-clipped
     const clippedVal = raw.clipped === "partial" ? 1 : 0;

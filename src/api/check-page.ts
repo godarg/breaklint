@@ -288,6 +288,7 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
       const tag = node.tagName.toLowerCase();
       const isSvg = node instanceof SVGElement;
       const isSvgText = isSvg && tag === "text";
+      const svgInterior = node instanceof SVGElement && (node as SVGElement).ownerSVGElement !== null;
       const overlay = overlayByNode.get(node) ?? false;
 
       let state: "candidate" | "excluded" | "not-measured" = "candidate"; let reason: string | null = null; let paint: string | null = null;
@@ -379,7 +380,9 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
           paintSignature: JSON.stringify([targetPaintSignature, ancestorSignature]),
           ancestorSignatureComplete: targetAncestorSignatureComplete, box, coordinateSystem: coordSystem,
           state, reason, paint, transform: transform(style), clipped,
-          horizontalOverflow: Math.max(0, node.scrollWidth - node.clientWidth),
+          // Inside an <svg>, scrollWidth is in CSS pixels and clientWidth in user units; the pair
+          // measures viewBox scaling, not overflow. SVG content is web/svg-text-overflows-viewport's.
+          horizontalOverflow: svgInterior ? 0 : Math.max(0, node.scrollWidth - node.clientWidth), svgInterior,
           allowedScroll: isMatch(node, options.allowed), overlay,
           sourceContainer: containerIndex(node), scroll: { x: sx, y: sy },
         },

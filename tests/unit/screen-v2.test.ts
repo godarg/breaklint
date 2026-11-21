@@ -126,7 +126,7 @@ describe("Paket 2: screen capture drift diff & schemaVersion 2 context/bundle co
     const baseTarget = {
       selector: "#card", domPath: "html:nth-child(1)>body:nth-child(2)>div:nth-child(1)", tag: "div", id: "card", className: "",
       textLength: 5, directTextSha256: "abc", hasDirectText: true, isSvg: false, isSvgText: false, isInteractiveControl: false, siblingEligible: true,
-      fontSizePx: 16, siblingOverlapPx: 0, svgTextOverflowPx: 0, svgClipped: false, paintSignature: "p1", ancestorSignatureComplete: true,
+      fontSizePx: 16, siblingOverlapPx: 0, svgTextOverflowPx: 0, svgClipped: false, svgInterior: false, paintSignature: "p1", ancestorSignatureComplete: true,
       box: { x: 0, y: 0, width: 100, height: 40 }, coordinateSystem: "css-viewport-pixels" as const,
       state: "candidate" as const, reason: null, paint: null, transform: null, clipped: "none" as const,
       horizontalOverflow: 0, allowedScroll: false, overlay: false, sourceContainer: null, scroll: { x: 0, y: 0 },
