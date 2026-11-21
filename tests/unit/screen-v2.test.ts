@@ -202,15 +202,18 @@ describe("Paket 2: screen capture drift diff & schemaVersion 2 context/bundle co
       assert.ok(svgHtml.includes("&lt;text&gt;"), "screen repair text must HTML-escape <text>");
       assert.equal(svgHtml.includes("rendered <text> bounding box"), false, "raw <text> tag must not appear in HTML");
 
-      // Malicious string injected into a numeric viewport field must be HTML-escaped.
+      // Malicious string injected into a numeric viewport field must never reach the HTML as
+      // markup. Since 0.11.1 a numeric field is shown only when it is a finite number (C6), so the
+      // string is replaced by "unavailable" rather than shown escaped.
       const xssReport = {
         ...svgReport,
         scope: { ...svgReport.scope, viewport: { ...svgReport.scope.viewport, width: "<b>injected</b>" as unknown as number } },
       };
       const xssBundle = writeReportBundle(xssReport, { outDir: bundleDir });
       const xssHtml = readFileSync(xssBundle.htmlPath, "utf8");
-      assert.ok(xssHtml.includes("&lt;b&gt;injected&lt;/b&gt;"));
+      assert.match(xssHtml, /<dt>Viewport<\/dt><dd>unavailable×\d+<\/dd>/u);
       assert.equal(xssHtml.includes("<b>injected</b>"), false);
+      assert.equal(xssHtml.includes("injected"), false, "the non-numeric viewport value must not be shown at all");
 
       // Failed bundle write (mismatched comparison) must NOT overwrite existing report.json on disk.
       const priorReportJson = readFileSync(join(bundleDir, "report.json"), "utf8");
