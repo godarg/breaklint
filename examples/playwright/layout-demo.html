@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Build matrix</title>
+  <style>
+    body { margin: 0; font: 16px/1.5 system-ui, sans-serif; color: #1d1d1f; background: #fff; }
+    header, main { max-width: 720px; margin: 0 auto; padding: 16px; }
+    nav a { display: inline-block; padding: 12px 8px; color: inherit; }
+    /* The table is wider than the page on purpose; its wrapper scrolls horizontally. */
+    .table-scroll { overflow-x: auto; }
+    table { width: 1400px; border-collapse: collapse; }
+    th, td { padding: 8px 12px; border-bottom: 1px solid #ddd; text-align: left; white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <header>
+    <nav><a href="#matrix">Matrix</a> <a href="#notes">Notes</a></nav>
+  </header>
+  <main>
+    <h1 id="matrix">Build matrix</h1>
+    <p>Every combination below runs the same layout checks. The table scrolls sideways.</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Runner</th><th>Node</th><th>Browser</th><th>Paginator</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td>Linux x64</td><td>22.13</td><td>Chromium, stable channel</td><td>Paged.js 0.4.3</td><td>passed</td></tr>
+          <tr><td>macOS arm64</td><td>24</td><td>Chrome, stable channel</td><td>Paged.js 0.4.3</td><td>passed</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p id="notes">Windows is not part of the matrix.</p>
+  </main>
+</body>
+</html>
