@@ -186,12 +186,17 @@ function findingModel(finding: Finding, index: number, allFindings: readonly Fin
     : null;
   let ambiguity: string | null = null;
   if (finding.ambiguity) {
+    // A partner is a finding of the SAME document with the same fingerprint: the fingerprint has no
+    // document path, so a match in another document is a different target. Every finding of the
+    // report is rendered, so a partner that exists is always one of these cards. Without one, no
+    // group size is stated: the page rules set `groupSize: 2` for every position-only key, and
+    // "2 findings share …" then pointed readers at a partner that was in neither the HTML nor the JSON.
     const partners = allFindings
-      .map((other, otherIndex) => (otherIndex !== index && other.fingerprint === finding.fingerprint ? otherIndex : -1))
+      .map((other, otherIndex) => (otherIndex !== index && other.document === finding.document && other.fingerprint === finding.fingerprint ? otherIndex : -1))
       .filter((otherIndex) => otherIndex >= 0);
     ambiguity = partners.length > 0
-      ? `${finding.ambiguity.groupSize} findings share this unresolved fingerprint (with ${partners.map((p) => `Finding ${String(p + 1).padStart(2, "0")}`).join(", ")}).`
-      : `${finding.ambiguity.groupSize} findings share this unresolved fingerprint (partner in JSON).`;
+      ? `${partners.length + 1} findings in this document share this unresolved fingerprint (with ${partners.map((p) => `Finding ${String(p + 1).padStart(2, "0")}`).join(", ")}).`
+      : "Unresolved fingerprint: the target identity is ambiguous, and no other finding in this document carries this fingerprint.";
   }
   return {
     id: `finding-${index + 1}`,

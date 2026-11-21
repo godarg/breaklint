@@ -11,6 +11,24 @@ import { ALL_RULES } from "../rules/index.ts";
  * and pointing a code-scanning UI at "line 1 of the input file" for them would be an invented
  * fact. Those become `logicalLocations` instead.
  */
+/**
+ * Every registered rule ships its page in docs/rules/ (package.json "files" includes docs/): the
+ * rule-doc generator reads each rule's page and tests/unit/registry.test.ts fails on a missing one.
+ * A rule id outside the registry (a screen rule, a page without a rule) has no shipped page here.
+ */
+const RULES_WITH_SHIPPED_PAGES: ReadonlySet<string> = new Set(ALL_RULES.map((rule) => rule.id));
+const RELEASE_VERSION = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
+
+/**
+ * The rule page of the release that wrote the report, pinned to its tag: a link to `main` would
+ * describe whatever the rule has become since. `undefined` when the rule has no shipped page or
+ * the version cannot name a release tag (the CLI's `0.0.0` fallback for an unreadable manifest).
+ */
+export function ruleHelpUri(ruleId: string, version: string): string | undefined {
+  if (!RULES_WITH_SHIPPED_PAGES.has(ruleId) || !RELEASE_VERSION.test(version) || version === "0.0.0") return undefined;
+  return `https://github.com/godarg/breaklint/blob/v${version}/docs/rules/${ruleId.replace("/", "-")}.md`;
+}
+
 export function renderSarif(report: Report): string {
   const sarif = {
     $schema: "https://json.schemastore.org/sarif-2.1.0.json",
@@ -23,16 +41,20 @@ export function renderSarif(report: Report): string {
             name: "breaklint",
             version: report.tool.version,
             informationUri: "https://github.com/godarg/breaklint",
-            rules: ALL_RULES.map((r) => ({
-              id: r.id,
-              shortDescription: { text: r.summary },
-              defaultConfiguration: { level: sarifLevel(r.severity) },
-              properties: {
-                calibrated: r.calibrated,
-                experimental: r.experimental,
-                proofSource: r.proofSource,
-              },
-            })),
+            rules: ALL_RULES.map((r) => {
+              const helpUri = ruleHelpUri(r.id, report.tool.version);
+              return {
+                id: r.id,
+                shortDescription: { text: r.summary },
+                ...(helpUri ? { helpUri } : {}),
+                defaultConfiguration: { level: sarifLevel(r.severity) },
+                properties: {
+                  calibrated: r.calibrated,
+                  experimental: r.experimental,
+                  proofSource: r.proofSource,
+                },
+              };
+            }),
           },
         },
         invocations: [
