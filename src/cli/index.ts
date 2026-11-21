@@ -233,9 +233,12 @@ function helpText(): string {
 usage
   breaklint [options] <file.html> [more.html ...]
   breaklint --demo
-  breaklint compare <before.json> <after.json> [--out <file>]
+  breaklint compare <before.json> <after.json> [--out <file>] [--repository <dir>] [--fail-on-new]
   breaklint context <report.json> [--out <file>] [--max-findings <n>] [--max-text <n>] [--comparison <file>]
-  breaklint bundle <report.json> --out-dir <dir> [--evidence-dir <dir>] [--title <text>] [--theme light|dark] [--comparison <file>]
+  breaklint bundle <report.json> --out-dir <dir> [--evidence-dir <dir>] [--title <text>] [--theme light|dark] [--comparison <file>] [--max-findings <n>]
+
+  The three subcommands have their own options, ranges and exit codes:
+      breaklint compare --help, breaklint context --help, breaklint bundle --help
 
   There is no directory recursion and no glob expansion in the tool. Use the shell:
       breaklint docs/**/*.html

@@ -16,8 +16,12 @@ import { READABLE_REPORT_SCHEMA_VERSIONS } from "../core/enums.ts";
  */
 export const CONTEXT_SCHEMA_VERSION = 2;
 
-const MAX_FINDINGS = 100;
-const MAX_TEXT = 1_200;
+/** The bounds `createContextPack()` clamps its options to; the CLI names them when it applies them. */
+export const CONTEXT_MAX_FINDINGS = 100;
+export const CONTEXT_MIN_TEXT = 80;
+export const CONTEXT_MAX_TEXT = 1_200;
+const MAX_FINDINGS = CONTEXT_MAX_FINDINGS;
+const MAX_TEXT = CONTEXT_MAX_TEXT;
 const OPERATIONS = ["inspect-source", "inspect-evidence", "recheck-after-repair"] as const;
 
 export type ContextOperation = typeof OPERATIONS[number];
@@ -281,7 +285,7 @@ export function createContextPack(report: unknown, options: CreateContextPackOpt
   const requested = options.maxFindings ?? 40;
   const maxFindings = Number.isInteger(requested) ? Math.min(MAX_FINDINGS, Math.max(1, requested)) : 40;
   const requestedText = options.maxTextPerField ?? 400;
-  const maxText = Number.isInteger(requestedText) ? Math.min(MAX_TEXT, Math.max(80, requestedText)) : 400;
+  const maxText = Number.isInteger(requestedText) ? Math.min(MAX_TEXT, Math.max(CONTEXT_MIN_TEXT, requestedText)) : 400;
   if (options.comparison && options.comparison.afterRunId !== runId) throw new Error("comparison does not refer to this current report");
   if (READABLE_SCREEN_REPORT_SCHEMA_VERSIONS.includes(schemaVersion as number) && profileKind === "screen" && Array.isArray(raw?.findings) && Array.isArray(raw?.evaluations) && asRecord(raw?.scope)) {
     const typed = report as PublicScreenReport;
