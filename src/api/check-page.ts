@@ -1,41 +1,33 @@
 /** Public host-page adapter. It observes an already-opened page and writes only its PNG artifact. */
 
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { captureBoundedSourceFile, sha256Bytes } from "../source/bytes.ts";
-import { EXIT_CODE_BY_VERDICT, type RunVerdict, type Severity } from "../core/enums.ts";
+import { EXIT_CODE_BY_VERDICT, type RunVerdict } from "../core/enums.ts";
+import { MAX_DRIFT_DETAILS, computeScreenDriftDetails, summarizeDriftDetails } from "../web/drift.ts";
+import { evaluateScreenTargets, screenFindings } from "../web/evaluate.ts";
 import { validateCheckPageOptions } from "../web/options.ts";
+import { digestBrowserSample, sha, stable, type BrowserRawSample, type BrowserRawTarget, type RawSample, type RawSampleSignature } from "../web/raw-sample.ts";
+import { verifyBinding, type Binding } from "../web/receipt.ts";
 import {
   SCREEN_REPORT_SCHEMA_VERSION,
-  type CheckPageOptions,
   type HostBuildContainerBinding,
   type PublicScreenReport,
   type ScreenCheckResult,
   type ScreenDriftDetail,
-  type ScreenFinding,
   type ScreenInfrastructureEvent,
-  type ScreenMeasurement,
   type ScreenRuleId,
-  type ScreenTargetEvaluation,
   type StructuralPage,
 } from "../web/types.ts";
 
-const sha = (value: string | Uint8Array): string => createHash("sha256").update(value).digest("hex");
-const stable = (value: unknown): string => JSON.stringify(value);
-const MAX_RECEIPT_BYTES = 1_000_000;
-const MAX_SOURCE_BYTES = 50 * 1024 * 1024;
-const MAX_SOURCE_TOTAL = 250 * 1024 * 1024;
-const MAX_OUTPUT_FILES = 10_000;
-const MAX_OUTPUT_TOTAL = 512 * 1024 * 1024;
+export { computeScreenDriftDetails } from "../web/drift.ts";
+export { verifyOutputReceipt } from "../web/receipt.ts";
+
 const MAX_SIGNATURE_TEXT_BYTES = 1_024 * 1_024;
 const MAX_SIGNATURE_ANCESTORS = 64;
 const MAX_STABILIZATION_ATTEMPTS = 20;
-const MAX_DRIFT_DETAILS = 10;
 const DEFAULT_SMALL_TEXT_PX = 12;
 const DEFAULT_SMALL_TOUCH_PX = 24;
-const SIBLING_OVERLAP_THRESHOLD_PX = 2;
-const SVG_TEXT_OVERFLOW_THRESHOLD_PX = 1;
 
 const CSS_COLOR_SPACES = new Set([
   "srgb", "srgb-linear", "display-p3", "a98-rgb", "prophoto-rgb", "rec2020", "xyz", "xyz-d50", "xyz-d65",
@@ -100,34 +92,6 @@ export function parseCssColorAlpha(color: string): number | null {
   return null;
 }
 
-type RawTarget = {
-  selector: string; domPath: string; tag: string; id: string; className: string; textLength: number; directTextSha256: string | null;
-  hasDirectText: boolean; isSvg: boolean; isSvgText: boolean; isInteractiveControl: boolean; siblingEligible: boolean;
-  fontSizePx: number; siblingOverlapPx: number; svgTextOverflowPx: number;
-  paintSignature: string; ancestorSignatureComplete: boolean;
-  box: { x: number; y: number; width: number; height: number } | null;
-  coordinateSystem: "css-viewport-pixels" | "css-document-pixels";
-  state: "candidate" | "excluded" | "not-measured"; reason: string | null; paint: string | null;
-  transform: string | null; clipped: "none" | "partial" | "outside"; horizontalOverflow: number; allowedScroll: boolean;
-  overlay: boolean; sourceContainer: number | null; scroll: { x: number; y: number };
-};
-type RawSampleSignature = {
-  url: string;
-  viewport: [number, number, number];
-  scroll: [number, number];
-  document: [number, number, number, number, number];
-  fonts: string;
-  targetDigest?: string;
-};
-type RawSample = {
-  signature: RawSampleSignature; fontsReady: boolean; deviceScaleFactor: number; candidates: number; omittedCount: number;
-  signatureTextComplete: boolean; ancestorSignatureComplete: boolean;
-  exceptions: { allowed: number[]; overlay: number[] }; targets: RawTarget[];
-};
-type BrowserRawTarget = Omit<RawTarget, "directTextSha256"> & { directText: string | null };
-type BrowserRawSample = Omit<RawSample, "targets"> & { targets: BrowserRawTarget[] };
-type Binding = { status: "verified-container-only" | "declared" | "unknown"; files: Set<string>; containerFiles: Map<number, string>; detail: string | null };
-
 function pngSize(bytes: Uint8Array): { widthPx: number; heightPx: number } | null {
   if (bytes.length < 24 || Buffer.from(bytes.subarray(0, 8)).compare(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) !== 0) return null;
   return { widthPx: Buffer.from(bytes).readUInt32BE(16), heightPx: Buffer.from(bytes).readUInt32BE(20) };
@@ -136,158 +100,6 @@ function safeUrl(raw: string): string {
   try { const url = new URL(raw); url.search = ""; url.hash = ""; return url.toString(); }
   catch { return "about:invalid"; }
 }
-function sourcePath(path: string): boolean {
-  return !!path && !path.includes("\\") && !path.includes("\0") && !path.startsWith("/") && path.split("/").every((part) => part && part !== "." && part !== ".." && part !== "__proto__" && part !== "constructor" && part !== "prototype");
-}
-function canonicalFiles(files: Record<string, { sha256: string; byteLength: number; role: string }>): string {
-  return JSON.stringify(Object.entries(files).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([file, entry]) => [file, entry.sha256, entry.byteLength, entry.role]));
-}
-function receiptFiles(value: unknown, allowedRoles: readonly string[], label: string, maxFiles: number, maxTotal: number): Record<string, { sha256: string; byteLength: number; role: string }> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} files are invalid`);
-  const entries = Object.entries(value as Record<string, unknown>); if (entries.length === 0 || entries.length > maxFiles) throw new Error(`${label} file inventory is invalid`);
-  const normalized: Record<string, { sha256: string; byteLength: number; role: string }> = Object.create(null); let total = 0;
-  for (const [file, candidate] of entries) {
-    if (!sourcePath(file) || !candidate || typeof candidate !== "object" || Array.isArray(candidate)) throw new Error(`${label} file path is invalid`);
-    const entry = candidate as Record<string, unknown>; const byteLength = entry.byteLength;
-    if (Object.keys(entry).some((key) => !["sha256", "byteLength", "role"].includes(key)) || typeof entry.sha256 !== "string" || !/^[a-f0-9]{64}$/u.test(entry.sha256) || typeof byteLength !== "number" || !Number.isSafeInteger(byteLength) || byteLength < 0 || byteLength > MAX_SOURCE_BYTES || !allowedRoles.includes(String(entry.role))) throw new Error(`invalid ${label} file entry`);
-    total += byteLength; if (total > maxTotal) throw new Error(`${label} byte budget exceeded`);
-    normalized[file] = { sha256: entry.sha256, byteLength, role: String(entry.role) };
-  }
-  if (Object.keys(normalized).length === 0) throw new Error(`${label} file inventory is invalid`);
-  return normalized;
-}
-
-/**
- * Verifies compiled output receipts in either schemaVersion 1 (Next.js `.next/BUILD_ID`) or
- * schemaVersion 2 (framework-agnostic output directory manifest with optional `buildMarkerPath`).
- */
-export function verifyOutputReceipt(input: HostBuildContainerBinding, sourceBuildId: string): void {
-  if (!input.buildOutputReceiptPath) throw new Error("build output receipt path is required for verified host binding");
-  if (!sourcePath(input.buildOutputReceiptPath)) throw new Error("unsafe build output receipt path");
-  const raw = captureBoundedSourceFile(input.root, input.buildOutputReceiptPath, MAX_RECEIPT_BYTES, "screen build output receipt");
-  const receipt: unknown = JSON.parse(raw.toString("utf8"));
-  if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)) throw new Error("build output receipt is not an object");
-  const value = receipt as Record<string, unknown>;
-
-  if (value.schemaVersion === 1) {
-    if (Object.keys(value).some((key) => !["schemaVersion", "sourceBuildId", "nextBuildId", "files", "filesSha256"].includes(key)) || value.sourceBuildId !== sourceBuildId || typeof value.nextBuildId !== "string" || !/^[A-Za-z0-9_-]{1,256}$/u.test(value.nextBuildId) || typeof value.filesSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(value.filesSha256)) throw new Error("invalid build output receipt schema");
-    const files = receiptFiles(value.files, ["build-output"], "build output receipt", MAX_OUTPUT_FILES, MAX_OUTPUT_TOTAL);
-    if (!Object.hasOwn(files, ".next/BUILD_ID") || sha(canonicalFiles(files)) !== value.filesSha256) throw new Error("invalid build output receipt inventory");
-    if (captureBoundedSourceFile(input.root, ".next/BUILD_ID", 512, "screen compiled build id").toString("utf8").trim() !== value.nextBuildId) throw new Error("compiled BUILD_ID does not match output receipt");
-    for (const [file, entry] of Object.entries(files)) {
-      const bytes = captureBoundedSourceFile(input.root, file, MAX_SOURCE_BYTES, "screen build output");
-      if (bytes.length !== entry.byteLength || sha256Bytes(bytes) !== entry.sha256) throw new Error(`build output mismatch: ${file}`);
-    }
-    return;
-  }
-
-  if (value.schemaVersion === 2) {
-    if (Object.keys(value).some((key) => !["schemaVersion", "sourceBuildId", "buildId", "buildMarkerPath", "files", "filesSha256"].includes(key)) || value.sourceBuildId !== sourceBuildId || typeof value.buildId !== "string" || !/^[A-Za-z0-9_.:-]{1,256}$/u.test(value.buildId) || typeof value.filesSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(value.filesSha256)) throw new Error("invalid build output receipt schema");
-    const files = receiptFiles(value.files, ["build-output"], "build output receipt", MAX_OUTPUT_FILES, MAX_OUTPUT_TOTAL);
-    if (sha(canonicalFiles(files)) !== value.filesSha256) throw new Error("invalid build output receipt inventory");
-    if (value.buildMarkerPath !== undefined) {
-      if (typeof value.buildMarkerPath !== "string" || !sourcePath(value.buildMarkerPath) || !Object.hasOwn(files, value.buildMarkerPath)) {
-        throw new Error("invalid build marker path in output receipt");
-      }
-      if (captureBoundedSourceFile(input.root, value.buildMarkerPath, 512, "screen compiled build marker").toString("utf8").trim() !== value.buildId) {
-        throw new Error("compiled build marker does not match output receipt");
-      }
-    } else if (value.buildId !== value.filesSha256) {
-      throw new Error("generic output receipt buildId must equal filesSha256 when buildMarkerPath is omitted");
-    }
-    for (const [file, entry] of Object.entries(files)) {
-      const bytes = captureBoundedSourceFile(input.root, file, MAX_SOURCE_BYTES, "screen build output");
-      if (bytes.length !== entry.byteLength || sha256Bytes(bytes) !== entry.sha256) throw new Error(`build output mismatch: ${file}`);
-    }
-    return;
-  }
-
-  throw new Error("invalid build output receipt schema");
-}
-
-function verifyBinding(input: HostBuildContainerBinding | undefined, domBuildId: string | null): Binding {
-  if (!input) return { status: "unknown", files: new Set(), containerFiles: new Map(), detail: null };
-  try {
-    if (!sourcePath(input.receiptPath)) throw new Error("unsafe receipt path");
-    const raw = captureBoundedSourceFile(input.root, input.receiptPath, MAX_RECEIPT_BYTES, "screen build receipt");
-    const receipt: unknown = JSON.parse(raw.toString("utf8"));
-    if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)) throw new Error("receipt is not an object");
-    const value = receipt as Record<string, unknown>;
-    if (Object.keys(value).some((key) => !["schemaVersion", "buildId", "files", "filesSha256"].includes(key)) || value.schemaVersion !== 1 || typeof value.buildId !== "string" || !/^[a-f0-9]{64}$/u.test(value.buildId) || typeof value.filesSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(value.filesSha256) || !value.files || typeof value.files !== "object" || Array.isArray(value.files)) throw new Error("invalid receipt schema");
-    if (value.buildId !== value.filesSha256) throw new Error("receipt build id must equal file inventory digest");
-    if (domBuildId !== value.buildId) throw new Error("compiled build id does not match receipt");
-    const normalized = receiptFiles(value.files, ["source", "config", "lock"], "receipt", 2_000, MAX_SOURCE_TOTAL);
-    for (const [file, entry] of Object.entries(normalized)) {
-      const bytes = captureBoundedSourceFile(input.root, file, MAX_SOURCE_BYTES, "screen build source");
-      if (bytes.length !== entry.byteLength || sha256Bytes(bytes) !== entry.sha256) throw new Error(`receipt source mismatch: ${file}`);
-    }
-    if (sha(canonicalFiles(normalized)) !== value.filesSha256) throw new Error("receipt inventory digest mismatch");
-    verifyOutputReceipt(input, value.buildId);
-    for (const container of input.containers) if (!Object.hasOwn(normalized, container.file)) throw new Error(`container file absent from receipt: ${container.file}`);
-    return { status: "verified-container-only", files: new Set(Object.keys(normalized)), containerFiles: new Map(input.containers.map((container, index) => [index, container.file])), detail: null };
-  } catch (error) { return { status: "declared", files: new Set(), containerFiles: new Map(), detail: error instanceof Error ? error.message : String(error) }; }
-}
-
-/** Computes a bounded list of concrete field/selector changes between two screen capture samples. */
-export function computeScreenDriftDetails(
-  first: Pick<RawSample, "signature" | "targets">,
-  second: Pick<RawSample, "signature" | "targets">,
-  phase: "pre-screenshot" | "post-screenshot",
-): ScreenDriftDetail[] {
-  const details: ScreenDriftDetail[] = [];
-  const push = (field: string, selector: string | null, before: string | number | null, after: string | number | null): void => {
-    if (details.length < MAX_DRIFT_DETAILS) details.push({ phase, field, selector, before, after });
-  };
-  if (first.signature.url !== second.signature.url) push("url", null, first.signature.url, second.signature.url);
-  if (JSON.stringify(first.signature.viewport) !== JSON.stringify(second.signature.viewport)) push("viewport", null, JSON.stringify(first.signature.viewport), JSON.stringify(second.signature.viewport));
-  if (JSON.stringify(first.signature.scroll) !== JSON.stringify(second.signature.scroll)) push("scroll", null, JSON.stringify(first.signature.scroll), JSON.stringify(second.signature.scroll));
-  if (JSON.stringify(first.signature.document) !== JSON.stringify(second.signature.document)) push("document", null, JSON.stringify(first.signature.document), JSON.stringify(second.signature.document));
-  if (first.signature.fonts !== second.signature.fonts) push("fonts", null, first.signature.fonts, second.signature.fonts);
-  if (first.targets.length !== second.targets.length) push("targetCount", null, first.targets.length, second.targets.length);
-
-  const byPath = new Map(first.targets.map((t) => [t.domPath, t]));
-  const secondPaths = new Set<string>();
-  for (const curr of second.targets) {
-    if (details.length >= MAX_DRIFT_DETAILS) break;
-    secondPaths.add(curr.domPath);
-    const prev = byPath.get(curr.domPath);
-    if (!prev) {
-      push("target-added", curr.selector, null, curr.domPath);
-      continue;
-    }
-    if (JSON.stringify(prev.box) !== JSON.stringify(curr.box)) {
-      push("box", curr.selector, prev.box ? `${prev.box.x},${prev.box.y},${prev.box.width}x${prev.box.height}` : null, curr.box ? `${curr.box.x},${curr.box.y},${curr.box.width}x${curr.box.height}` : null);
-    } else if (prev.state !== curr.state || prev.reason !== curr.reason) {
-      push("state", curr.selector, `${prev.state}:${prev.reason ?? ""}`, `${curr.state}:${curr.reason ?? ""}`);
-    } else if (prev.directTextSha256 !== curr.directTextSha256 || prev.textLength !== curr.textLength) {
-      push("text", curr.selector, prev.directTextSha256 ?? prev.textLength, curr.directTextSha256 ?? curr.textLength);
-    } else if (prev.horizontalOverflow !== curr.horizontalOverflow) {
-      push("horizontalOverflow", curr.selector, prev.horizontalOverflow, curr.horizontalOverflow);
-    } else if (prev.clipped !== curr.clipped) {
-      push("clipped", curr.selector, prev.clipped, curr.clipped);
-    } else if (prev.siblingOverlapPx !== curr.siblingOverlapPx) {
-      push("siblingOverlap", curr.selector, prev.siblingOverlapPx, curr.siblingOverlapPx);
-    } else if (prev.svgTextOverflowPx !== curr.svgTextOverflowPx) {
-      push("svgTextOverflow", curr.selector, prev.svgTextOverflowPx, curr.svgTextOverflowPx);
-    } else if (prev.paintSignature !== curr.paintSignature) {
-      push("paint", curr.selector, sha(prev.paintSignature).slice(0, 12), sha(curr.paintSignature).slice(0, 12));
-    }
-  }
-  if (details.length < MAX_DRIFT_DETAILS) {
-    for (const prev of first.targets) {
-      if (details.length >= MAX_DRIFT_DETAILS) break;
-      if (!secondPaths.has(prev.domPath)) push("target-removed", prev.selector, prev.domPath, null);
-    }
-  }
-  return details;
-}
-
-function summarizeDriftDetails(details: readonly ScreenDriftDetail[]): string {
-  if (details.length === 0) return "DOM/layout/viewport/scroll signature changed around screenshot";
-  const parts = details.slice(0, 5).map((d) => `${d.phase}:${d.field}${d.selector ? `(${d.selector})` : ""}`);
-  return `DOM/layout/viewport/scroll signature changed around screenshot [${parts.join(", ")}${details.length > 5 ? `, +${details.length - 5} more` : ""}]`;
-}
-
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<{ value: T | null; timedOut: boolean }> {
   let timer: NodeJS.Timeout | null = null;
   try { const value = await Promise.race([promise, new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), timeoutMs); })]); return { value, timedOut: value === null }; }
@@ -583,59 +395,13 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
     return { signature, fontsReady: document.fonts?.status === "loaded", deviceScaleFactor: devicePixelRatio, candidates: nodes.length, omittedCount: capped ? nodes.length - selected.length : 0, signatureTextComplete, ancestorSignatureComplete, exceptions: { allowed: allowedCounts, overlay: overlayCounts }, targets };
   }, input);
 
-  // Direct text crosses this private host boundary only to become a digest. It is never
-  // retained in the public report, artifact, events, or evidence metadata.
-  const targets = sampled.targets.map(({ directText, ...target }) => ({ ...target, directTextSha256: directText === null ? null : sha(directText) }));
-  const targetDigest = JSON.stringify(targets.map((target) => [
-    target.selector, target.domPath, target.tag, target.id, target.className, target.textLength, target.directTextSha256,
-    target.paintSignature, target.ancestorSignatureComplete, target.box?.x ?? null, target.box?.y ?? null, target.box?.width ?? null, target.box?.height ?? null,
-    target.state, target.reason, target.paint, target.transform, target.horizontalOverflow, target.clipped,
-    target.siblingOverlapPx, target.svgTextOverflowPx, target.fontSizePx, target.hasDirectText, target.isInteractiveControl, target.siblingEligible,
-    target.allowedScroll, target.overlay, target.sourceContainer,
-  ]));
-  return { ...sampled, signature: { ...sampled.signature, targetDigest }, targets };
+  return digestBrowserSample(sampled);
 }
 
-function buildSourceRef(raw: RawTarget, binding: Binding): ScreenTargetEvaluation["source"] {
-  const sourceFile = raw.sourceContainer === null ? null : binding.containerFiles.get(raw.sourceContainer) ?? null;
-  return sourceFile !== null && binding.status === "verified-container-only"
-    ? { status: "verified-container-only", method: "build-bound-component-container", file: sourceFile }
-    : { status: binding.status === "declared" ? "declared" : "unknown", method: null, file: null };
-}
-
-function buildEvaluation(
-  raw: RawTarget,
-  ruleId: ScreenRuleId,
-  index: number,
-  binding: Binding,
-  stableCapture: boolean,
-  artifactPath: string | null,
-  measurement: ScreenMeasurement,
-  violated: boolean,
-  overrideReason: string | null = null,
-  overrideStatus: "excluded" | null = null,
-): ScreenTargetEvaluation {
-  const status = raw.state === "candidate" ? (overrideStatus ?? "measured") : raw.state;
-  const reason = raw.state === "candidate" ? overrideReason : raw.reason;
-  return {
-    id: `screen-evaluation-${index}-${ruleId}`,
-    ruleId,
-    target: { selector: raw.selector, domPath: raw.domPath, tag: raw.tag, box: raw.box, coordinateSystem: raw.coordinateSystem, scroll: raw.scroll },
-    status,
-    reason,
-    measurements: [measurement],
-    predicate: { connective: "single", violated: status === "measured" ? violated : null },
-    evidenceBound: status === "measured" && stableCapture && artifactPath !== null && binding.status !== "declared",
-    source: buildSourceRef(raw, binding),
-    stableIdentity: { status: "unavailable", value: null, candidates: [], identityContract: "logical-source-value-v1", canonicalization: "canonical-node-v1" },
-  };
-}
-
-function severityForScreenRule(ruleId: ScreenRuleId): Severity {
-  if (ruleId === "web/unexpected-horizontal-overflow" || ruleId === "web/content-clipped" || ruleId === "web/svg-text-overflows-viewport") {
-    return "error";
-  }
-  return "warn";
+/** Reads the rendered build id the host declared; null when unbound, absent, or unreadable. */
+async function readDomBuildId(page: StructuralPage, binding: HostBuildContainerBinding | undefined): Promise<string | null> {
+  if (!binding) return null;
+  return page.evaluate((b) => { try { return document.querySelector(b.selector)?.getAttribute(b.attribute) ?? null; } catch { return null; } }, { selector: binding.compiledBuildSelector, attribute: binding.compiledBuildAttribute });
 }
 
 /** Observe one existing host-owned page; it never navigates, mutates, closes, or imports a driver. */
@@ -728,11 +494,11 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
     prevHash = currHash;
   }
 
-  const domBuildId = options.sourceBinding ? await page.evaluate((binding) => { try { return document.querySelector(binding.selector)?.getAttribute(binding.attribute) ?? null; } catch { return null; } }, { selector: options.sourceBinding.compiledBuildSelector, attribute: options.sourceBinding.compiledBuildAttribute }) : null;
+  const domBuildId = await readDomBuildId(page, options.sourceBinding);
   const bindingBefore = verifyBinding(options.sourceBinding, domBuildId);
   const bytes = await page.screenshot({ fullPage });
   const after = await samplePage(page, sampleInput);
-  const domBuildIdAfter = options.sourceBinding ? await page.evaluate((binding) => { try { return document.querySelector(binding.selector)?.getAttribute(binding.attribute) ?? null; } catch { return null; } }, { selector: options.sourceBinding.compiledBuildSelector, attribute: options.sourceBinding.compiledBuildAttribute }) : null;
+  const domBuildIdAfter = await readDomBuildId(page, options.sourceBinding);
   const bindingAfter = verifyBinding(options.sourceBinding, domBuildIdAfter);
 
   const captureBefore = sha(stable(before.signature));
@@ -771,83 +537,13 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
   const relativePath = `evidence/screen-${sha(runId).slice(0, 32)}.png`; writeFileSync(join(options.output.dir, relativePath), bytes);
   const dimensions = pngSize(bytes); if (!dimensions) infrastructure.push({ kind: "screen-screenshot-invalid", detail: "host screenshot was not a PNG with IHDR dimensions", fatal: true });
 
-  const evaluations: ScreenTargetEvaluation[] = [];
-  let i = 0;
   const effectiveBinding: Binding = bindingStable ? bindingAfter : { status: options.sourceBinding ? "declared" : "unknown", files: new Set(), containerFiles: new Map(), detail: bindingAfter.detail };
-
-  for (const raw of settled.targets) {
-    const exceptionReason = raw.overlay ? "target/intentional-overlay" : raw.allowedScroll ? "target/allowed-scroll-container" : null;
-    const exceptionStatus = exceptionReason !== null ? ("excluded" as const) : null;
-    // 1. web/unexpected-horizontal-overflow
-    evaluations.push(buildEvaluation(
-      raw, "web/unexpected-horizontal-overflow", i++, effectiveBinding, stableCapture, relativePath,
-      { name: "horizontal-overflow", value: raw.horizontalOverflow, unit: "css-px", operator: ">", threshold: 0, calibrated: false },
-      raw.state === "candidate" && !raw.overlay && !raw.allowedScroll && raw.horizontalOverflow > 0,
-      exceptionReason,
-      exceptionStatus,
-    ));
-    // 2. web/content-clipped
-    const clippedVal = raw.clipped === "partial" ? 1 : 0;
-    evaluations.push(buildEvaluation(
-      raw, "web/content-clipped", i++, effectiveBinding, stableCapture, relativePath,
-      { name: "clipped-content", value: clippedVal, unit: "count", operator: ">", threshold: 0, calibrated: false },
-      raw.state === "candidate" && !raw.overlay && !raw.allowedScroll && clippedVal > 0,
-      exceptionReason,
-      exceptionStatus,
-    ));
-    // 3. web/sibling-overlap (HTML elements only; SVG shapes overlap by design)
-    if (!raw.isSvg) {
-      const siblingExcluded = !raw.siblingEligible;
-      const siblingReason = raw.overlay
-        ? "target/intentional-overlay"
-        : siblingExcluded
-          ? "rule/target-not-applicable"
-          : null;
-      evaluations.push(buildEvaluation(
-        raw, "web/sibling-overlap", i++, effectiveBinding, stableCapture, relativePath,
-        { name: "sibling-overlap-depth", value: raw.siblingOverlapPx, unit: "css-px", operator: ">", threshold: SIBLING_OVERLAP_THRESHOLD_PX, calibrated: false },
-        raw.state === "candidate" && raw.siblingEligible && !raw.overlay && raw.siblingOverlapPx > SIBLING_OVERLAP_THRESHOLD_PX,
-        siblingReason,
-        siblingExcluded || raw.overlay ? "excluded" : null,
-      ));
-    }
-    // 4. web/svg-text-overflows-viewport (SVG <text> targets)
-    if (raw.isSvgText) {
-      evaluations.push(buildEvaluation(
-        raw, "web/svg-text-overflows-viewport", i++, effectiveBinding, stableCapture, relativePath,
-        { name: "svg-text-overflow", value: raw.svgTextOverflowPx, unit: "css-px", operator: ">", threshold: SVG_TEXT_OVERFLOW_THRESHOLD_PX, calibrated: false },
-        raw.state === "candidate" && raw.svgTextOverflowPx > SVG_TEXT_OVERFLOW_THRESHOLD_PX,
-      ));
-    }
-    // 5. Opt-in web/small-text
-    if (smallTextEnabled && raw.hasDirectText) {
-      evaluations.push(buildEvaluation(
-        raw, "web/small-text", i++, effectiveBinding, stableCapture, relativePath,
-        { name: "font-size", value: raw.fontSizePx, unit: "css-px", operator: "<", threshold: smallTextThreshold, calibrated: false },
-        raw.state === "candidate" && raw.fontSizePx > 0 && raw.fontSizePx < smallTextThreshold,
-      ));
-    }
-    // 6. Opt-in web/small-touch-target
-    if (smallTouchEnabled && raw.isInteractiveControl) {
-      const minDim = raw.box ? Math.round(Math.min(raw.box.width, raw.box.height) * 100) / 100 : null;
-      evaluations.push(buildEvaluation(
-        raw, "web/small-touch-target", i++, effectiveBinding, stableCapture, relativePath,
-        { name: "touch-target-min-dimension", value: minDim, unit: "css-px", operator: "<", threshold: smallTouchThreshold, calibrated: false },
-        raw.state === "candidate" && minDim !== null && minDim < smallTouchThreshold,
-      ));
-    }
-  }
-
-  const findings: ScreenFinding[] = evaluations.filter((entry) => entry.predicate.violated === true).map((entry, index) => ({
-    id: `screen-finding-${index}-${sha(entry.id).slice(0, 12)}`,
-    ruleId: entry.ruleId,
-    severity: severityForScreenRule(entry.ruleId),
-    target: entry.target,
-    measurement: entry.measurements[0]!,
-    evaluationId: entry.id,
-    evidence: { bindsFinding: entry.evidenceBound, screenshot: relativePath },
-    repair: { nextCheck: "rerun-same-scenario-and-viewport" },
-  }));
+  const evaluations = evaluateScreenTargets(settled.targets, {
+    binding: effectiveBinding, stableCapture, artifactPath: relativePath,
+    smallText: { enabled: smallTextEnabled, thresholdPx: smallTextThreshold },
+    smallTouch: { enabled: smallTouchEnabled, thresholdPx: smallTouchThreshold },
+  });
+  const findings = screenFindings(evaluations, relativePath);
 
   const measured = evaluations.filter((entry) => entry.status === "measured").length;
   const excluded = evaluations.filter((entry) => entry.status === "excluded").length;
