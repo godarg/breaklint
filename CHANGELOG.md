@@ -69,11 +69,12 @@ published to npm, so the Action pinned to `@v0.11.0` fails with its default inst
   of 0.
 - Geometry is measured with CSS Color 4 colours, semi-transparent opacity, `filter` and
   `backdrop-filter`; masks, clip paths, unsupported transforms and running animations stay
-  not measured.
+  not measured, except animations of shadows, box colours and background position.
 - `checkPage` waits for two identical layout samples, reports what drifted, and reports timeouts,
   the attempt limit, loading fonts and real drift as separate events
   (`capture.stabilizationEndedBy`, `capture.firstSampleMs`); `stabilizationTimeoutMs: 0` waits
-  for nothing, as in 0.10.
+  for nothing, as in 0.10. A browser call that fails, on a closed page for example, ends as
+  `infrastructure` with a report instead of throwing.
 - Build output receipts can come from any framework, not only Next.js.
 - Capture signatures are keyed per run and no longer allow conclusions about page text.
 

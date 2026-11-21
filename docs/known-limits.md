@@ -82,8 +82,8 @@ Screen checks are new in 0.11 and uncalibrated; start in report mode.
 - **Not rendered means not measured.** Hidden and off-viewport elements, the body of a closed
   `<details>`, content under `content-visibility: hidden`, and elements whose effective opacity is
   0 are excluded, never reported as fine.
-- **No clean claim** with non-axis-aligned transforms, masks, clip paths, active animations,
-  capture drift, a font timeout or a truncated inventory.
+- **No clean claim** with non-axis-aligned transforms, masks, clip paths, active animations (other
+  than of shadows and box colours), capture drift, a font timeout or a truncated inventory.
 - **Overflow** is measured on HTML boxes; content inside an `<svg>` is judged only by the SVG text
   rule.
 - **Small text and touch targets** are measured in CSS pixels; scaling through an SVG `viewBox` or
