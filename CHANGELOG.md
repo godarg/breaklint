@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.1 — TBD-at-tag
+
+Release notes are written at the end of the release preparation.
+
 ## 0.11.0 — 2026-11-21
 
 Print measurement improvements, Screen Profile v2 (`PublicScreenReport` schema 2), CLI subcommands

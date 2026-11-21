@@ -15,7 +15,7 @@ name: release
 
 on:
   push:
-    tags: ["v0.11.0"]
+    tags: ["v0.11.1"]
 
 permissions:
   contents: read
