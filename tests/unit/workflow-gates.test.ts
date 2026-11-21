@@ -401,4 +401,26 @@ describe("workflow gates", () => {
       assert.deepEqual(publish.lines.filter(({ text }) => /^\s*cache\s*:/u.test(executablePart(text))).map(({ number, text }) => `${number}: ${text.trim()}`), []);
     });
   });
+
+  /*
+   * Recovery: a tag commit may be an ancestor of main (main moves on after a merge; the exact
+   * commit still needs its own successful main CI run), an existing GitHub Release is completed or
+   * verified byte for byte instead of refused, and the release notes are the tag commit's own
+   * CHANGELOG section. The logic lives in tests/tools/release-recovery.mjs, whose self-test runs
+   * in every CI run through `npm run test:release-tag`.
+   */
+  it("release.yml recovers through release-recovery.mjs, and CI runs its self-test", () => {
+    const publish = jobsOf(readLines(".github/workflows/release.yml")).find((job) => job.name === "publish");
+    assert.ok(publish, "release.yml has no publish job");
+    const runs = workflowRunLines(publish.lines.map(({ text }) => text).join("\n"));
+    assert.deepEqual(runs.filter((line) => /"\$release_commit" = "\$main_commit"/u.test(line)), [], "the publish job still demands that the tag commit BE origin/main");
+    assert.deepEqual(runs.filter((line) => /--generate-notes/u.test(line)), [], "release notes are generated from commit titles, not the CHANGELOG");
+    assert.ok(runs.includes('node tests/tools/release-recovery.mjs --assert-on-main "$release_commit" origin/main'), "the publish job does not check that the tag commit is on main");
+    assert.ok(runs.some((line) => /^node tests\/tools\/release-recovery\.mjs --notes "\$RELEASE_VERSION" --changelog \S+ --out "\$RUNNER_TEMP\/release-notes\.md"$/u.test(line)), "the publish job does not take its notes from the CHANGELOG");
+    assert.ok(runs.some((line) => /^git show "\$\{?release_commit\}?:CHANGELOG\.md" > \S+$/u.test(line) || /^git show "\$\{RELEASE_COMMIT\}:CHANGELOG\.md" > \S+$/u.test(line)), "the notes are not read from the tag commit");
+    assert.ok(runs.some((line) => /^node tests\/tools\/release-recovery\.mjs --registry-decide$/u.test(line)), "the registry decision is not the tested one");
+    assert.ok(runs.some((line) => /^node tests\/tools\/release-recovery\.mjs --github-release "\$GITHUB_REF_NAME" --notes-file "\$RUNNER_TEMP\/release-notes\.md" "\$PACKAGE_FILE" "\$PACKAGE_FILE\.sha256" "\$PACKAGE_FILE\.sri"$/u.test(line)), "the GitHub Release is not created through the tested state machine");
+    const manifest = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { scripts: Record<string, string> };
+    assert.match(manifest.scripts["test:release-tag"] ?? "", /node tests\/tools\/release-recovery\.mjs --self-test/u, "CI does not run the recovery self-test");
+  });
 });

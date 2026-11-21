@@ -1,7 +1,7 @@
 name: release
 
 # A tag starts validation; it does not confer trust by itself. The publish job proves that the
-# tag resolves to origin/main and that ci.yml already passed for exactly that commit. Validation
+# tag commit is on origin/main and that ci.yml already passed for exactly that commit. Validation
 # builds ONE tarball. Both clean consumers, npm and the GitHub Release receive those exact bytes.
 #
 # The trigger below is the ONLY place this file names the release version, and it is a literal
@@ -324,15 +324,14 @@ jobs:
           git fetch --no-tags origin main
           release_commit=$(git rev-parse "${GITHUB_SHA}^{commit}")
           tag_commit=$(git rev-parse "${GITHUB_REF_NAME}^{commit}")
-          main_commit=$(git rev-parse "origin/main^{commit}")
           test "$release_commit" = "$tag_commit" || {
             echo "GITHUB_SHA resolves to $release_commit but $GITHUB_REF_NAME resolves to $tag_commit"
             exit 1
           }
-          test "$release_commit" = "$main_commit" || {
-            echo "release commit $release_commit is not the exact origin/main $main_commit"
-            exit 1
-          }
+          # The tag commit must be ON main, not BE its tip: requiring equality made 0.11.0
+          # unreleasable the moment anything merged before a rerun. What it guarded stays below:
+          # ci.yml must have passed a main push run for exactly this commit.
+          node tests/tools/release-recovery.mjs --assert-on-main "$release_commit" origin/main
 
           gh api "/repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$release_commit&status=completed&per_page=100" \
             > /tmp/ci-runs.json
@@ -348,38 +347,21 @@ jobs:
           echo "release_commit=$release_commit" >> "$GITHUB_OUTPUT"
           echo "version=$artifact_version" >> "$GITHUB_OUTPUT"
 
-      - name: decide whether this is a first publish or an exact recovery run
-        id: registry
+      - name: release notes are the tag commit's own CHANGELOG section
         env:
           RELEASE_COMMIT: ${{ steps.identity.outputs.release_commit }}
         run: |
-          set +e
-          npm view "breaklint@$RELEASE_VERSION" version dist.integrity dist.attestations gitHead --json > /tmp/existing.json 2> /tmp/existing.err
-          status=$?
-          set -e
-          if [ "$status" -eq 0 ]; then
-            curl -fsSL \
-              "https://registry.npmjs.org/-/npm/v1/attestations/breaklint@$RELEASE_VERSION" \
-              > /tmp/existing-attestations.json
-            EXPECTED_PACKAGE_NAME=breaklint \
-            EXPECTED_VERSION="$RELEASE_VERSION" \
-            EXPECTED_SRI=$(cat "$PACKAGE_FILE.sri") \
-            EXPECTED_COMMIT="$RELEASE_COMMIT" \
-            EXPECTED_REPOSITORY_URL="https://github.com/$GITHUB_REPOSITORY" \
-            EXPECTED_REF="$GITHUB_REF" \
-            EXPECTED_WORKFLOW_PATH=.github/workflows/release.yml \
-              node tests/tools/registry-provenance-contract.mjs \
-                --verify /tmp/existing.json /tmp/existing-attestations.json
-            echo "publish_needed=false" >> "$GITHUB_OUTPUT"
-            echo "breaklint@$RELEASE_VERSION already contains these exact bytes; continuing recovery verification"
-          else
-            if ! grep -q "E404" /tmp/existing.err; then
-              echo "registry lookup failed for a reason other than an absent version"
-              cat /tmp/existing.err
-              exit 1
-            fi
-            echo "publish_needed=true" >> "$GITHUB_OUTPUT"
-          fi
+          git show "${RELEASE_COMMIT}:CHANGELOG.md" > "$RUNNER_TEMP/CHANGELOG.tag.md"
+          node tests/tools/release-recovery.mjs --notes "$RELEASE_VERSION" --changelog "$RUNNER_TEMP/CHANGELOG.tag.md" --out "$RUNNER_TEMP/release-notes.md"
+
+      - name: decide whether this is a first publish or an exact recovery run
+        # Absent on npm (E404): publish. Present: its integrity and provenance must bind these
+        # bytes and this commit, with the attestation lookup retried for five minutes. Any other
+        # lookup failure fails here and never becomes a publish.
+        id: registry
+        env:
+          RELEASE_COMMIT: ${{ steps.identity.outputs.release_commit }}
+        run: node tests/tools/release-recovery.mjs --registry-decide
 
       - name: publish exactly the validated tarball through npm trusted publishing (OIDC)
         if: steps.registry.outputs.publish_needed == 'true'
@@ -456,16 +438,10 @@ jobs:
             --cli "$registry_consumer/node_modules/breaklint/dist/cli/index.js" \
             --cwd "$registry_consumer"
 
-      - name: create the GitHub Release with the published bytes and checksums
+      - name: create, complete or verify the GitHub Release with the published bytes and checksums
+        # No release: create it. A draft left by an interrupted upload: verify what it has byte
+        # for byte and upload only what is missing. A published release: every asset must equal
+        # the validated artifact. Nothing is overwritten; tests/tools/release-recovery.mjs.
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
-            echo "GitHub Release $GITHUB_REF_NAME already exists; refusing to overwrite assets"
-            exit 1
-          fi
-          gh release create "$GITHUB_REF_NAME" \
-            "$PACKAGE_FILE" "$PACKAGE_FILE.sha256" "$PACKAGE_FILE.sri" \
-            --verify-tag \
-            --generate-notes \
-            --title "breaklint ${GITHUB_REF_NAME#v}"
+        run: node tests/tools/release-recovery.mjs --github-release "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md" "$PACKAGE_FILE" "$PACKAGE_FILE.sha256" "$PACKAGE_FILE.sri"
