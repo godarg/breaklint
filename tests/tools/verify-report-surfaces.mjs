@@ -1203,6 +1203,19 @@ assert.throws(() => assertSurfaceInventory(redistributed, process.platform), /pr
   "a changed state split with an unchanged total passed the fixed state inventory");
 assert.throws(() => assertSurfaceInventory(manifest, "unsupported-control"), /unsupported report-surface platform/u,
   "an unregistered platform passed the fixed inventory");
+// The tile total is not pinned; what it stood for is. A tile listed twice in place of another,
+// with every total unchanged, and a screen whose tiles stop one row short must both be rejected.
+{
+  const doubled = structuredClone(manifest);
+  const [first, second] = doubled.artifacts.filter((artifact) => artifact.kind === "screen" && artifact.tiles.length > 1);
+  second.tiles[1].path = first.tiles[1].path;
+  assert.throws(() => assertSurfaceInventory(doubled, process.platform), /listed more than once/u,
+    "a tile listed twice with unchanged totals passed the inventory invariants");
+  const short = structuredClone(manifest);
+  short.artifacts.find((artifact) => artifact.kind === "screen").dimensions.height += 1;
+  assert.throws(() => assertSurfaceInventory(short, process.platform), /covered by exactly one tile/u,
+    "a screen row no tile covers passed the inventory invariants");
+}
 
 const latestRound = describeLatestRound(ledger, manifest, currentReviewInput.fingerprint);
 // The review ledger's state belongs where a release reader looks, not only in a log line. The line

@@ -84,5 +84,5 @@ export interface ReviewLedger {
   [key: string]: unknown;
 }
 export const EXPECTED_PRINT_PAGES_BY_PLATFORM: Readonly<Record<string, Readonly<Record<string, number>>>>;
-export const EXPECTED_SCREEN_TILES_BY_PLATFORM: Readonly<Record<string, number>>;
+export const EXPECTED_SCREEN_CELLS: number;
 export function assertSurfaceInventory(inventory: unknown, platform: string): void;

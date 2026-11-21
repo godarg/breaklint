@@ -403,6 +403,25 @@ describe("workflow gates", () => {
   });
 
   /*
+   * The report-surface matrix fixes printed page counts per platform. On `ubuntu-latest` a runner
+   * image change (fonts, Chrome) moves those figures on an unchanged candidate, so every job that
+   * renders the matrix names its image.
+   */
+  it("every job that renders the report-surface matrix runs on a pinned ubuntu-24.04 image", () => {
+    const rendering: string[] = [];
+    for (const path of WORKFLOWS) {
+      for (const job of jobsOf(readLines(path))) {
+        const runs = workflowRunLines(job.lines.map(({ text }) => text).join("\n"));
+        if (!runs.some((line) => /\bnpm run test:report-surfaces\b/u.test(line))) continue;
+        rendering.push(`${path}#${job.name}`);
+        const runsOn = job.lines.map(({ text }) => /^ {4}runs-on:\s*(\S+)\s*$/u.exec(text)?.[1]).find(Boolean);
+        assert.equal(runsOn, "ubuntu-24.04", `${path} job ${job.name} renders the report-surface matrix on ${runsOn ?? "no declared image"}`);
+      }
+    }
+    assert.ok(rendering.includes(".github/workflows/ci.yml#check"), `the ci.yml check job no longer renders the matrix; this guard has lost its subject (${rendering.join(", ")})`);
+  });
+
+  /*
    * Recovery: a tag commit may be an ancestor of main (main moves on after a merge; the exact
    * commit still needs its own successful main CI run), an existing GitHub Release is completed or
    * verified byte for byte instead of refused, and the release notes are the tag commit's own

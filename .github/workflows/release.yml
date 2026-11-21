@@ -30,7 +30,8 @@ env:
 jobs:
   validate-pack:
     name: validate and pack once (Node 24)
-    runs-on: ubuntu-latest
+    # The report-surface matrix pins printed pages per platform; a floating image moves them.
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
       contents: read

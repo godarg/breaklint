@@ -10,7 +10,8 @@ permissions:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # The report-surface matrix pins printed pages per platform; a floating image moves them.
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
       # Belt and braces: the names of these two have changed across versions, so both are set.

@@ -668,7 +668,7 @@ export function assessSightGate(ledger, manifest, currentFingerprint, reviewInpu
   return { latest, reviewKind: summarizeLatestRound(ledger).humanPass ? "human" : "delegatedAI" };
 }
 
-// The printed inventory is pinned rather than derived, so that a report which silently doubles in
+// The printed page inventory is pinned rather than derived, so that a report which silently doubles in
 // length is a failing gate and not a shrug. History: 32 page rasters; 43 in 0.6.0 when every finding
 // gained a remediation box; 31 when coverage became one aligned table instead of thirteen six-label
 // cards (measured per state: clean 5 -> 2, findings 12 -> 9, infrastructure 13 -> 10,
@@ -707,23 +707,65 @@ export const EXPECTED_PRINT_PAGES_BY_PLATFORM = Object.freeze({
   darwin: Object.freeze({ clean: 3, findings: 8, infrastructure: 8, "insufficient-coverage": 8 }),
   linux: Object.freeze({ clean: 3, findings: 8, infrastructure: 8, "insufficient-coverage": 8 }),
 });
-export const EXPECTED_SCREEN_TILES_BY_PLATFORM = Object.freeze({
-  darwin: 214,
-  linux: 212,
-});
+// 0.11.1: the tile TOTAL is no longer pinned. It is a change detector, not an oracle: Linux and
+// macOS differ by two tiles on the same candidate, and every runner-image font change moved it on an
+// unchanged report (PR runs 37594360825 and 44894380636). What the total stood for is checked as
+// invariants instead: 24 distinct screen cells; every screen row covered by exactly one tile, in
+// order, from the top to the page end; no tile listed twice; physical totals equal to the tiles and
+// pages the artifacts list; and the fixed per-state printed page count above, which still makes a
+// report that silently grows a page a failing gate. The verifier separately re-cuts every tile from
+// the decoded full page and requires the gallery to present each one.
+export const EXPECTED_SCREEN_CELLS = 24;
 
 export function assertSurfaceInventory(inventory, platform) {
   assert.ok(Object.hasOwn(EXPECTED_PRINT_PAGES_BY_PLATFORM, platform), `unsupported report-surface platform: ${platform}`);
-  assert.ok(Object.hasOwn(EXPECTED_SCREEN_TILES_BY_PLATFORM, platform), `unsupported report-surface tile platform: ${platform}`);
   const expectedPages = EXPECTED_PRINT_PAGES_BY_PLATFORM[platform];
-  const expectedTiles = EXPECTED_SCREEN_TILES_BY_PLATFORM[platform];
-  const pdfs = inventory.artifacts.filter((artifact) => artifact.kind === "pdf");
+  const artifacts = inventory?.artifacts ?? [];
+
+  const screens = artifacts.filter((artifact) => artifact.kind === "screen");
+  const screenCells = new Set(screens.map((artifact) => artifact.cell));
+  assert.equal(screenCells.size, screens.length, `${platform}: a screen cell is listed more than once`);
+  assert.equal(screens.length, EXPECTED_SCREEN_CELLS, `${platform}: the report-surface inventory must contain ${EXPECTED_SCREEN_CELLS} distinct screen cells, not ${screens.length}`);
+  const seenImages = new Set();
+  const once = (path, label) => {
+    assert.ok(typeof path === "string" && path.length > 0, `${label}: image path missing`);
+    assert.ok(!seenImages.has(path), `${label}: ${path} is listed more than once`);
+    seenImages.add(path);
+  };
+  for (const artifact of screens) {
+    once(artifact.path, artifact.cell);
+    const height = artifact.dimensions?.height;
+    assert.ok(Number.isSafeInteger(height) && height > 0, `${artifact.cell}: screen height missing`);
+    assert.ok(Array.isArray(artifact.tiles) && artifact.tiles.length > 0, `${artifact.cell}: every screen row must be covered by exactly one tile; no tile is listed`);
+    let covered = 0;
+    for (const [index, tile] of artifact.tiles.entries()) {
+      once(tile.path, `${artifact.cell} tile ${index + 1}`);
+      assert.equal(tile.index, index + 1, `${artifact.cell}: tile ${index + 1} is numbered ${tile.index}; tiles are listed in order`);
+      assert.ok(Number.isSafeInteger(tile.height) && tile.height > 0, `${artifact.cell}: tile ${index + 1} has no height`);
+      assert.equal(tile.top, covered,
+        `${artifact.cell}: tile ${index + 1} starts at row ${tile.top}, not at row ${covered}; every screen row must be covered by exactly one tile`);
+      covered += tile.height;
+    }
+    assert.equal(covered, height, `${artifact.cell}: tiles end at row ${covered} of a ${height}-row page; every screen row must be covered by exactly one tile`);
+  }
+
+  const pdfs = artifacts.filter((artifact) => artifact.kind === "pdf");
   assert.equal(pdfs.length, 4, "the report-surface inventory must contain exactly four PDF cells");
   const actualPages = Object.fromEntries(pdfs.map((artifact) => [artifact.cell.split("/")[1], artifact.pages]));
   assert.deepEqual(actualPages, expectedPages, `${platform}: print page inventory must match every fixed state`);
+  const rasterSets = artifacts.filter((artifact) => artifact.kind === "raster-set");
+  assert.equal(rasterSets.length, 4, "the report-surface inventory must contain exactly four raster sets");
+  for (const artifact of rasterSets) {
+    const state = artifact.cell.split("/")[1];
+    assert.equal(artifact.pages?.length, expectedPages[state],
+      `${artifact.cell}: the raster set holds ${artifact.pages?.length} pages; its PDF state prints ${expectedPages[state]}`);
+    for (const [index, page] of artifact.pages.entries()) once(page.path, `${artifact.cell} page ${index + 1}`);
+  }
+
+  const screenTiles = screens.reduce((sum, artifact) => sum + artifact.tiles.length, 0);
   const rasterPages = Object.values(expectedPages).reduce((sum, pages) => sum + pages, 0);
-  assert.deepEqual(inventory.physicalArtifacts, { screens: 24, screenTiles: expectedTiles, pdfs: 4, rasterPages },
-    `${platform}: the report-surface inventory must be exactly 24 screens with ${expectedTiles} viewport tiles, 4 PDFs and ${rasterPages} PDF page rasters`);
+  assert.deepEqual(inventory.physicalArtifacts, { screens: EXPECTED_SCREEN_CELLS, screenTiles, pdfs: 4, rasterPages },
+    `${platform}: the physical inventory must state exactly the ${EXPECTED_SCREEN_CELLS} screens, ${screenTiles} tiles, 4 PDFs and ${rasterPages} PDF page rasters the artifacts list`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
