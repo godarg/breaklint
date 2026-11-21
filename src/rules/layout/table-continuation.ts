@@ -11,6 +11,27 @@ function visibleHeader(table: Table, fragment: TableFragment): boolean {
   return table.headerRowSids.length > 0 && table.headerRowSids.every(sid => fragment.rows.some(row => row.sid === sid
     && row.cells.length > 0 && row.cells.every(cell => cell.visible && cell.box.width > 0 && cell.box.height > 0)));
 }
+type FragmentRow = TableFragment["rows"][number];
+/** Inclusive grid column span [start, end] of each cell, in authored order. */
+function spans(row: Pick<FragmentRow, "cells">): [number, number][] {
+  let at = 0;
+  return row.cells.map(cell => { const span: [number, number] = [at, at + cell.colSpan - 1]; at += cell.colSpan; return span; });
+}
+function referenceEdges(lead: TableFragment, headerRows: FragmentRow[], headerSids: string[], columns: number) {
+  const left: (number | undefined)[] = new Array(columns).fill(undefined);
+  const right: (number | undefined)[] = new Array(columns).fill(undefined);
+  const observe = (row: FragmentRow) => {
+    if (!row.cells.every(cell => cell.visible && cell.box.width > 0 && cell.box.height > 0)) return;
+    for (const [i, [start, end]] of spans(row).entries()) {
+      const cell = row.cells[i]!;
+      left[start] ??= cell.box.x - lead.box.x;
+      right[end] ??= cell.box.x + cell.box.width - lead.box.x;
+    }
+  };
+  for (const row of [...headerRows].reverse()) observe(row);
+  for (const row of lead.rows.filter(row => !headerSids.includes(row.sid!))) observe(row);
+  return { left, right };
+}
 function check(snapshot: Snapshot, ctx: Parameters<typeof makeFinding>[0]["ctx"], id: string) {
   const findings = []; const notMeasured = []; const evaluations = [];
   let candidates = 0; let measured = 0;
@@ -39,18 +60,14 @@ function check(snapshot: Snapshot, ctx: Parameters<typeof makeFinding>[0]["ctx"]
     const leadDataRows = lead?.rows.filter(row => !table.headerRowSids.includes(row.sid!)).length ?? 0;
     const firstDataPage = fragments.find(f => f.rows.some(row => !table.headerRowSids.includes(row.sid!)))?.page;
     const leadHeaderRows = lead ? lead.rows.filter(row => table.headerRowSids.includes(row.sid!)) : [];
-    const unspannedHeader = gridColumns !== null
-      ? [...leadHeaderRows].reverse().find(row => row.cells.length === gridColumns && row.cells.every(cell => cell.colSpan === 1))
-      : undefined;
-    const simpleSpanLayoutMatches = leadHeaderRows.length > 0 && gridColumns !== null && (() => {
-      const ref = leadHeaderRows[leadHeaderRows.length - 1]!;
-      const refSpans = ref.cells.map(c => c.colSpan);
-      return fragments.every(f => f.rows.filter(row => !table.headerRowSids.includes(row.sid!)).every(row =>
-        (row.cells.length === 1 && row.cells[0]!.colSpan === gridColumns) ||
-        (row.cells.length === refSpans.length && row.cells.every((c, idx) => c.colSpan === refSpans[idx]))
-      ));
-    })();
-    const columnTracksUnavailable = id === COLUMNS && !unspannedHeader && !simpleSpanLayoutMatches;
+    // Reference column edges from the first fragment. Observed header edges win (finest header row
+    // first); data rows on the first fragment only add edges the header does not observe, e.g. the
+    // inner edges under a grouped [2,2] header over [1,1,1,1] data. Nothing is interpolated.
+    const refEdges = gridColumns !== null && lead ? referenceEdges(lead, leadHeaderRows, table.headerRowSids, gridColumns) : null;
+    const missingReferenceEdge = id === COLUMNS && refEdges !== null && fragments.slice(1).some(f => f.rows
+      .filter(row => !table.headerRowSids.includes(row.sid!)).some(row => spans(row).some(([start, end]) =>
+        refEdges.left[start] === undefined || refEdges.right[end] === undefined)));
+    const columnTracksUnavailable = id === COLUMNS && (refEdges === null || missingReferenceEdge);
     const unsupported = !sourceTableMatches(table) || gridColumns === null || !lead || !table.headerRowSids.length
       || !visibleHeader(table, lead) || columnTracksUnavailable
       || fragments.some(f => f.rows.filter(row => !table.headerRowSids.includes(row.sid!))
@@ -72,33 +89,11 @@ function check(snapshot: Snapshot, ctx: Parameters<typeof makeFinding>[0]["ctx"]
       // Local tracks survive page stacking. Compare both edges, never font or wrapper width.
       let maxDelta = 0;
       if (id === COLUMNS) {
-        const refRow = unspannedHeader ?? leadHeaderRows[leadHeaderRows.length - 1]!;
-        const refLefts = refRow.cells.map(c => c.box.x - lead!.box.x);
-        const refRights = refRow.cells.map(c => c.box.x + c.box.width - lead!.box.x);
-        const refSpanLeft = (start: number, end: number): number => Math.min(refLefts[start]!, refLefts[end]!);
-        const refSpanRight = (start: number, end: number): number => Math.max(refRights[start]!, refRights[end]!);
-        for (const row of dataRows) {
-          if (unspannedHeader) {
-            let colStart = 0;
-            for (const cell of row.cells) {
-              const colEnd = colStart + cell.colSpan - 1;
-              const left = (cell.box.x - fragment.box.x) - refSpanLeft(colStart, colEnd);
-              const right = (cell.box.x + cell.box.width - fragment.box.x) - refSpanRight(colStart, colEnd);
-              maxDelta = Math.max(maxDelta, Math.abs(left), Math.abs(right));
-              colStart += cell.colSpan;
-            }
-          } else if (row.cells.length === 1 && row.cells[0]!.colSpan === gridColumns) {
-            const cell = row.cells[0]!;
-            const left = (cell.box.x - fragment.box.x) - refSpanLeft(0, refLefts.length - 1);
-            const right = (cell.box.x + cell.box.width - fragment.box.x) - refSpanRight(0, refRights.length - 1);
-            maxDelta = Math.max(maxDelta, Math.abs(left), Math.abs(right));
-          } else {
-            for (const [i, cell] of row.cells.entries()) {
-              const left = (cell.box.x - fragment.box.x) - refLefts[i]!;
-              const right = (cell.box.x + cell.box.width - fragment.box.x) - refRights[i]!;
-              maxDelta = Math.max(maxDelta, Math.abs(left), Math.abs(right));
-            }
-          }
+        for (const row of dataRows) for (const [i, [start, end]] of spans(row).entries()) {
+          const cell = row.cells[i]!;
+          const left = (cell.box.x - fragment.box.x) - refEdges!.left[start]!;
+          const right = (cell.box.x + cell.box.width - fragment.box.x) - refEdges!.right[end]!;
+          maxDelta = Math.max(maxDelta, Math.abs(left), Math.abs(right));
         }
       }
       const threshold = id === COLUMNS ? Number(ctx.options.maxColumnDriftPx ?? 2) : 0;
