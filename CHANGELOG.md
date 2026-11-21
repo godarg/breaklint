@@ -45,7 +45,8 @@ published to npm, so the Action pinned to `@v0.11.0` fails with its default inst
   rendered and the others are `display: none`.
 - The table continuation checks measure tables with simple `colspan` rows (group and separator
   rows, grouped headers); `layout/table-column-drift` compares continuations against the edges it
-  observed on the first page. Irregular spans, `rowspan` and edges never seen stay declined.
+  observed on the first page. An edge never seen there is declined on its own while the observed
+  edges are still compared; irregular spans and `rowspan` stay declined.
 - A declined check names what it observed (`notMeasured[].detail`; console: `(observed: …)`), for
   example `rowSpan > 1 in thead` or the number of script mutations before pagination.
 - The browser's default `/favicon.ico` request is answered with 204 when the document declares no
@@ -85,8 +86,9 @@ published to npm, so the Action pinned to `@v0.11.0` fails with its default inst
   `--out` that would overwrite an input, and a non-empty `bundle --out-dir` end with 2; a failed
   write ends with 3 and leaves the previous output in place. `compare` ends with 4 when the after
   report is `insufficient-coverage` or no finding can be matched, which includes two reports with
-  findings from a plain CLI run; `compare --fail-on-new` ends with 1 when a result is `new`, and
-  `--repository <dir>` reads the ancestry for producer-bound reports.
+  findings from a plain CLI run and two reports of different documents; `compare --fail-on-new`
+  ends with 1 when a result is `new`, and `--repository <dir>` reads the ancestry for
+  producer-bound reports.
 - SARIF rules link to the rule page of the exact release tag.
 - HTML reports escape every report value where it is written and print `unavailable` for a
   number that is not one; they name an ambiguity partner only when it is in the same document,

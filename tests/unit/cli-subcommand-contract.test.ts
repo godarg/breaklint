@@ -12,7 +12,8 @@
  *      readable version, an output that would overwrite an input, a non-empty bundle directory
  *   3  the output could not be written (I/O), or `compare`'s after report is `infrastructure`
  *   4  `compare`'s after report is `insufficient-coverage`, or findings exist and none of them
- *      can be matched (no stable identity), so the comparison states nothing about a repair
+ *      can be matched (no stable identity, or no document of the same comparison scope in the
+ *      other report), so the comparison states nothing about a repair
  * A failed or incomplete BEFORE report is a warning on stderr; it does not change the exit code.
  *
  * Real report fixtures (tests/fixtures/reports/, written by the named released builds, minified):
@@ -175,6 +176,9 @@ describe("C1: a subcommand reads only a breaklint report of a readable version",
       ["evaluation-target-null", (r) => { r.evaluations[0].targetRef = null; }, /evaluations\[0\]\.targetRef/u],
       ["verdict-unknown", (r) => { r.runVerdict = "fine"; }, /runVerdict/u],
       ["active-rules-missing", (r) => { delete r.config.activeRules; }, /config\.activeRules/u],
+      // A damaged archive: the coverage decline list holds a non-object the projections read.
+      ["coverage-not-measured-null", (r) => { const first = Object.keys(r.documents[0].coverage)[0]!; r.documents[0].coverage[first].notMeasured = [null]; r.documents[0].coverage[first].notMeasuredCount = 1; }, /coverage\[".*"\]\.notMeasured\[0\]/u],
+      ["coverage-not-measured-reason", (r) => { const first = Object.keys(r.documents[0].coverage)[0]!; r.documents[0].coverage[first].notMeasured = [{ count: 1 }]; r.documents[0].coverage[first].notMeasuredCount = 1; }, /coverage\[".*"\]\.notMeasured\[0\]\.reason/u],
     ];
     for (const [name, mutate, field] of documentCases) {
       const report = demoReport() as unknown as Record<string, any>;
@@ -251,6 +255,40 @@ describe("C2/C3: an output never replaces an input, and a bundle directory start
     assert.deepEqual(readFileSync(join(dir, "cmp.json")), cmpOriginal, "the comparison input was changed");
     assert.deepEqual(readFileSync(before), beforeOriginal);
     assert.deepEqual(readFileSync(afterPath), afterOriginal);
+  });
+
+  it("an --out or --out-dir through a symlinked directory and .. is written where the file system resolves it", () => {
+    // `link/..` is `elsewhere` for the file system and `.` for a lexical normalisation. The
+    // collision check and the write must name the same file, or an input in `.` is replaced
+    // while the check looked at `elsewhere`.
+    const dir = caseDir("c23-symlink-dotdot");
+    mkdirSync(join(dir, "elsewhere/inner"), { recursive: true });
+    symlinkSync(join(dir, "elsewhere/inner"), join(dir, "link"));
+    const reportPath = join(dir, "report.json");
+    copyFileSync(currentDemo, reportPath);
+    const original = readFileSync(reportPath);
+    const context = run(["context", "report.json", "--out", "link/../report.json"], dir);
+    assert.equal(context.status, 0, show(context));
+    assert.deepEqual(readFileSync(reportPath), original, "the input report in the working directory was replaced");
+    assert.equal(existsSync(join(dir, "elsewhere/report.json")), true, "the output is not where the file system resolves --out");
+    const compare = run(["compare", "report.json", "report.json", "--out", "link/../cmp.json"], dir);
+    assert.notEqual(compare.status, 2, show(compare));
+    assert.equal(existsSync(join(dir, "elsewhere/cmp.json")), true, "compare --out is not where the file system resolves it");
+    assert.equal(existsSync(join(dir, "cmp.json")), false);
+    // When the resolved file IS an input, the collision is refused.
+    copyFileSync(currentDemo, join(dir, "elsewhere/input.json"));
+    const inside = run(["context", "elsewhere/input.json", "--out", "link/../input.json"], dir);
+    assert.equal(inside.status, 2, show(inside));
+    assert.match(inside.stderr, /would overwrite an input/u);
+    // The bundle directory follows the same resolution: checked and written in one place.
+    const bundle = run(["bundle", "report.json", "--out-dir", "link/../fresh"], dir);
+    assert.equal(bundle.status, 0, show(bundle));
+    assert.equal(existsSync(join(dir, "elsewhere/fresh/report.json")), true, "the bundle is not where the file system resolves --out-dir");
+    assert.equal(existsSync(join(dir, "fresh")), false, "the bundle was written to the lexically normalised directory");
+    // A used directory reached through the link is refused, not written into.
+    const used = run(["bundle", "report.json", "--out-dir", "link/.."], dir);
+    assert.equal(used.status, 2, show(used));
+    assert.deepEqual(readFileSync(reportPath), original);
   });
 
   it("bundle requires a new or empty --out-dir: a second run without --comparison cannot leave a stale comparison", () => {
@@ -338,6 +376,38 @@ describe("C4/C5: the exit contract of compare, context and bundle", () => {
     assert.equal(run(["compare", currentDemo, currentDemo]).status, 4);
     const none = writeJson(join(dir, "none.json"), withoutFindings(cleanReportState()));
     assert.equal(run(["compare", none, none]).status, 0);
+  });
+
+  it("compare: findings with a stable identity but no counterpart document of the same scope is 4", () => {
+    // Two different documents compared by mistake: every finding has a stable identity, but no
+    // after document shares its comparison scope, so nothing was matched against anything.
+    const dir = caseDir("c45-scope");
+    const hash = (seed: string) => seed.repeat(64).slice(0, 64);
+    const scoped = (report: Report, documentSeed: string, runId: string): Report => {
+      report.runId = runId;
+      for (const document of report.documents) {
+        document.comparisonScope = { projectId: hash("a"), documentId: hash(documentSeed), scenario: "document-print" };
+      }
+      const stamp = (finding: Report["findings"][number], index: number) => {
+        const value = hash(String(index + 1));
+        finding.stableIdentity = { status: "unique", value, candidates: [value], identityContract: "logical-source-value-v1", canonicalization: "canonical-node-v1", authorAnchorSha256: hash("c"), semanticSha256: hash("d") };
+      };
+      report.findings.forEach(stamp);
+      for (const document of report.documents) document.findings.forEach(stamp);
+      return report;
+    };
+    const before = writeJson(join(dir, "before.json"), scoped(demoReport(), "b", "before-run"));
+    const afterPath = writeJson(join(dir, "after.json"), scoped(demoReport(), "e", "after-run"));
+    const result = run(["compare", before, afterPath, "--out", join(dir, "cmp.json")]);
+    const written = JSON.parse(readFileSync(join(dir, "cmp.json"), "utf8")) as { results: { status: string; reasons: string[] }[] };
+    assert.ok(written.results.length > 0, "the fixture must produce comparison results");
+    assert.ok(written.results.every((item) => item.status !== "unmatchable"), "the fixture must carry stable identities");
+    assert.ok(written.results.every((item) => item.reasons.includes("scope-incompatible-or-unknown")), "the fixture must differ in scope");
+    assert.equal(result.status, 4, show(result));
+    assert.match(result.stderr, /comparison scope/u);
+    // The same reports against themselves share the scope and are matched: not 4.
+    const self = run(["compare", before, before]);
+    assert.notEqual(self.status, 4, show(self));
   });
 
   it("compare: --fail-on-new without a new result keeps 0; --repository must name a directory", () => {

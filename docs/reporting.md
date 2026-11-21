@@ -169,7 +169,7 @@ kept unchanged. [`revision-comparison.md`](revision-comparison.md) describes the
 | 1 | `compare --fail-on-new` only: at least one result is `new` |
 | 2 | invalid invocation or input: unknown option, a file that is not a breaklint report of a readable version, an output that would overwrite an input, a non-empty bundle directory |
 | 3 | the output could not be written, or the after report of `compare` is `infrastructure` |
-| 4 | `compare` only: the after report is `insufficient-coverage`, or findings exist and none carries a stable identity, so nothing can be matched |
+| 4 | `compare` only: the after report is `insufficient-coverage`, or findings exist and none can be matched: no stable identity, or no document of the same comparison scope |
 
 A before report that ended `infrastructure` or `insufficient-coverage` produces a warning on
 stderr and does not change the exit code. `breaklint compare --help`, `context --help` and

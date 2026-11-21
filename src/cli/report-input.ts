@@ -117,6 +117,13 @@ function documentFinding(value: unknown, path: string): void {
   }
 }
 
+/** A decline as the context pack reads it, in `documents[].notMeasured` and in each coverage row. */
+function notMeasuredEntry(value: unknown, path: string): void {
+  const entry = record(value, path);
+  text(entry.reason, `${path}.reason`);
+  finite(entry.count, `${path}.count`);
+}
+
 function documentEvaluation(value: unknown, path: string): void {
   const evaluation = record(value, path);
   text(evaluation.ruleId, `${path}.ruleId`);
@@ -154,17 +161,14 @@ function documentReport(report: Rec): void {
       const entry = record(event, `${path}.infrastructure[${inner}]`);
       text(entry.kind, `${path}.infrastructure[${inner}].kind`);
     });
-    array(document.notMeasured, `${path}.notMeasured`).forEach((event, inner) => {
-      const entry = record(event, `${path}.notMeasured[${inner}]`);
-      text(entry.reason, `${path}.notMeasured[${inner}].reason`);
-      finite(entry.count, `${path}.notMeasured[${inner}].count`);
-    });
+    array(document.notMeasured, `${path}.notMeasured`).forEach((event, inner) => notMeasuredEntry(event, `${path}.notMeasured[${inner}]`));
     array(document.evidence, `${path}.evidence`).forEach((event, inner) => record(event, `${path}.evidence[${inner}]`));
     for (const [ruleId, value] of Object.entries(record(document.coverage, `${path}.coverage`))) {
       const coverage = record(value, `${path}.coverage[${JSON.stringify(ruleId)}]`);
       for (const key of ["candidates", "measured", "notMeasuredCount"]) finite(coverage[key], `${path}.coverage[${JSON.stringify(ruleId)}].${key}`);
       nullableFinite(coverage.floor ?? null, `${path}.coverage[${JSON.stringify(ruleId)}].floor`);
-      array(coverage.notMeasured, `${path}.coverage[${JSON.stringify(ruleId)}].notMeasured`);
+      const declines = `${path}.coverage[${JSON.stringify(ruleId)}].notMeasured`;
+      array(coverage.notMeasured, declines).forEach((event, inner) => notMeasuredEntry(event, `${declines}[${inner}]`));
     }
   });
 }

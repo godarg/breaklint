@@ -170,7 +170,7 @@ export interface EvidenceOptions {
   dpi?: number;
   /** `--no-evidence-binding`. Off means: no overlay at all, and every binding is false. */
   binding: boolean;
-  /** 1-based page numbers confirmed blank in the measured snapshot (e.g. Paged.js parity blanks, G-78). */
+  /** 1-based page numbers confirmed blank in the measured snapshot (e.g. Paged.js parity blanks). */
   blankPages?: ReadonlySet<number>;
   /** Page-local content box in mm for each confirmed blank page so margin-box running headers remain distinct from content-area text. */
   blankPageContentBoxes?: ReadonlyMap<number, { leftMm: number; topMm: number; rightMm: number; bottomMm: number }>;
@@ -808,7 +808,7 @@ async function finish(input: FinishInput): Promise<EvidenceOutcome> {
           if (!blankContentBoxMm) return false;
           const xMm = item.x * MM_PER_PT;
           // The whole horizontal range [x, x + width] counts, not only the origin: text starting in
-          // the margin can run across the content area (CODE-PRINT-3). An unknown width is taken
+          // the margin can run across the content area. An unknown width is taken
           // to reach the page edge, which can only withhold verification, never grant it.
           const widthPt = typeof item.width === "number" && Number.isFinite(item.width) ? Math.abs(item.width) : Infinity;
           const endMm = (item.x + widthPt) * MM_PER_PT;
@@ -822,7 +822,7 @@ async function finish(input: FinishInput): Promise<EvidenceOutcome> {
             yMm <= blankContentBoxMm.bottomMm + 0.5;
           return !insideContentBox;
         });
-        // G-78: a confirmed parity-blank page carries zero flow blocks and zero marks. When the
+        // A confirmed parity-blank page carries zero flow blocks and zero marks. When the
         // rest of the document has verified mark conformance, zero raster diff, zero unplaced
         // marks on this page, and zero visible text inside the content area (and no stray mark
         // tokens anywhere on the page), the blank page itself is verified rather than failing

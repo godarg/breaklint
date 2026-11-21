@@ -1,10 +1,11 @@
 import { randomBytes } from "node:crypto";
-import { closeSync, constants, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync, type Stats } from "node:fs";
-import { basename, dirname, join, relative, resolve as resolvePath } from "node:path";
+import { closeSync, constants, existsSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync, type Stats } from "node:fs";
+import { basename, dirname, join, relative } from "node:path";
 
 import { compareReports, type ReportComparison } from "../api/compare.ts";
 import { CONTEXT_MAX_FINDINGS, CONTEXT_MAX_TEXT, CONTEXT_MIN_TEXT, createContextPack } from "../api/context.ts";
 import { writeReportBundle } from "../api/bundle.ts";
+import { physicalPath } from "../api/output-path.ts";
 import { UsageError } from "../config/resolve.ts";
 import type { Report } from "../core/types.ts";
 import type { ReadableScreenReport } from "../web/types.ts";
@@ -26,7 +27,7 @@ const SUBCOMMAND_EXIT_CODES = `exit codes
      readable version, an output that would overwrite an input, a non-empty bundle directory
   3  the output could not be written, or compare's after report is "infrastructure"
   4  compare only: the after report is "insufficient-coverage", or findings exist and none of
-     them carries a stable identity, so no result can be matched
+     them can be matched: no stable identity, or no document of the same comparison scope
   A before report that ended with "infrastructure" or "insufficient-coverage" is a warning on
   stderr; it does not change the exit code.
 `;
@@ -133,7 +134,8 @@ interface NamedInput { label: string; path: string }
 function fileIdentity(path: string): { real: string; dev: number; ino: number } | null {
   try {
     const stat = statSync(path);
-    return { real: realpathSync(path), dev: stat.dev, ino: stat.ino };
+    // The operating system's realpath: the JavaScript one normalises `..` lexically first.
+    return { real: realpathSync.native(path), dev: stat.dev, ino: stat.ino };
   } catch {
     return null;
   }
@@ -145,7 +147,8 @@ function fileIdentity(path: string): { real: string; dev: number; ino: number } 
  * equality after `realpath` covers the first two; device and inode equality covers the third.
  */
 function assertOutputIsNotAnInput(outFile: string, inputs: readonly NamedInput[]): void {
-  const output = fileIdentity(outFile);
+  // The same resolution the writer uses, so the check and the write name one file.
+  const output = fileIdentity(physicalPath(outFile));
   if (!output) return;
   for (const input of inputs) {
     const identity = fileIdentity(input.path);
@@ -160,15 +163,12 @@ function assertOutputIsNotAnInput(outFile: string, inputs: readonly NamedInput[]
  * failed write (disk full, file-size limit, I/O error) leaves the previous file intact instead of
  * truncated. A symlinked target is written through to the file it names. A target that is not a
  * regular file and not absent (a device such as /dev/stdout, a FIFO) cannot be replaced by a
- * rename and is written directly, as before.
+ * rename and is written directly, as before. The target is resolved by `physicalPath()`, the
+ * resolution the collision check used: a lexical `..` after a symlinked directory once sent the
+ * write to a different file than the one the check had looked at.
  */
 function writeOutputFile(outFile: string, content: string): void {
-  let destination = resolvePath(outFile);
-  try {
-    if (lstatSync(destination).isSymbolicLink()) destination = realpathSync(destination);
-  } catch {
-    // Absent target (or a dangling link): created below.
-  }
+  const destination = physicalPath(outFile);
   let existing: Stats | null = null;
   try {
     existing = statSync(destination);
@@ -216,7 +216,8 @@ function emitJson(payload: unknown, outFile: string | undefined, kind: string): 
 function assertNewOrEmptyDirectory(outDir: string): void {
   let stat: Stats;
   try {
-    stat = statSync(outDir);
+    // writeReportBundle() writes to physicalPath(outDir); the check reads the same directory.
+    stat = statSync(physicalPath(outDir));
   } catch (error) {
     if ((error as { code?: unknown }).code === "ENOENT") return;
     throw error;
@@ -224,7 +225,7 @@ function assertNewOrEmptyDirectory(outDir: string): void {
   if (!stat.isDirectory()) {
     throw new UsageError(`--out-dir must be a new or empty directory: ${outDir} exists and is not a directory.`);
   }
-  if (readdirSync(outDir).length > 0) {
+  if (readdirSync(physicalPath(outDir)).length > 0) {
     throw new UsageError(`--out-dir must be a new or empty directory: ${outDir} is not empty. Choose a new directory or empty this one.`);
   }
 }
@@ -324,12 +325,20 @@ async function runCompare(argv: readonly string[]): Promise<number> {
     err("breaklint: the after report ended with insufficient-coverage; the comparison was written but cannot confirm a repair (exit 4).\n");
     return 4;
   }
-  const matchable = comparison.results.filter((result) => result.status !== "unmatchable").length;
-  if (comparison.results.length > 0 && matchable === 0) {
-    err(
-      `breaklint: none of the ${comparison.results.length} compared finding(s) carries a stable identity, so no result could be matched (exit 4). ` +
-        "compare needs producer-bound reports (checkProducedDocuments); findings of a plain CLI run are always unmatchable.\n",
-    );
+  // A result was matched when its finding carried a stable identity AND the other report had a
+  // document of the same comparison scope to look in. A "not-sufficiently-measured" result for a
+  // missing scope compared nothing: two different documents handed in by mistake used to end 0.
+  const unscoped = (result: ReportComparison["results"][number]) => result.reasons.includes("scope-incompatible-or-unknown") &&
+    !(result.beforeRunFindingId !== null && result.afterRunFindingIds.length > 0);
+  const withoutIdentity = comparison.results.filter((result) => result.status === "unmatchable").length;
+  const withoutScope = comparison.results.filter((result) => result.status !== "unmatchable" && unscoped(result)).length;
+  if (comparison.results.length > 0 && withoutIdentity + withoutScope === comparison.results.length) {
+    const why = withoutScope === 0
+      ? `none of the ${comparison.results.length} compared finding(s) carries a stable identity, so no result could be matched (exit 4). ` +
+        "compare needs producer-bound reports (checkProducedDocuments); findings of a plain CLI run are always unmatchable.\n"
+      : `none of the ${comparison.results.length} compared finding(s) could be matched (exit 4): ${withoutIdentity} carry no stable identity and ` +
+        `${withoutScope} have no document of the same comparison scope in the other report. Check that both reports describe the same document.\n`;
+    err(`breaklint: ${why}`);
     return 4;
   }
   if (failOnNew && comparison.results.some((result) => result.status === "new")) {

@@ -1794,7 +1794,7 @@ function printRoundingSum(pageHeights: readonly number[], pageIndex: number): nu
  * transform, translate, margins) are the same object/values before and after the same PDF, whose
  * position before the PDF follows from its CSS offsets, and whose upward shift equals its page
  * content origin within the actual print rounding of the preceding page heights + 2.5 px. Every
- * element on one page must shift by the same amount (CDX-20, CODE-PRINT-4/5).
+ * element on one page must shift by the same amount.
  */
 export function judgePostPdfOofDrift(input: { beforeBoxes: string; afterBoxes: string; before: OofFacts; after: OofFacts }): boolean {
   const beforeEntries = input.beforeBoxes === "" ? [] : input.beforeBoxes.split(";");
@@ -2678,7 +2678,7 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
       integrityAtSnapshot.mutationRecordsAfterRendered === opened.postPaginationMutations &&
       integrityAtSnapshot.sidMutations === 0 &&
       runtimeFigureTreeMatches(sourceModel.figureIndex, opened.prePaginationFigureTree, sourceModel.elementCount);
-    // The first failed condition, as observed; the decline code itself is unchanged (VALUE-DIAG-1).
+    // The first failed condition, as observed; the decline code itself is unchanged.
     const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
     const runtimeFigureDetail = !needRuntimeFigureCheck || runtimeFigureVerified ? null
       : opened.prePaginationScriptMutations > 0

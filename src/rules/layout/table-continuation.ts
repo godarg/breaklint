@@ -64,10 +64,19 @@ function check(snapshot: Snapshot, ctx: Parameters<typeof makeFinding>[0]["ctx"]
     // first); data rows on the first fragment only add edges the header does not observe, e.g. the
     // inner edges under a grouped [2,2] header over [1,1,1,1] data. Nothing is interpolated.
     const refEdges = gridColumns !== null && lead ? referenceEdges(lead, leadHeaderRows, table.headerRowSids, gridColumns) : null;
-    const missingReferenceEdge = id === COLUMNS && refEdges !== null && fragments.slice(1).some(f => f.rows
-      .filter(row => !table.headerRowSids.includes(row.sid!)).some(row => spans(row).some(([start, end]) =>
-        refEdges.left[start] === undefined || refEdges.right[end] === undefined)));
-    const columnTracksUnavailable = id === COLUMNS && (refEdges === null || missingReferenceEdge);
+    // A continued edge without a reference (a grouped header alone on the first page) is not
+    // compared; each one is its own declined candidate below. It once declined the whole table, so
+    // a real displacement of an edge the header DID show was reported only as a coverage gap.
+    const missingEdges = new Set<string>();
+    if (id === COLUMNS && refEdges !== null) {
+      for (const f of fragments.slice(1)) for (const row of f.rows.filter(row => !table.headerRowSids.includes(row.sid!))) {
+        for (const [start, end] of spans(row)) {
+          if (refEdges.left[start] === undefined) missingEdges.add(`left-${start}`);
+          if (refEdges.right[end] === undefined) missingEdges.add(`right-${end}`);
+        }
+      }
+    }
+    const columnTracksUnavailable = id === COLUMNS && refEdges === null;
     const hiddenDataCell = fragments.some(f => f.rows.filter(row => !table.headerRowSids.includes(row.sid!))
       .some(row => row.cells.some(cell => !cell.visible || cell.box.width <= 0 || cell.box.height <= 0)));
     const unsupported = !sourceTableMatches(table) || gridColumns === null || !lead || !table.headerRowSids.length
@@ -84,6 +93,18 @@ function check(snapshot: Snapshot, ctx: Parameters<typeof makeFinding>[0]["ctx"]
       : !lead || !visibleHeader(table, lead) ? "header row not visible on the first fragment"
       : columnTracksUnavailable ? "no observed reference edge for a continued column on the first fragment"
       : "a data cell is invisible or has an empty box";
+    if (!unsupported) {
+      for (const edge of [...missingEdges].sort()) {
+        candidates += 1;
+        const reason = "env/table-structure-unsupported" as const;
+        const nodeKey = `table-column-edge:${table.sid}:${edge}`;
+        notMeasured.push(declined({ scope: "block", ruleId: id, reason,
+          detail: `continued column ${edge.replace("-", " edge ")} has no observed reference edge on the first fragment`,
+          target: { keyType: "generated", nodeKey, sid: table.sid } }));
+        evaluations.push(targetEvaluation({ ruleId: id, keyType: "generated", nodeKey, sid: table.sid, occurrenceKey: `column-edge:${edge}`,
+          status: "not-measured", reason }));
+      }
+    }
     for (const [at, fragment] of fragments.entries()) {
       const block = blocks.get(`${table.sid}:${fragment.page}`);
       const target = { ruleId: id, keyType: "block" as const, nodeKey: block?.nodeKey ?? `table:${table.sid}:${fragment.page}`,
@@ -105,9 +126,10 @@ function check(snapshot: Snapshot, ctx: Parameters<typeof makeFinding>[0]["ctx"]
       if (id === COLUMNS) {
         for (const row of dataRows) for (const [i, [start, end]] of spans(row).entries()) {
           const cell = row.cells[i]!;
-          const left = (cell.box.x - fragment.box.x) - refEdges!.left[start]!;
-          const right = (cell.box.x + cell.box.width - fragment.box.x) - refEdges!.right[end]!;
-          maxDelta = Math.max(maxDelta, Math.abs(left), Math.abs(right));
+          // Only observed reference edges are compared; a missing one is a declined candidate above.
+          const leftRef = refEdges!.left[start]; const rightRef = refEdges!.right[end];
+          if (leftRef !== undefined) maxDelta = Math.max(maxDelta, Math.abs((cell.box.x - fragment.box.x) - leftRef));
+          if (rightRef !== undefined) maxDelta = Math.max(maxDelta, Math.abs((cell.box.x + cell.box.width - fragment.box.x) - rightRef));
         }
       }
       const threshold = id === COLUMNS ? Number(ctx.options.maxColumnDriftPx ?? 2) : 0;
