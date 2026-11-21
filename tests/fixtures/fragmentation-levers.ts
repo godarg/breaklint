@@ -165,13 +165,11 @@ export const APPROVED_FRAGMENTATION_TEXTS: readonly ApprovedText[] = Object.free
     text: "3. **Split paragraphs and table rows (`layout/widow`, `layout/orphan`):** inside a table row, keep the row together with `tr { break-inside: avoid; }`. For a paragraph, prevent the split with `break-inside: avoid`, force an earlier break with `break-before: page`, or reword the text. *(Note: CSS `widows` and `orphans` do take effect on paragraphs: Paged.js never reads them, but the browser applies them through its own fragmentation inside Paged.js's flow. Each value is also its rule's threshold, so changing it is not a fix.)*" },
   // README.md
   { where: { file: "README.md" }, requires: [],
-    text: "`breaklint` is a command-line layout check for people who generate PDFs from HTML: it reports widows, orphans, blocks too tall to keep together and hyphenation across page breaks, each with the measured value and the threshold it failed." },
+    text: "breaklint reports what a browser preview hides — widows, orphans, blocks too tall for a page, tables that lose their header, clipped labels — with the measured value, the threshold and where to look." },
   { where: { file: "README.md" }, requires: [],
-    text: "Prior art, and what it does well: `veraPDF` and `pdfcpu` check whether a PDF conforms to the standard. `BackstopJS` and `pdf-visual-diff` compare a build against a previous one. `typopo` corrects German punctuation in plain text, and does it well. `fmitex-widows-and-orphans` checks widows and orphans in LaTeX, and TeX has reported `Overfull \\hbox` for decades. All of these are useful. None of them judges the layout of an HTML→PDF page on the first build, where there is no previous version to compare to." },
+    text: "| [`layout/widow`](https://github.com/godarg/breaklint/blob/v0.11.1/docs/rules/layout-widow.md) | lines in the opening fragment against the element's own `widows` | warn |" },
   { where: { file: "README.md" }, requires: [],
-    text: "| [`layout/widow`](docs/rules/layout-widow.md) | lines in the opening fragment against the element's own `widows` | warn |" },
-  { where: { file: "README.md" }, requires: [],
-    text: "| [`layout/orphan`](docs/rules/layout-orphan.md) | lines in the closing fragment against its own `orphans` | warn |" },
+    text: "| [`layout/orphan`](https://github.com/godarg/breaklint/blob/v0.11.1/docs/rules/layout-orphan.md) | lines in the closing fragment against its own `orphans` | warn |" },
   // src/api/context.ts
   { where: { file: "src/api/context.ts" }, requires: BOTH,
     text: "The CSS `widows` and `orphans` values are deliberately not offered as repairs. The browser applies both when Paged.js splits a paragraph (pinned by tests/live/fragmentation-levers.test.ts), but each value is also its rule's threshold: changing it moves the threshold and repairs nothing." },

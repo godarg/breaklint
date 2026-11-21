@@ -113,7 +113,9 @@ describe("rule registry", () => {
     assert.deepEqual(Object.keys(APPLIED).sort(), ["orphans", "widows"], "the guard must have a pin to follow");
     const units = guardedUnits(ALL_RULES, REPO_ROOT);
     const judged = units.filter(isJudged);
-    assert.ok(judged.length >= 19, `the guard reads too few units to be guarding anything (${judged.length})`);
+    // The floor follows the published text: the 0.11.1 README names the properties in three units
+    // instead of four. Every judged unit must still be approved, and every approval still published.
+    assert.ok(judged.length >= 18, `the guard reads too few units to be guarding anything (${judged.length})`);
     for (const place of ["layout/widow summary", "layout/widow finding message", "layout/orphan finding message", "README.md", "docs/agent-contract.md", "src/api/context.ts"]) {
       assert.ok(judged.some((unit) => unit.place === place), `the guard no longer reads ${place}`);
     }

@@ -29,6 +29,8 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 /** The one list of budgets. A key ending in `/*.md` applies to every Markdown file in that directory. */
 export const WORD_BUDGETS = Object.freeze({
+  "README.md": 1200,
+  "docs/screen-checks.md": 1500,
   "docs/known-limits.md": 1000,
   "docs/reporting.md": 2000,
   "docs/ci-recipe.md": 1200,

@@ -37,7 +37,8 @@ describe("user documentation word budgets", () => {
 
   it("budgets the pages the 0.11.1 documentation plan names", () => {
     assert.deepEqual(Object.keys(WORD_BUDGETS).sort(), [
-      "docs/ci-recipe.md", "docs/configuration.md", "docs/known-limits.md", "docs/reporting.md", "docs/rules/*.md",
+      "README.md", "docs/ci-recipe.md", "docs/configuration.md", "docs/known-limits.md", "docs/reporting.md", "docs/rules/*.md",
+      "docs/screen-checks.md",
     ]);
   });
 });
