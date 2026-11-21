@@ -13,7 +13,10 @@
  */
 
 import { strict as assert } from "node:assert";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -221,5 +224,56 @@ describe("the packaging manifest names only things that exist", () => {
 
   it("ROOT resolves to the repository, so the assertions above address the right tree", () => {
     assert.ok(existsSync(`${ROOT}package.json`), "the test is looking at the wrong directory");
+  });
+});
+
+/*
+ * What npm shows and ships. The description is the one positioning sentence the 0.11.1 plan fixes
+ * for package.json, GitHub, README line 1 and the website (Massnahmenplan 0.11.1 v02, guiding
+ * decision 7); the keywords make the Playwright and print-CSS uses findable in npm search. The
+ * package carries user documentation only: maintainer material (`maintainers/`, `planning/`)
+ * never ships.
+ */
+describe("the npm listing and the shipped file set", () => {
+  const listing = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as {
+    description: string;
+    keywords: string[];
+    files: string[];
+  };
+
+  it("the description is the positioning sentence, word for word", () => {
+    assert.equal(
+      listing.description,
+      "Find page-break and layout bugs in HTML-to-PDF output (Paged.js) and in your Playwright pages — measured on the rendered page, with source locations and CI-ready exit codes.",
+    );
+  });
+
+  it("the keywords name the print and the Playwright uses", () => {
+    const required = ["cli", "lint", "print-css", "playwright", "pdf-layout", "layout-testing", "css-paged-media", "github-action"];
+    assert.deepEqual(required.filter((keyword) => !listing.keywords.includes(keyword)), [], "package.json keywords lack these");
+    assert.equal(new Set(listing.keywords).size, listing.keywords.length, "a keyword is listed twice");
+  });
+
+  it("npm packs no maintainer material, whatever lands in maintainers/ or planning/", () => {
+    // The real `files` field and the real npm, over a stand-in tree that HAS the directories a
+    // later move creates: a check over today's tree alone could not see a pattern that would
+    // pick them up tomorrow.
+    const tree = mkdtempSync(join(tmpdir(), "breaklint-files-"));
+    try {
+      writeFileSync(join(tree, "package.json"), JSON.stringify({ name: "breaklint-files-probe", version: "0.0.0", files: listing.files }));
+      for (const path of ["maintainers/releasing.md", "planning/finish.md", "docs/rules/example.md", "docs/configuration.md", "dist/index.js", "README.md"]) {
+        mkdirSync(join(tree, path, ".."), { recursive: true });
+        writeFileSync(join(tree, path), "x\n");
+      }
+      const run = spawnSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], {
+        cwd: tree, encoding: "utf8", env: { ...process.env, npm_config_cache: join(tree, ".npm-cache"), npm_config_update_notifier: "false" },
+      });
+      assert.equal(run.status, 0, run.stderr);
+      const packed = (JSON.parse(run.stdout) as { files: { path: string }[] }[])[0]!.files.map((file) => file.path);
+      assert.ok(packed.includes("docs/rules/example.md") && packed.includes("dist/index.js"), `the probe packed too little to mean anything: ${packed.join(", ")}`);
+      assert.deepEqual(packed.filter((path) => /^(maintainers|planning)\//u.test(path)), [], "npm would ship maintainer material");
+    } finally {
+      rmSync(tree, { recursive: true, force: true });
+    }
   });
 });

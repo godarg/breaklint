@@ -1,7 +1,7 @@
 {
   "name": "breaklint",
   "version": "0.11.1",
-  "description": "Source-bound layout diagnostics for paginated HTML documents and existing Playwright pages.",
+  "description": "Find page-break and layout bugs in HTML-to-PDF output (Paged.js) and in your Playwright pages — measured on the rendered page, with source locations and CI-ready exit codes.",
   "keywords": [
     "pagedjs",
     "paged-media",
@@ -14,7 +14,15 @@
     "widows",
     "orphans",
     "linter",
-    "typography"
+    "typography",
+    "cli",
+    "lint",
+    "print-css",
+    "css-paged-media",
+    "pdf-layout",
+    "playwright",
+    "layout-testing",
+    "github-action"
   ],
   "license": "MIT",
   "author": "Gottlieb Dargel",
