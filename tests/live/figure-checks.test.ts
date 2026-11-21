@@ -195,6 +195,36 @@ it("counts mutations between apparatus install and the guarded preview call, inc
     assert.equal(renamed.tree?.ids["fig-renamed"], 1);
   } finally { await browser.close(); }
 });
+it("treats <foreignObject> HTML as part of its SVG in source index, runtime probe and snapshot (P9)", () => {
+  const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+  const runFo = (name: string, extraBody: string, script: string, expectedExit: number) => {
+    const dir = join(root, name); mkdirSync(dir);
+    symlinkSync(join(repo, "node_modules"), join(dir, "node_modules"));
+    writeFileSync(join(dir, "doc.html"), `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>foreignObject ${name}</title>
+<style>@page { size: 120mm 140mm; margin: 10mm; } body { font: 14px/1.5 serif; } figure { margin: 0; } .print-variant { display: none; }</style></head>
+<body><p>See <a href="#fo-fig">Figure 1</a>.</p>
+<figure id="fo-fig"><svg class="screen-variant" width="160" height="80" viewBox="0 0 160 80"><rect width="160" height="80" fill="#ddd"/>
+<foreignObject x="10" y="10" width="40" height="40"><img xmlns="http://www.w3.org/1999/xhtml" src="${png}" width="20" height="20" alt=""/></foreignObject></svg>
+<svg class="print-variant" width="160" height="80"><rect width="160" height="80" fill="#ccc"/></svg>${extraBody}
+<figcaption>Figure 1: SVG with embedded HTML</figcaption></figure>${script}</body></html>`);
+    const res = spawnSync(process.execPath, [
+      join(repo, "dist/cli/index.js"), "--only", "figure/caption-separated,figure/dangling-reference",
+      "--fail-on", "warn", "--format", "json", "--out", "report.json", "--out-dir", "evidence", "doc.html",
+    ], { cwd: dir, encoding: "utf8", timeout: 300_000 });
+    assert.equal(res.status, expectedExit, `${name}: ${res.stdout}${res.stderr}`);
+    return JSON.parse(readFileSync(join(dir, "report.json"), "utf8")) as Report;
+  };
+  // Without scripts: static source index and snapshot must agree that the img belongs to the SVG.
+  const plain = runFo("foreign-object-static", "", "", 0);
+  assert.equal(plain.documents[0]!.coverage["figure/caption-separated"]!.measured, 1, JSON.stringify(plain.documents[0]!.notMeasured));
+  assert.equal(plain.documents[0]!.coverage["figure/dangling-reference"]!.measured, 1);
+  // With an inert script: the runtime probe must agree as well.
+  const scripted = runFo("foreign-object-scripted", "", "<script>window.__fo = 1;</script>", 0);
+  assert.equal(scripted.documents[0]!.coverage["figure/caption-separated"]!.measured, 1, JSON.stringify(scripted.documents[0]!.notMeasured));
+  // Negative control: an img that is a real second body (outside the SVG) still declines.
+  const second = runFo("foreign-object-second-body", `<img src="${png}" width="20" height="20" alt="">`, "", 4);
+  assert.ok(second.documents[0]!.notMeasured.some(n => n.reason === "env/figure-body-unsupported"), JSON.stringify(second.documents[0]!.notMeasured));
+});
 it("measures responsive dual-SVG figures when one variant is display:none and fails closed otherwise", () => {
   const runInline = (name: string, html: string, expectedExit: number) => {
     const dir = join(root, name); mkdirSync(dir);

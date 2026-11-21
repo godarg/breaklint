@@ -1086,7 +1086,9 @@ export const SNAPSHOT_SOURCE = `(() => {
   }));
   const figureBodies = [];
   pagesEls.forEach((page, pageIndex) => P.all(page, "figure[data-bl-sid] img,figure[data-bl-sid] svg").forEach((el) => {
-    if (!inFlow(el) || P.closest(el, "figcaption") || (el.tagName.toLowerCase() === "svg" && P.closest(P.parent(el), "svg"))) return;
+    // Anything inside an SVG, including HTML in <foreignObject>, is part of that SVG body, never a
+    // body of its own: the same rule as the static source index and the runtime figure probe.
+    if (!inFlow(el) || P.closest(el, "figcaption") || P.closest(P.parent(el), "svg")) return;
     const owner = P.closest(el, "figure[data-bl-sid]");
     if (!owner) return;
     const tag = el.tagName.toLowerCase();
