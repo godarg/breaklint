@@ -83,7 +83,8 @@ Strict enables all 17 registered checks. Default enables 12; half-empty-page, bo
 table checks are off. Legacy snapshots lacking their source inventories explicitly decline.
 A missing target is not proved by an old ID inventory that lacks legacy named anchors. Table
 checks require exact source/runtime row/cell membership and content, visible existing headers,
-unit spans and supported flow; they do not invent headers or accept a wrapper as cell geometry.
+`rowSpan === 1` with uniform column-grid width (supporting simple regular `colspan` rows) and
+supported flow; they do not invent headers or accept a wrapper as cell geometry.
 
 Ten selected examples received actual human labels on 2026-10-07; see
 [`evaluation-0.10.md`](evaluation-0.10.md) for selection, results and limits.

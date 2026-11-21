@@ -9,12 +9,17 @@ a keep remedy would fit.
 Multiple or mixed bodies, split/repeated image bodies, missing/hidden geometry, clipping/masking/filter effects,
 multiple captions, unsupported flow and source mismatch decline. An inline SVG needs a nonzero
 paint primitive intersecting its viewport: a DOM paint-state witness, not an ink-mask proof.
-A convenient wrapper box cannot replace this evidence. Source scripts/base elements, no
-source-map mode and stored snapshots without an inventory decline inventory unavailable.
+A convenient wrapper box cannot replace this evidence. Non-executing data scripts
+(`application/json`, `application/ld+json`) do not mark a document script-bearing; documents with
+executable scripts or inline `on*` handlers unlock the figure inventory only when runtime-verified
+mutation-free with exact DOM element-count parity and static-to-runtime figure/ID/anchor/reference
+tree parity. Any DOM mutation, `<base>` element, authored `data-ref`/`data-next-break-before`,
+no source-map mode and stored snapshots without an inventory decline inventory unavailable.
 
 A table body can span several pages. Its source row/cell IDs, order, normalized content and
-unit spans must match all actual printed fragments; repeated existing header clones are allowed,
-while duplicated/split data rows and unknown membership decline. Each page's body box is the
+regular column spans (`rowSpan === 1` with uniform grid width) must match all actual printed
+fragments; repeated existing header clones are allowed,
+while duplicated/split data rows, `rowSpan > 1`, irregular spans and unknown membership decline. Each page's body box is the
 union of its positive visible cell boxes. Neither the table nor figure wrapper supplies the body
 measurement. Every visible table fragment needs such a witnessed box inside the page content
 area, with supported horizontal single-column flow.
@@ -24,8 +29,8 @@ caption after the table, distance is measured from the last body page; for a cap
 from the first. The table may span pages without being separated from its caption. Missing order
 in an older inventory, ambiguous body membership or unsupported table geometry declines.
 This body check does not require an existing header; the separate continuation-header checks do.
-Source-script figure inventory remains unavailable even when the table continuation checks can
-establish their own exact membership witness.
+An unverified or DOM-mutating script figure inventory remains unavailable even when the table
+continuation checks can establish their own exact membership witness.
 
 SVG identity uses a full normalized content hash and preserves meaningful text whitespace,
 authored style, drawing attributes and content. Normalization follows measured Paged.js 0.4.3

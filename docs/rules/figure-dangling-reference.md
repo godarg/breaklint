@@ -9,8 +9,11 @@ decline the containing source block.
 One candidate is evaluated per containing source block; a warning reports its distinct missing
 targets above `maxMissingTargets` (default 0). An old figure inventory without `namedAnchors`
 cannot prove a missing destination merely because its ID index lacks it; that block declines.
-Missing or incomplete inventory, source scripts/base elements and unsupported source addressing
-remain explicit nonmeasurements. An absent reference candidate is distinct from an unmeasured one.
+Missing or incomplete inventory, unverified/mutating scripts, `<base>` elements and unsupported
+source addressing remain explicit nonmeasurements. Non-executing data scripts (`application/json`,
+`application/ld+json`) do not mark a document script-bearing, and executable scripts / `on*`
+handlers unlock only when runtime-verified mutation-free with exact DOM element-count and
+figure-tree parity. An absent reference candidate is distinct from an unmeasured one.
 
 External links and unlinked textual numbers are outside scope. Location/page identify the
 containing block, not the exact inline link. The check does not validate printed numbering,
