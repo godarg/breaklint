@@ -219,6 +219,7 @@ function renderCoverageRow(row: HtmlCoverageRow): string {
   const ratio = row.ratio === "Not applicable"
     ? `<abbr title="Not applicable: no candidates">n/a</abbr>`
     : esc(row.ratio);
+  const resultLabel = !row.ok ? "Below floor" : row.candidates === 0 ? "No candidates" : "Coverage met";
   return `<tr id="${esc(row.id)}"${row.ok ? "" : ` class="short"`}>
     <th scope="row" class="rule">${ruleIdCode(row.ruleId)}</th>
     <td class="num">${row.candidates}</td>
@@ -226,7 +227,7 @@ function renderCoverageRow(row: HtmlCoverageRow): string {
     <td class="num">${row.notMeasured}</td>
     <td class="num">${ratio}</td>
     <td class="num">${esc(row.floor)}</td>
-    <td class="result"><span class="coverage-result${row.ok ? "" : " short"}">${row.ok ? "Coverage met" : "Below floor"}</span></td>
+    <td class="result"><span class="coverage-result${row.ok ? "" : " short"}">${resultLabel}</span></td>
   </tr>`;
 }
 
@@ -241,13 +242,16 @@ function renderCoverageRow(row: HtmlCoverageRow): string {
  * no flow-height cost. `break-before: avoid` on the last row would say the same thing directly, and
  * Blink does not honour avoid-between-siblings here (see `.apparatus-section` in html-styles.ts).
  */
-function renderCoverageTable(document: ReturnType<typeof buildHtmlReportModel>["coverage"][number]): string {
+function renderCoverageTable(document: ReturnType<typeof buildHtmlReportModel>["coverage"][number], runPartial: boolean): string {
   const rows = document.rows.map(renderCoverageRow);
   const body = rows.length < 3
     ? `<tbody>\n  ${rows.join("\n  ")}\n</tbody>`
     : `<tbody>\n  ${rows.slice(0, -2).join("\n  ")}\n</tbody>\n<tbody class="coverage-tail">\n  ${rows.slice(-2).join("\n  ")}\n</tbody>`;
+  const partialQualifier = runPartial || document.verdict === "infrastructure" || document.verdict === "insufficient-coverage"
+    ? " (partial run)"
+    : "";
   return `<table class="coverage-table" id="${esc(document.id)}">
-<caption><span class="caption-line"><span class="coverage-path mono">${pathText(document.path)}</span> <span class="document-verdict">Document verdict: ${esc(document.verdict)}</span></span></caption>
+<caption><span class="caption-line"><span class="coverage-path mono">${pathText(document.path)}</span> <span class="document-verdict">Document verdict: ${esc(document.verdict)}${partialQualifier}</span></span></caption>
 <thead>
   ${COVERAGE_COLUMNS}
 </thead>
@@ -261,7 +265,7 @@ function renderCoverage(model: ReturnType<typeof buildHtmlReportModel>): string 
     : `<div class="coverage-documents">
 ${model.coverage.map((document) => document.rows.length === 0
     ? `<div class="empty-state" id="${esc(document.id)}"><h3 class="mono">${pathText(document.path)}</h3><p>Document verdict: ${esc(document.verdict)}. No rule coverage rows were produced for this document.</p></div>`
-    : renderCoverageTable(document)).join("\n")}
+    : renderCoverageTable(document, model.status.partial)).join("\n")}
 </div>`;
   return `<section class="coverage-section" aria-labelledby="coverage-heading">
 <div class="section-heading">
@@ -299,14 +303,27 @@ function renderContents(model: ReturnType<typeof buildHtmlReportModel>, decision
 </nav>`;
 }
 
+function formatInlineRuleIds(text: string): string {
+  const parts: string[] = [];
+  let cursor = 0;
+  for (const match of text.matchAll(/\b[a-z0-9]+\/[a-z0-9-]+\b/gu)) {
+    const start = match.index ?? 0;
+    if (start > cursor) parts.push(esc(text.slice(cursor, start)));
+    parts.push(ruleIdCode(match[0]));
+    cursor = start + match[0].length;
+  }
+  if (cursor < text.length) parts.push(esc(text.slice(cursor)));
+  return parts.join("");
+}
+
 function renderNextChecks(decisions: ReportDecisions): string {
   if (decisions.nextChecks.length === 0) return "";
   return `<section class="next-checks" aria-labelledby="next-checks-heading">
 <h2 id="next-checks-heading">Next checks</h2>
 <p class="section-lead">Navigation only; these are not tested fixes. Measurement limits come before partial findings.</p>
 <ol class="next-check-list">
-${decisions.nextChecks.map((check) => `<li><p><strong>${check.findingIndex === null ? esc(check.title)
-    : `<a href="#finding-${check.findingIndex + 1}-title">${esc(check.title)}</a>`}</strong></p><p>${esc(check.detail)}</p></li>`).join("\n")}
+${decisions.nextChecks.map((check) => `<li><p><strong>${check.findingIndex === null ? formatInlineRuleIds(check.title)
+    : `<a href="#finding-${check.findingIndex + 1}-title">${formatInlineRuleIds(check.title)}</a>`}</strong></p><p>${esc(check.detail)}</p></li>`).join("\n")}
 </ol>
 </section>`;
 }
@@ -328,7 +345,7 @@ function renderDeclines(decisions: ReportDecisions): string {
 <h2 id="declines-heading">Declined candidates</h2>
 <p class="section-lead">Counted reasons remain visible even when coverage meets its floor. These are recorded reasons a measurement was not made, not layout findings.</p>
 <ul class="decline-list">
-${decisions.declines.map((decline) => `<li><span class="decline-count"><strong>Count ${decline.count}</strong></span> · ${pathText(decline.document)} · ${decline.ruleId === null ? "no rule" : ruleIdCode(decline.ruleId)} · ${esc(decline.scope)} · ${esc(decline.reason)}</li>`).join("\n")}
+${decisions.declines.map((decline) => `<li><span class="decline-count"><strong>Count ${decline.count}</strong></span> · ${pathText(decline.document)} · ${decline.ruleId === null ? "no rule" : ruleIdCode(decline.ruleId)} · ${esc(decline.scope)} · ${ruleIdCode(decline.reason)} · <span class="decline-base">${esc(decline.baseCategory)}</span></li>`).join("\n")}
 </ul>
 </section>`;
 }
@@ -369,14 +386,14 @@ ${renderContents(model, decisions)}
 </dl>
 <dl class="run-facts">
   <div><dt>${esc(LABELS.runVerdict)}</dt><dd>${esc(f.runVerdict)}</dd></div>
-  <div><dt>${esc(LABELS.gateTriggeredBy)}</dt><dd>${esc(f.gateTriggeredBy)}</dd></div>
+  <div><dt>${esc(LABELS.gateTriggeredBy)}</dt><dd>${model.status.partial && f.gateTriggeredBy === "none" ? "none (finding gate)" : esc(f.gateTriggeredBy)}</dd></div>
   <div><dt>${esc(LABELS.failOn)}</dt><dd>${esc(f.failOn)}</dd></div>
   <div><dt>${esc(LABELS.mode)}</dt><dd>${esc(f.mode)}</dd></div>
   <div><dt>${esc(LABELS.inputsFound)}</dt><dd>${f.inputsFound}</dd></div>
   <div><dt>${esc(LABELS.pagesAnalysed)}</dt><dd>${f.pagesAnalysed}</dd></div>
   <div><dt>${esc(LABELS.rulesRun)}</dt><dd>${f.rulesRun}</dd></div>
   <div><dt>${esc(LABELS.measuredRules)}</dt><dd>${f.measuredRules}</dd></div>
-  <div><dt>${esc(LABELS.notMeasuredTotal)}</dt><dd>${f.notMeasuredTotal}</dd></div>
+  <div><dt>${esc(LABELS.notMeasuredTotal)}</dt><dd>${f.notMeasuredTotal} ${f.notMeasuredTotal === 1 ? "decline" : "declines"}</dd></div>
   <div><dt>Finding gate candidate</dt><dd>${esc(report.summary.gateCandidate ?? "none")}</dd></div>
   <div><dt>Source</dt><dd>${esc(report.source)}</dd></div>
   <div><dt>Configuration</dt><dd class="mono">${esc(report.config.fingerprint)}</dd></div>

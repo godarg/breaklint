@@ -372,10 +372,17 @@ export interface SnapshotMeta {
 }
 
 /** Snapshot 6: authored relations and separately measured image bodies, never wrapper geometry. */
+export interface FigureBodyCandidate {
+  tag: "img" | "svg" | "table";
+  identity: string;
+  tableSid?: string;
+}
 export interface FigureBodyFragment {
   page: number;
   box: Box;
   visible: boolean;
+  /** True only when the element or an ancestor is `display: none` and produces zero layout rects. */
+  nonRendered?: boolean;
   identity: string;
 }
 export interface FigureIndex {
@@ -386,7 +393,9 @@ export interface FigureIndex {
   figures: {
     sid: string;
     captionSids: string[];
-    body: { tag: "img" | "svg" | "table"; identity: string; tableSid?: string } | null;
+    body: FigureBodyCandidate | null;
+    /** Optional authored body candidates when a figure contains multiple responsive variants. */
+    bodyCandidates?: FigureBodyCandidate[];
     /** Authored ordering, not an author-intent inference; required for table captions. */
     captionPosition?: "before" | "after" | null;
     bodyFragments: FigureBodyFragment[];
@@ -412,6 +421,8 @@ export interface TableFragment {
   page: number;
   box: Box;
   visible: boolean;
+  /** True only when the table or an ancestor is `display: none` and produces zero layout rects. */
+  nonRendered?: boolean;
   rows: { sid: string | null; cells: (TableCell & { box: Box; visible: boolean })[] }[];
 }
 export interface TableIndex {

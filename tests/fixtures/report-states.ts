@@ -62,8 +62,9 @@ function findingsBase(): Report {
     config: toReportConfig(resolved, { interventions: [], networkBlocked: 0 }),
   });
   if (report.findings[0]) {
+    // Matches findings[0].page (page 2) so synthetic fixture evidence stays page-consistent (G-150).
     report.findings[0].evidence = {
-      ref: "evidence/surface-demo-page-001.png",
+      ref: "evidence/surface-demo-page-002.png",
       bindsFinding: true,
     };
   }

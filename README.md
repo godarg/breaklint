@@ -58,20 +58,20 @@ at your own HTML and the same chain measures a real page.
 
 ## Install
 
-This documentation describes **version 0.10.0**. The npm command below installs the registry's
+This documentation describes **version 0.11.0**. The npm command below installs the registry's
 current `latest`; check the installed version with `npx breaklint --version`. Publication and
 verification records are in [status](docs/status.md), and the release procedure is in
 [releasing](docs/releasing.md). The [bounded human example evaluation](docs/evaluation-0.10.md)
-records what the selected real examples establish and what remains unknown.
+records what the selected 0.10.0 real examples establish and what remains unknown.
 
-Publication checkpoint, **2026-10-08**: `breaklint@0.10.0` and `latest` were read back from
+Historical publication checkpoint, **2026-10-08**: `breaklint@0.10.0` was read back from
 npm after the successful [release workflow](https://github.com/godarg/breaklint/actions/runs/37730851901).
 Clean registry consumers on Node 22.13.0 and 24.21.0 matched the released package bytes.
 Four frozen real-product readbacks retained all 215 original page PNGs; one still exited 4
 for insufficient measurement and three exited 1 with findings. See the dated
 [publication and limitations checkpoint](docs/status.md#release-v0100-published-2026-10-08)
 for package identity, review scope and the separately measured Action, website and local
-consumer integration outcomes.
+consumer integration outcomes. Publication of 0.11.0 is pending candidate review and tagging.
 
 ```bash
 npm i -D breaklint
@@ -82,10 +82,14 @@ needs a browser and the paginator; see [Requirements](#requirements).
 
 ## Source-bound findings and existing web pages
 
-The installed package now exposes `checkProducedDocuments`, `checkPage`, `compareReports`,
-`createContextPack`, `renderReport` and `writeReportBundle`. Live document reports use Report 5, and
-the report readers accept Report 4 and 5; the screen profile has a separate contract and checks
-visible geometry without pagination.
+The installed package exposes `checkProducedDocuments`, `checkPage`, `compareReports`,
+`createContextPack`, `renderReport` and `writeReportBundle`, plus the CLI subcommands
+`breaklint compare`, `breaklint context` and `breaklint bundle`. Live document reports use Report 5,
+and the report readers accept Report 4 and 5; the screen profile emits Screen 2 (readers accept
+Screen 1 and 2) and checks visible geometry without pagination, including CSS Color 4 alpha parsing,
+stabilization drift reporting, full-page coverage, framework-agnostic build output receipts, and
+`web/sibling-overlap`, `web/svg-text-overflows-viewport`, plus opt-in `web/small-text` and
+`web/small-touch-target`.
 
 ```js
 import { checkPage, writeReportBundle } from 'breaklint';
@@ -130,7 +134,7 @@ previous version to compare to.
 
 ## What is checked
 
-Seventeen rules are registered in 0.10.0. Twelve run by default: two can fail a build;
+Seventeen print rules are registered in 0.11.0. Twelve run by default: two can fail a build;
 ten more are advisory unless you request `--fail-on warn`. Five are off by default: the two
 figure checks, the two table continuation checks and experimental `layout/half-empty-page`.
 Strict mode enables all seventeen. Half-empty-page never gates, even with `--fail-on warn`.
@@ -275,6 +279,9 @@ breaklint --only layout/table-header-not-repeated,layout/table-column-drift --fa
   --format json --out table-report.json manual.html
 breaklint --disable layout/hyphen-across-page report.html
 breaklint --out-dir build/evidence book.html   # where the page PNGs and the checked PDF go
+breaklint compare before.json after.json --out comparison.json
+breaklint context report.json --max-findings 40 --out context.json
+breaklint bundle report.json --out-dir ./bundle --evidence-dir ./breaklint-report
 ```
 
 A live run writes its evidence — one PNG per page and the PDF it checked — into
@@ -330,18 +337,18 @@ cell for decoded pixels, contrast, accessibility and fragmentation. A human revi
 a passing round by a rostered reviewer in the review ledger, bound to the current inputs; see its
 latest round and [`docs/releasing.md`](docs/releasing.md).
 <!-- review-state -->
-For 0.10.0 the current record is round 8: four fresh Claude Opus reviews, actual model
+For 0.11.0 the current record is round 9: four fresh Claude Opus reviews, actual model
 `claude-opus-5-5`, passed all 32 cells under the Founder's release-specific AI delegation
-of 2026-10-07. Native receipts bind 263 image reads: 24 full screens, 212 desktop/tablet/mobile
-tiles and 27 A4 page rasters. The four PDF cells were judged through all matching rasters.
-Round 7 remains recorded as FAIL: contradictory handwritten fixture counts and missing desktop
-tiles were corrected with actual red/green tests and independently measured physical inventory.
-This is delegated AI sight evidence. Four medium and 27 low findings have explicit accepted-risk
-or follow-up dispositions; unitless secondary stats, decline-base labels, finding-gate wording,
-synthetic evidence context, identifier wrapping and paper navigation remain presentation limits.
-Fine-text judgment rests on native viewport tiles and A4 rasters. The local sight review does not
-establish human or Ubuntu visual review. Independent Mac and Linux technical inventories agree
-on 212 tiles and 3/8/8/8 printed pages. JSON remains canonical.
+of 2026-11-21. Native receipts bind 265 image reads: 24 full screens, 214 desktop/tablet/mobile
+tiles and 27 A4 page rasters (3/8/8/8 pages). The four PDF cells were judged through all matching
+rasters. Rounds 1–8 and their receipts remain preserved unchanged in the ledger.
+This is delegated AI sight evidence, not a human surface pass. Six medium and 21 low advisory
+findings have explicit non-blocking layout/wrapping dispositions (mobile stacked coverage-table
+header, A4 keep-together card page balance, long identifier/hash wrapping, desktop remediation
+measure width, and repeated print tail labels); zero blocker or high findings were reported.
+Fine-text judgment rests on native viewport tiles and A4 rasters. The local macOS arm64 Node 24
+sight review does not establish human or Ubuntu visual review; Linux CI technical verification
+separately confirms 212 viewport tiles and 3/8/8/8 printed pages. JSON remains canonical.
 The information contract and the reproducible 32-cell screen/print review are documented in
 [`docs/reporting.md`](docs/reporting.md).
 
@@ -349,7 +356,7 @@ The information contract and the reproducible 32-cell screen/print review are do
 
 Node 22.13 or newer, on macOS or Linux. The floor is exact because `pdfjs-dist@6.2.108` requires
 Node 22.13 or Node 24, and the release gate installs the packed package on both Node 22.13 and 24.
-A live run additionally needs a Chromium-based browser, `puppeteer-core` at `>=25.8.0 <26` (the
+A live run additionally needs a Chromium-based browser, `puppeteer-core` at `>=25.16.0 <26` (the
 declared peer range) and `pagedjs@0.4.3`. `pdfjs-dist` is what rasterises the produced PDF to bind evidence to findings; a
 run without it still measures and still reports, but the findings carry no evidence and the report
 says so rather than pretending otherwise. Poppler's `pdftoppm` is **not** used by the tool at all: the live test suite uses
@@ -357,7 +364,7 @@ it as an independent rasteriser, so that Chrome is not both the producer and the
 every PDF. It is never shipped and never called at check time.
 
 ```bash
-npm i -D puppeteer-core@^25.8.0 pagedjs@0.4.3 pdfjs-dist@6.2.108
+npm i -D puppeteer-core@^25.16.0 pagedjs@0.4.3 pdfjs-dist@6.2.108
 ```
 
 ## Running foreign HTML

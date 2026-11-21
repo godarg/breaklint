@@ -6,6 +6,17 @@
 import type { RunVerdict, Severity } from "../core/enums.ts";
 import type { Box, StableTargetIdentity } from "../core/types.ts";
 
+export const SCREEN_REPORT_SCHEMA_VERSION = 2 as const;
+export const READABLE_SCREEN_REPORT_SCHEMA_VERSIONS: readonly number[] = Object.freeze([1, 2]);
+
+export type ScreenRuleId =
+  | "web/unexpected-horizontal-overflow"
+  | "web/content-clipped"
+  | "web/sibling-overlap"
+  | "web/svg-text-overflows-viewport"
+  | "web/small-text"
+  | "web/small-touch-target";
+
 export interface StructuralPage {
   /** Matches Playwright's callable evaluate surface without naming its optional package types. */
   evaluate<R>(fn: (...args: any[]) => R | Promise<R>, ...args: any[]): Promise<R>;
@@ -15,7 +26,17 @@ export interface StructuralPage {
   context(): { browser(): { version(): string } | null };
 }
 
-export interface NamedScreenException { selector: string; reason: string; }
+export interface NamedScreenException {
+  selector: string;
+  reason: string;
+  /** "scenario" (default) emits screen-exception-unused when unmatched; "suite" suppresses unused-noise while retaining count. */
+  scope?: "scenario" | "suite";
+}
+
+export interface ScreenOptInRules {
+  smallText?: boolean | { minFontSizePx?: number };
+  smallTouchTarget?: boolean | { minSizePx?: number };
+}
 
 export interface HostBuildContainer { selector: string; file: string; }
 
@@ -44,6 +65,7 @@ export interface CheckPageOptions {
     intentionalOverlays?: readonly NamedScreenException[];
     maxTargets?: number;
     stabilizationTimeoutMs?: number;
+    rules?: ScreenOptInRules;
   };
   sourceBinding?: HostBuildContainerBinding;
 }
@@ -53,7 +75,7 @@ export interface ScreenTargetRef {
   domPath: string;
   tag: string;
   box: Box | null;
-  coordinateSystem: "css-viewport-pixels";
+  coordinateSystem: "css-viewport-pixels" | "css-document-pixels";
   scroll: { x: number; y: number };
 }
 
@@ -61,13 +83,14 @@ export interface ScreenMeasurement {
   name: string;
   value: number | boolean | string | null;
   unit: "css-px" | "count" | null;
-  operator: ">" | "=" | null;
+  operator: ">" | "<" | "=" | null;
   threshold: number | boolean | string | null;
+  calibrated?: false;
 }
 
 export interface ScreenTargetEvaluation {
   id: string;
-  ruleId: "web/unexpected-horizontal-overflow" | "web/content-clipped";
+  ruleId: ScreenRuleId;
   target: ScreenTargetRef;
   status: "measured" | "excluded" | "not-measured";
   reason: string | null;
@@ -84,7 +107,7 @@ export interface ScreenTargetEvaluation {
 
 export interface ScreenFinding {
   id: string;
-  ruleId: ScreenTargetEvaluation["ruleId"];
+  ruleId: ScreenRuleId;
   severity: Severity;
   target: ScreenTargetRef;
   measurement: ScreenMeasurement;
@@ -95,6 +118,14 @@ export interface ScreenFinding {
 
 export interface ScreenInfrastructureEvent { kind: string; detail: string; fatal: boolean; }
 
+export interface ScreenDriftDetail {
+  phase: "pre-screenshot" | "post-screenshot";
+  field: string;
+  selector: string | null;
+  before: string | number | null;
+  after: string | number | null;
+}
+
 export interface ScreenArtifact {
   kind: "png";
   relativePath: string | null;
@@ -103,7 +134,7 @@ export interface ScreenArtifact {
   widthPx: number | null;
   heightPx: number | null;
   capture: "viewport" | "full-page";
-  coordinateSystem: "css-viewport-pixels-with-scroll";
+  coordinateSystem: "css-viewport-pixels-with-scroll" | "css-document-pixels";
 }
 
 export interface ScreenCoverage {
@@ -111,12 +142,12 @@ export interface ScreenCoverage {
   measured: number;
   excluded: number;
   notMeasured: number;
-  allowedScrollContainers: { selector: string; reason: string; count: number }[];
-  intentionalOverlays: { selector: string; reason: string; count: number }[];
+  allowedScrollContainers: { selector: string; reason: string; scope: "scenario" | "suite"; count: number }[];
+  intentionalOverlays: { selector: string; reason: string; scope: "scenario" | "suite"; count: number }[];
 }
 
 export interface PublicScreenReport {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   profileKind: "screen";
   runId: string;
   runVerdict: RunVerdict;
@@ -131,6 +162,7 @@ export interface PublicScreenReport {
   };
   trust: "host-controlled-page";
   networkPolicy: "host-owned";
+  rulesEnabled?: ScreenRuleId[];
   targetInventory: { complete: boolean; omittedCount: number; reason: string | null };
   coverage: ScreenCoverage;
   capture: {
@@ -140,6 +172,9 @@ export interface PublicScreenReport {
     fontsReady: boolean;
     timedOut: boolean;
     drifted: boolean;
+    stabilized?: boolean;
+    stabilizationAttempts?: number;
+    driftDetails?: ScreenDriftDetail[];
   };
   artifact: ScreenArtifact;
   evaluations: ScreenTargetEvaluation[];

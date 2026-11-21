@@ -157,11 +157,11 @@ export function describeAdvisories(report) {
 
 export function manifestIssues(manifest) {
   const issues = [];
-  if (!/^\^25\.8\./u.test(manifest.devDependencies?.["puppeteer-core"] ?? "")) {
-    issues.push(`devDependencies puppeteer-core is ${JSON.stringify(manifest.devDependencies?.["puppeteer-core"])}, the contract pins ^25.8.x`);
+  if (!/^\^25\.16\./u.test(manifest.devDependencies?.["puppeteer-core"] ?? "")) {
+    issues.push(`devDependencies puppeteer-core is ${JSON.stringify(manifest.devDependencies?.["puppeteer-core"])}, the contract pins ^25.16.x`);
   }
-  if (manifest.peerDependencies?.["puppeteer-core"] !== ">=25.8.0 <26") {
-    issues.push(`peerDependencies puppeteer-core is ${JSON.stringify(manifest.peerDependencies?.["puppeteer-core"])}, the contract pins ">=25.8.0 <26"`);
+  if (manifest.peerDependencies?.["puppeteer-core"] !== ">=25.16.0 <26") {
+    issues.push(`peerDependencies puppeteer-core is ${JSON.stringify(manifest.peerDependencies?.["puppeteer-core"])}, the contract pins ">=25.16.0 <26"`);
   }
   if (manifest.engines?.node !== ">=22.13.0") {
     issues.push(`engines.node is ${JSON.stringify(manifest.engines?.node)}, the contract pins ">=22.13.0"`);

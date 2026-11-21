@@ -224,11 +224,19 @@ const OVERLAY_TEMPLATE = `(() => {
           // browser was shown to move them. The bound refuses them rather than depend on that.
           const relativeY = y - areaBox.y;
           const maxAdvance = token.length * 1.2 + 2;
-          // A continuation container can end exactly at the area boundary. That observed edge
-          // lies inside the physical page box; its mark is checked against the actual PDF later.
-          // Never extend this exception to the footnote area, where a clipped note is G-100.
-          const observedAreaEdge = side === "end" && rect.bottom === areaBox.bottom &&
-            P.closest(el, ".pagedjs_footnote_area") === null && y + 1 <= pageBox.bottom;
+          // An edge strictly inside the content area (relativeY <= areaBox.height) still trips
+          // relativeY + 1 > areaBox.height in the final 1 px above areaBox.bottom because the mark
+          // glyph is 1 px tall. That 1 px envelope stays inside the physical sheet whenever
+          // y + 1 <= pageBox.bottom, and is still checked against the actual PDF later.
+          // A continuation container's end edge or a zero-height split wrapper may also sit within
+          // 0.5 px sub-pixel rounding of areaBox.bottom. Never extend either allowance to the
+          // footnote area (G-100); genuine overflow below areaBox.bottom + 0.5 stays refused.
+          const notInFootnote = P.closest(el, ".pagedjs_footnote_area") === null;
+          const atAreaBottom = Math.abs(y - areaBox.bottom) <= 0.5;
+          const observedAreaEdge = notInFootnote && y + 1 <= pageBox.bottom && (
+            y <= areaBox.bottom ||
+            (atAreaBottom && (side === "end" || (side === "start" && rect.height === 0)))
+          );
           if (
             x < pageBox.left || x + maxAdvance > pageBox.right || y < pageBox.top || y > pageBox.bottom ||
             relativeY < 0 || (relativeY + 1 > areaBox.height && !observedAreaEdge)

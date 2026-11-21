@@ -197,6 +197,7 @@ export const REPORT_HTML_STYLES = String.raw`
     html, body { background: var(--bl-color-bg-primary); }
     .report-shell { width: 100%; padding: 0; }
     .skip-link, .report-contents { display: none; }
+    .finding-navigation { display: none; }
     .report-header { min-height: 0; padding: var(--bl-space-4); }
     .tool-line { margin-block-end: var(--bl-space-5); }
     section { margin-block-start: var(--bl-space-6); }

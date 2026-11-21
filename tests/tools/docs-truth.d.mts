@@ -4,6 +4,8 @@ export interface Stamps {
   readable: number[];
   snapshot: number;
   readableSnapshots: number[];
+  screen: number;
+  readableScreens: number[];
   context: number;
   comparison: number;
   config: number;

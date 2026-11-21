@@ -668,7 +668,7 @@ describe("installing breaklint", () => {
     assert.equal(run.npmRecords.length, 1);
     assert.deepEqual(run.npmRecords[0]!.args, [
       "install", "--no-audit", "--no-fund", "--ignore-scripts", "--no-package-lock", "--loglevel=error",
-      `breaklint@${PACKAGE.version}`, "puppeteer-core@25.8.0", "pagedjs@0.4.3", "pdfjs-dist@6.2.108",
+      `breaklint@${PACKAGE.version}`, "puppeteer-core@25.16.0", "pagedjs@0.4.3", "pdfjs-dist@6.2.108",
     ]);
     const installDir = run.npmRecords[0]!.cwd;
     assert.ok(installDir.startsWith(join(run.runnerTemp, "breaklint-action")), "installed outside RUNNER_TEMP");

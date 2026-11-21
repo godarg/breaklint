@@ -4,7 +4,7 @@
  * untrusted and the only recheck operations are this finite enum.
  */
 import type { Finding, Report, StableTargetIdentity } from "../core/types.ts";
-import type { PublicScreenReport, ScreenFinding } from "../web/types.ts";
+import { READABLE_SCREEN_REPORT_SCHEMA_VERSIONS, type PublicScreenReport, type ScreenFinding } from "../web/types.ts";
 import type { ReportComparison } from "./compare.ts";
 import { READABLE_REPORT_SCHEMA_VERSIONS } from "../core/enums.ts";
 
@@ -283,13 +283,13 @@ export function createContextPack(report: unknown, options: CreateContextPackOpt
   const requestedText = options.maxTextPerField ?? 400;
   const maxText = Number.isInteger(requestedText) ? Math.min(MAX_TEXT, Math.max(80, requestedText)) : 400;
   if (options.comparison && options.comparison.afterRunId !== runId) throw new Error("comparison does not refer to this current report");
-  if (schemaVersion === 1 && profileKind === "screen" && Array.isArray(raw?.findings) && Array.isArray(raw?.evaluations) && asRecord(raw?.scope)) {
+  if (READABLE_SCREEN_REPORT_SCHEMA_VERSIONS.includes(schemaVersion as number) && profileKind === "screen" && Array.isArray(raw?.findings) && Array.isArray(raw?.evaluations) && asRecord(raw?.scope)) {
     const typed = report as PublicScreenReport;
     const sorted = [...typed.findings].sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || a.id.localeCompare(b.id));
     // Targets the inventory itself dropped are omitted too; leaving them out of the count is the
     // silence this projection exists to prevent.
     const omittedCount = Math.max(0, sorted.length - maxFindings) + typed.targetInventory.omittedCount;
-    const complete = omittedCount === 0 && typed.targetInventory.complete && typed.coverage.notMeasured === 0 && typed.runVerdict !== "infrastructure";
+    const complete = omittedCount === 0 && typed.targetInventory.complete && typed.coverage.notMeasured === 0 && typed.runVerdict !== "infrastructure" && typed.runVerdict !== "insufficient-coverage";
     const screenNotMeasured = new Map<string, { ruleId: string; reason: string; declinedCount: number; candidateCount: number | null; floor: number | null }>();
     for (const entry of typed.evaluations) {
       if (entry.status !== "not-measured") continue;

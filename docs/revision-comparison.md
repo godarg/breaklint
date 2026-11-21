@@ -83,10 +83,10 @@ The development HTTP-font fixture exposed font requests that did not settle afte
 preview on the measured browser/driver. Such an acquisition remains an infrastructure failure;
 the tracker is not forced quiet. The positive repair fixture uses the captured inline font path.
 A captured non-font dependency may change during a verified repair when its
-old and new hashes are inventory-bound. Changed font bytes, blocked/failed requests (including
-an implicit favicon request), incomplete resources and unknown identity prevent resolution.
-Use an explicit supported favicon declaration when an otherwise self-contained fixture must
-avoid the browser's implicit blocked favicon request.
+old and new hashes are inventory-bound. Changed font bytes, blocked/failed requests, incomplete
+resources and unknown identity prevent resolution. Unreferenced browser-default `/favicon.ico`
+fetches (`resourceType: "other"`, absent from HTML/CSS) receive `204 No Content`, while explicitly
+referenced `/favicon.ico` assets remain strictly verified against the captured inventory.
 
 The two explicit applicability transitions currently admitted are a still-visible block with
 measured `break-inside: avoid` becoming false, and still-rendered SVG text under measured

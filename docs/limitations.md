@@ -379,7 +379,7 @@ number. The failing registry check is the reminder that the order matters.
 
 The expanded robustness review is **partial**. Real Digital Product Studio inputs and independent third-party template groups were exercised, but not all admitted candidates paginated successfully. Some W3C/Alice candidates stop with DOM/PDF divergence, pagination residue or source-order mismatch. These are nonmeasurement results. Version 0.5.0 does not claim a complete broad-template robustness pass or increase calibration/trust status.
 
-The screen profile measures the **currently visible viewport rectangle**, including when a full-page screenshot is requested. Below-fold nodes are explicitly excluded; the host must open and check additional scroll states. Authored scroll containers and intentional overlays use named exceptions. Source binding is a verified host-build container when supported, not a JSX line-level source map. Screen reports have no automatic `resolved` repair-comparison path.
+The 0.5.0 screen profile measured only the **currently visible viewport rectangle**, including when a full-page screenshot was requested (in 0.11.0, `output.screenshot: "full-page"` measures full-document targets in `css-document-pixels`, while `"viewport"` retains viewport-only scope). Authored scroll containers and intentional overlays use named exceptions. Source binding is a verified host-build container when supported, not a JSX line-level source map. Screen reports have no automatic `resolved` repair-comparison path.
 
 Document repair comparison is limited to preserved, unambiguous author anchors, a compatible complete document set, verified local Git continuity and captured actual font identity. Page-only findings remain unmatchable; system/fallback font identity and reduced or absent measurements prevent a repair claim. CSS resources must be captured as dependency/asset inputs; the host's authoring documents are not a resource allowlist.
 
@@ -751,7 +751,7 @@ legacy `<a name>` targets are used only when no ID has that name. Duplicate targ
 fragment encoding decline. A stored figure inventory lacking named anchors cannot prove that
 a target absent from IDs is missing; that block declines. One candidate/finding aggregates a
 containing source block. Printed numbering, exact inline link placement, external links and target
-visibility remain outside scope. Script-bearing/base-URI figure source still declines. Missing
+visibility remain outside scope. Non-executing data scripts (`application/ld+json`, `application/json`) do not mark a document script-bearing; documents with executable scripts or inline `on*` handlers unlock figure checks only when runtime-verified mutation-free with exact DOM element-count parity and static-to-runtime figure/ID/anchor/reference-link tree parity. Any DOM mutation, `<base>`, or authored `data-ref` / `data-next-break-before` remains strictly fail-closed. Missing
 legacy inventories remain nonmeasurements. Source/delivery claims keep their existing requirements.
 
 SVG body identity uses a full normalized content hash. Only observed paginator/parser metadata,
@@ -764,10 +764,12 @@ cannot substitute for a painted body.
 ## Bounded table continuation checks
 
 The two table checks are warnings, default-off and uncalibrated. They require a visible existing
-header, exact row/cell membership and order, unchanged content, unit spans and measured cells.
+header, exact row/cell membership and order, unchanged content, `rowSpan === 1` with uniform total
+column width per row (supporting simple regular `colspan` group/separator rows and grouped headers),
+and measured cells.
 Source-script presence alone does not prevent this bounded measurement, but an unknown runtime
 table, a missing source row or changed content does. Missing inventory, headerless tables, split
-data rows, spanning cells, multicolumn/vertical flow and unusable geometry decline. An authored
+data rows, `rowSpan > 1` or irregular `colspan` totals, multicolumn/vertical flow and unusable geometry decline. An authored
 `thead` or an initial contiguous all-`th` row run supplies the header; a data row never does.
 Snapshot 7 represents positive integer spans. Valid `rowspan="0"` row-group growth and raw
 attributes outside that representation withhold the optional table inventory; enabled table

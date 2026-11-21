@@ -7,7 +7,7 @@ Action at the root of this repository (`action.yml`) and gives a workflow you ca
 What the Action does, in one run:
 
 1. installs breaklint at the version its own ref pins, with the renderer peers
-   `puppeteer-core@25.8.0`, `pagedjs@0.4.3` and `pdfjs-dist@6.2.108`, into the runner's temporary
+   `puppeteer-core@25.16.0`, `pagedjs@0.4.3` and `pdfjs-dist@6.2.108`, into the runner's temporary
    directory — or uses your project's own install;
 2. hands breaklint the runner's Chrome without a sandbox-disabling switch; breaklint refuses two known Puppeteer overrides and strips `CHROME_EXTRA_FLAGS`, while other wrapper variables are not proven safe;
 3. runs breaklint once over the HTML paths you give it, and writes the canonical JSON report;
@@ -254,7 +254,7 @@ breaklint and the peers to your `devDependencies`, commit the lockfile, run `npm
 Action, and set `use-project-install: true`:
 
 ```bash
-npm i -D breaklint puppeteer-core@25.8.0 pagedjs@0.4.3 pdfjs-dist@6.2.108
+npm i -D breaklint puppeteer-core@25.16.0 pagedjs@0.4.3 pdfjs-dist@6.2.108
 ```
 
 breaklint looks for its peers from the working directory first. When the Action installs its own

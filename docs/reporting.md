@@ -235,9 +235,11 @@ machine-readable record is required.
 
 ## Public bounded review bundle
 
-The installed package also exposes three report-only helpers. They accept a canonical document
+The installed package also exposes three report-only helpers and matching CLI subcommands
+(`breaklint context`, `breaklint bundle`, and `breaklint compare`). They accept a canonical document
 report — readers accept Report 4 and 5 — and the renderer also accepts the distinct screen-report
-profile; they do not acquire documents, run a browser, or turn report strings into commands.
+profile (Screen 2; readers accept Screen 1 and 2); they do not acquire documents, run a browser, or
+turn report strings into commands.
 
 ```ts
 import { createContextPack, renderReport, writeReportBundle } from "breaklint";
@@ -269,7 +271,8 @@ the report's integrity record. A failed check produces an explicit unavailable-e
 it does not retain a stale image or link. Page-relative target crops use that same verified full
 page image and retain the declared `css-page-top-left` coordinate system. Legacy Report 3 input is
 shown as legacy: it receives neither a new original-source assertion nor a repair claim.
-Screen reports retain their separate route, viewport, target and CSS-viewport coordinate semantics;
+Screen reports retain their separate route, viewport, target and CSS coordinate semantics
+(`css-viewport-pixels` for viewport captures or `css-document-pixels` for full-page captures);
 they never acquire document page or PDF claims in this view.
 
 Each document card names the original-source status and role, exact verified range when available
@@ -725,15 +728,15 @@ the per-page records to agree with the summary.
 The portable bundle keeps `report.json` as the historical capture record. `context.json` adds `bundleEvidence` contract version 1 with current per-finding asset availability; `bundle.json` lists every copied PNG/PDF and its SHA-256 and byte length. A missing or tampered local asset remains `missing-or-integrity-failed` in both HTML and AI context. A historical report comparison is not a fresh verification of local bundle assets. Overflow crops show the visible intersection while preserving the original target coordinates.
 
 <!-- review-state -->
-For 0.9.0 the current record is round 6: four fresh Claude Opus reviews (actual model
-`claude-opus-5-5`) passed all 32 cells on the source after the platform inventory correction,
-under the Founder's release-specific AI delegation of 2026-10-04 and targeted-completion
-instruction of 2026-10-07. Native receipts bind 222 image reads (24 full screens, 168 viewport
-tiles and 30 A4 page rasters); the four PDF cells were judged through every matching raster.
-This is AI sight review, not human review. One medium and eighteen low findings have explicit
-accepted-risk or follow-up dispositions: split-card frames, identifier wrapping, print disclosure,
-ratio wording and short-list continuations remain documented presentation costs. Full desktop
-captures were downscaled; fine-text judgement rests on tablet/mobile tiles and A4 evidence.
-This local sight review does not establish Ubuntu visual review. The separate Linux technical
-diagnostic measured LiberationSerif, LiberationSans and DejaVuSansMono resolution and 3/8/9/9
-A4 pages versus macOS 3/9/9/9. JSON remains canonical.
+For 0.11.0 the current record is round 9: four fresh Claude Opus reviews (actual model
+`claude-opus-5-5`) passed all 32 cells under the Founder's release-specific AI delegation of
+2026-11-21. Native receipts bind 265 image reads (24 full screens, 214 desktop/tablet/mobile
+viewport tiles and 27 A4 page rasters across 3/8/8/8 pages); the four PDF cells were judged
+through every matching raster. Rounds 1–8 remain preserved unchanged.
+This is delegated AI sight review, not human review. Six medium and 21 low advisory findings
+have explicit non-blocking dispositions (mobile two-row coverage header, A4 keep-together card
+page balance, long identifier/hash wrapping, desktop remediation measure width, and print tail
+labels); zero blocker or high findings were reported. Fine-text judgement rests on native
+viewport tiles and A4 rasters. This local macOS arm64 Node 24 sight review does not establish
+human or Ubuntu visual review; Linux CI technical verification separately confirms 212 viewport
+tiles and 3/8/8/8 A4 pages versus macOS 214 tiles and 3/8/8/8 pages. JSON remains canonical.

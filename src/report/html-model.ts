@@ -170,7 +170,7 @@ export function safeEvidenceHref(ref: string | null): string | null {
     .join("/");
 }
 
-function findingModel(finding: Finding, index: number): HtmlFinding {
+function findingModel(finding: Finding, index: number, allFindings: readonly Finding[]): HtmlFinding {
   const href = safeEvidenceHref(finding.evidence.ref);
   const state = finding.evidence.ref === null ? "none" : finding.evidence.bindsFinding ? "bound" : "unbound";
   const labels = {
@@ -184,6 +184,15 @@ function findingModel(finding: Finding, index: number): HtmlFinding {
   const frequencyNote = finding.ruleId === "layout/half-empty-page"
     ? "High-frequency heuristic: this rule fires on most documents because line leading and block margins are not included in net fill."
     : null;
+  let ambiguity: string | null = null;
+  if (finding.ambiguity) {
+    const partners = allFindings
+      .map((other, otherIndex) => (otherIndex !== index && other.fingerprint === finding.fingerprint ? otherIndex : -1))
+      .filter((otherIndex) => otherIndex >= 0);
+    ambiguity = partners.length > 0
+      ? `${finding.ambiguity.groupSize} findings share this unresolved fingerprint (with ${partners.map((p) => `Finding ${String(p + 1).padStart(2, "0")}`).join(", ")}).`
+      : `${finding.ambiguity.groupSize} findings share this unresolved fingerprint (partner in JSON).`;
+  }
   return {
     id: `finding-${index + 1}`,
     severity: finding.severity,
@@ -199,9 +208,7 @@ function findingModel(finding: Finding, index: number): HtmlFinding {
     proofSource: finding.measurement.proofSource,
     message: finding.message,
     evidence: { state, label: labels[state], ref: finding.evidence.ref, href },
-    ambiguity: finding.ambiguity
-      ? `${finding.ambiguity.groupSize} findings share this unresolved fingerprint.`
-      : null,
+    ambiguity,
     remediation,
     remediationTested,
     frequencyNote,

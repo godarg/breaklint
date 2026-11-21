@@ -89,6 +89,7 @@ import { assignPageCauses } from "../paginate/breaks.ts";
 import { produceEvidence, type EvidenceOutcome } from "../render/evidence.ts";
 import { openRasterizer, type OpenRasterizerResult } from "../render/rasterizer.ts";
 import { collisionDetail, detectCollision, type CollisionSource } from "../source/collision.ts";
+import { figureBodyIdentity, figureIndexTreeFingerprint } from "../source/figure-index.ts";
 import { injectSourceIds } from "../source/inject.ts";
 import { captureBoundedSourceFile, decodeUtf8Strict, StrictUtf8Error } from "../source/bytes.ts";
 import { closeRendererOwnedResourcesBounded } from "./renderer-cleanup.ts";
@@ -828,6 +829,7 @@ export async function configureNetwork(
   options: RenderOptions,
   blocked: { count: number },
   omittedDeploymentRoutes: ReadonlySet<string> = new Set(),
+  explicitlyReferencedRoutes: ReadonlySet<string> = new Set(),
 ): Promise<NetworkTracker> {
   const allowed = normalisedAllowedOrigins(options);
   const tracker: NetworkTracker = {
@@ -924,14 +926,25 @@ export async function configureNetwork(
       const request = payload as RequestLike;
       if (tracker.afterRendered) tracker.activityAfterRendered += 1;
       let permit = false;
+      let respondEmptyFavicon = false;
       try {
         const url = new URL(request.url());
+        const resourceType = (request as RequestLike & { resourceType?: () => string }).resourceType?.() ?? "unknown";
         if (url.origin === localOrigin) {
-          const roles = tracker.localRequestRoles.get(url.pathname) ?? new Set<string>();
-          // Puppeteer's resource type records the request role independently of its filename.
-          // Unknown drivers decline the ambient exemption instead of silently accepting a failure.
-          roles.add((request as RequestLike & { resourceType?: () => string }).resourceType?.() ?? "unknown");
-          tracker.localRequestRoles.set(url.pathname, roles);
+          // Unreferenced browser-default /favicon.ico fetches (resourceType "other", never
+          // stylesheet/script/image/fetch and never named in HTML/CSS) receive 204 No Content
+          // rather than failing as a 403 local-resource error. Explicitly referenced assets and
+          // dynamic stylesheet/script/image loads at /favicon.ico stay strictly fail-closed.
+          if (url.pathname === "/favicon.ico" && !explicitlyReferencedRoutes.has("/favicon.ico") &&
+              resourceType === "other" && typeof request.respond === "function") {
+            respondEmptyFavicon = true;
+          } else {
+            const roles = tracker.localRequestRoles.get(url.pathname) ?? new Set<string>();
+            // Puppeteer's resource type records the request role independently of its filename.
+            // Unknown drivers decline the ambient exemption instead of silently accepting a failure.
+            roles.add(resourceType);
+            tracker.localRequestRoles.set(url.pathname, roles);
+          }
         }
         permit =
           url.origin === localOrigin ||
@@ -954,7 +967,8 @@ export async function configureNetwork(
       } catch {
         permit = false;
       }
-      if (permit) void request.continue();
+      if (respondEmptyFavicon) void request.respond!({ status: 204, body: "" });
+      else if (permit) void request.continue();
       else {
         blocked.count += 1;
         const record = records.get(request);
@@ -1146,8 +1160,33 @@ interface OpenedContentPage {
   cascadeHints: Record<string, BreakCauseCascadeHint | null>;
   sourceLayoutRisks: string[];
   imageFailures: ImageDecodeFailure[];
+  prePaginationFigureTree: RawRuntimeFigureTree | null;
+  prePaginationScriptMutations: number;
+  postPaginationMutations: number;
   network: NetworkTracker;
   close(): Promise<void>;
+}
+
+interface RawRuntimeFigureBody {
+  tag: "img" | "svg" | "table";
+  authorId: string | null;
+  value: string;
+  tableSid: string;
+}
+
+interface RawRuntimeFigureTree {
+  ids: Record<string, number>;
+  namedAnchors: Record<string, number>;
+  figures: {
+    sid: string;
+    captionSids: string[];
+    captionPosition: "before" | "after" | null;
+    body: RawRuntimeFigureBody | null;
+    bodyCandidates?: RawRuntimeFigureBody[];
+  }[];
+  referenceBlocks: { sid: string; references: { href: string; targetId: string | null }[] }[];
+  prePaginationScriptMutations?: number;
+  elementCount?: number;
 }
 
 class FontLoadFailure extends Error {}
@@ -1224,6 +1263,7 @@ function positiveHtmlDimension(raw: string | null): number | null {
 
 export interface RuntimeIntegrityStatus {
   sidMutations: number;
+  prePaginationScriptMutations?: number;
   mutationRecordsAfterRendered: number;
   paginationPreviewCalls: number;
   /** Source ids in document order, outside any page or inside a page's content. */
@@ -1392,15 +1432,29 @@ function integritySourceWithCapability(expectedSids: readonly string[], capabili
   return `(() => {
     const P = window.__blPrimitives;
     const expected = ${JSON.stringify(expectedSids)};
-    let sidMutations = 0, late = false, mutationRecordsAfterRendered = 0, paginationPreviewCalls = 0;
+    let sidMutations = 0, prePaginationScriptMutations = 0, parseDone = false, paginationStarted = false, late = false, mutationRecordsAfterRendered = 0, paginationPreviewCalls = 0;
+    const microtask = queueMicrotask;
+    P.on(document, "DOMContentLoaded", () => { microtask(() => { parseDone = true; }); });
     const Observer = MutationObserver;
     const observer = new Observer((records) => {
       for (const record of records) {
+        const type = P.mutationType(record);
         if (late) mutationRecordsAfterRendered += 1;
-        if (P.mutationType(record) === "attributes" && P.startsWith(P.mutationAttributeName(record) || "", "data-bl-")) sidMutations += 1;
+        else if (!paginationStarted) {
+          // During streamed HTML parsing, Blink emits childList insertions and characterData
+          // chunk-appends when a text node straddles a network buffer boundary. Neither removes
+          // nodes or mutates attributes; after DOMContentLoaded's microtask any mutation is script
+          // activity, and any synchronous parse-time element/figure/reference mutation is caught
+          // by exact element-count and figure-tree fingerprint parity before pagination.
+          if (parseDone || type === "attributes" || P.mutationRemovedCount(record) > 0) {
+            prePaginationScriptMutations += 1;
+          }
+        }
+        if (type === "attributes" && P.startsWith(P.mutationAttributeName(record) || "", "data-bl-")) sidMutations += 1;
       }
     });
-    observer.observe(document, { subtree: true, childList: true, attributes: true });
+    observer.observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
+    const markPaginationStart = () => { if (paginationStarted) return false; paginationStarted = true; return true; };
     const armLate = () => { if (late) return false; late = true; return true; };
     // Where each source id sits: outside any page (the source before pagination) or in a page's
     // content is the FLOW, whose order must be the source order; margin boxes hold running-element
@@ -1428,12 +1482,247 @@ function integritySourceWithCapability(expectedSids: readonly string[], capabili
           pageBoxSids[pageBoxSids.length] = { sid, page: pageIndex + 1, beforeArea: areaSeen[pageIndex] !== true };
         } else displacedSids[displacedSids.length] = sid;
       }
-      return { sidMutations, mutationRecordsAfterRendered, paginationPreviewCalls, sids, pageCount: pages.length,
+      return { sidMutations, prePaginationScriptMutations, mutationRecordsAfterRendered, paginationPreviewCalls, sids, pageCount: pages.length,
         footnoteSids, pageBoxSids, displacedSids, marginSids, expected };
     };
     const recordPaginationPreview = () => { paginationPreviewCalls += 1; return paginationPreviewCalls; };
-    P.installIntegrity(${JSON.stringify(capability)}, { armLate, recordPreview: recordPaginationPreview, status });
+    P.installIntegrity(${JSON.stringify(capability)}, { markPaginationStart, armLate, recordPreview: recordPaginationPreview, status });
   })()`;
+}
+
+function prePaginationFigureProbeSource(capability: string): string {
+  return `(() => {
+  const P = window.__blPrimitives;
+  const prePaginationScriptMutations = P.integrityStatus(${JSON.stringify(capability)}).prePaginationScriptMutations;
+  const ids = Object.create(null);
+  const namedAnchors = Object.create(null);
+  const figures = [];
+  const candidatesByFigure = new Map();
+  const seenCaption = new Set();
+  const bodiesBeforeCaption = new Map();
+  const bodiesAfterCaption = new Map();
+  const refGroups = new Map();
+  const walk = (node, blockSid, figure, inCaption, insideSvg) => {
+    if (!node || P.nodeType(node) !== 1) {
+      for (const child of P.children(node)) walk(child, blockSid, figure, inCaption, insideSvg);
+      return;
+    }
+    const tag = String(node.tagName || "").toLowerCase();
+    const sid = P.attr(node, "data-bl-sid") || blockSid;
+    const idAttr = P.attr(node, "id");
+    if (idAttr) ids[idAttr] = (ids[idAttr] || 0) + 1;
+    const nameAttr = P.attr(node, "name");
+    if (tag === "a" && nameAttr) namedAnchors[nameAttr] = (namedAnchors[nameAttr] || 0) + 1;
+    let current = figure;
+    let caption = inCaption;
+    if (tag === "figure") {
+      current = { sid: P.attr(node, "data-bl-sid") || "", captionSids: [], body: null, captionPosition: null };
+      figures.push(current);
+      caption = false;
+    }
+    if (tag === "figcaption") {
+      caption = true;
+      if (current) {
+        const capSid = P.attr(node, "data-bl-sid");
+        if (capSid) current.captionSids.push(capSid);
+        seenCaption.add(current);
+      }
+    }
+    if (current && !caption && !insideSvg && (tag === "img" || tag === "svg" || tag === "table")) {
+      const candidate = {
+        tag,
+        authorId: idAttr || null,
+        value: tag === "svg" ? P.outerHtml(node) : (P.attr(node, "src") || ""),
+        tableSid: tag === "table" ? (P.attr(node, "data-bl-sid") || "") : "",
+      };
+      let list = candidatesByFigure.get(current);
+      if (!list) { list = []; candidatesByFigure.set(current, list); }
+      list.push(candidate);
+      if (seenCaption.has(current)) bodiesAfterCaption.set(current, (bodiesAfterCaption.get(current) || 0) + 1);
+      else bodiesBeforeCaption.set(current, (bodiesBeforeCaption.get(current) || 0) + 1);
+    }
+    const hrefAttr = P.attr(node, "href");
+    if (tag === "a" && hrefAttr && P.startsWith(hrefAttr, "#") &&
+        /\\b(?:figure|fig\\.?|abbildung|abb\\.?|table|tbl\\.?|tabelle|tab\\.?)\\s+\\d/iu.test(P.text(node) || "")) {
+      if (sid) {
+        let targetId = null;
+        try { targetId = decodeURIComponent(hrefAttr.slice(1)) || null; } catch (_) {}
+        let group = refGroups.get(sid);
+        if (!group) { group = { sid, references: [] }; refGroups.set(sid, group); }
+        group.references.push({ href: hrefAttr, targetId });
+      }
+    }
+    for (const child of P.children(node)) walk(child, sid, current, caption, insideSvg || tag === "svg");
+  };
+  walk(document.documentElement, null, null, false, false);
+  for (const figure of figures) {
+    const candidates = candidatesByFigure.get(figure) || [];
+    if (candidates.length === 1) figure.body = candidates[0];
+    else if (candidates.length >= 2) { figure.body = null; figure.bodyCandidates = candidates; }
+    else figure.body = null;
+    if (seenCaption.has(figure)) {
+      const before = bodiesBeforeCaption.get(figure) || 0;
+      const after = bodiesAfterCaption.get(figure) || 0;
+      figure.captionPosition = before === 0 ? "before" : after === 0 ? "after" : null;
+    }
+  }
+  const allElements = P.all(document, "*");
+  let elementCount = 0;
+  for (let i = 0; i < allElements.length; i += 1) {
+    if (P.attr(allElements[i], "data-breaklint-intervention") !== "animations-disabled") elementCount += 1;
+  }
+  return { ids, namedAnchors, figures, referenceBlocks: [...refGroups.values()], prePaginationScriptMutations, elementCount };
+})()`;
+}
+
+function mapRuntimeFigureBody(body: RawRuntimeFigureBody) {
+  return body.tag === "table"
+    ? { tag: "table" as const, identity: `table:${body.tableSid}`, tableSid: body.tableSid }
+    : { tag: body.tag, identity: figureBodyIdentity(body.tag, body.authorId, body.value) };
+}
+
+export function runtimeFigureTreeMatches(
+  staticIndex: NonNullable<DocumentInput["snapshot"]>["figureIndex"],
+  raw: RawRuntimeFigureTree | null,
+  expectedElementCount?: number,
+): boolean {
+  if (!staticIndex || !raw) return false;
+  if (expectedElementCount !== undefined && raw.elementCount !== expectedElementCount) {
+    return false;
+  }
+  const runtimeIndex = {
+    ids: raw.ids,
+    namedAnchors: raw.namedAnchors,
+    figures: raw.figures.map(figure => ({
+      sid: figure.sid,
+      captionSids: figure.captionSids,
+      captionPosition: figure.captionPosition,
+      body: figure.body === null ? null : mapRuntimeFigureBody(figure.body),
+      ...(figure.bodyCandidates && figure.bodyCandidates.length >= 2
+        ? { bodyCandidates: figure.bodyCandidates.map(mapRuntimeFigureBody) }
+        : {}),
+      bodyFragments: [],
+    })),
+    referenceBlocks: raw.referenceBlocks,
+  };
+  return figureIndexTreeFingerprint(staticIndex) === figureIndexTreeFingerprint(runtimeIndex);
+}
+
+function explicitlyReferencedLocalRoutes(html: string, documentRoute: string, assets: ReadonlyMap<string, CapturedAsset>): Set<string> {
+  const routes = new Set<string>(assets.keys());
+  for (const ref of htmlResourceReferences(html)) {
+    const route = virtualHttpRoute(documentRoute, ref.raw);
+    if (route) routes.add(route);
+  }
+  return routes;
+}
+
+interface BoxEntry { tag: string; x: number; y: number; width: number; height: number }
+
+function parseBoxEntry(entry: string): BoxEntry | null {
+  const colon = entry.indexOf(":");
+  if (colon <= 0) return null;
+  const nums = entry.slice(colon + 1).split(",").map(Number);
+  if (nums.length !== 4 || nums.some(n => !Number.isFinite(n))) return null;
+  return { tag: entry.slice(0, colon), x: nums[0]!, y: nums[1]!, width: nums[2]!, height: nums[3]! };
+}
+
+/**
+ * Chrome Blink's LayoutNG can retain a stale screen-space coordinate on out-of-flow
+ * `position: absolute` elements inside `.pagedjs_page_content` immediately after `page.pdf()`
+ * leaves print media, dropping the page's fragmentainer offset while the PDF itself, the element's
+ * containing block (`offsetParent`), its box dimensions and its resolved CSS `top`/`left` remain
+ * completely unchanged. Verify every single drifted index strictly before accepting it.
+ */
+async function isVerifiedPostPdfOofCoordinateArtifact(
+  page: PageLike,
+  beforeBoxesRaw: string,
+  afterBoxesRaw: string,
+): Promise<boolean> {
+  const beforeEntries = beforeBoxesRaw === "" ? [] : beforeBoxesRaw.split(";");
+  const afterEntries = afterBoxesRaw === "" ? [] : afterBoxesRaw.split(";");
+  if (beforeEntries.length === 0 || beforeEntries.length !== afterEntries.length) return false;
+  const drifted: { index: number; before: BoxEntry; after: BoxEntry }[] = [];
+  for (let i = 0; i < beforeEntries.length; i += 1) {
+    if (beforeEntries[i] === afterEntries[i]) continue;
+    const before = parseBoxEntry(beforeEntries[i]!);
+    const after = parseBoxEntry(afterEntries[i]!);
+    if (!before || !after || before.tag !== after.tag) return false;
+    if (before.width !== after.width || before.height !== after.height) return false;
+    if (before.y <= after.y) return false;
+    drifted.push({ index: i, before, after });
+  }
+  if (drifted.length === 0) return false;
+  const driftedIndices = drifted.map(item => item.index);
+  const details = await page.evaluate<
+    { ok: boolean }
+  >(`((driftedInput) => {
+    const P = window.__blPrimitives;
+    const pages = P.all(document, ".pagedjs_page");
+    const indexSet = new Set(driftedInput.map(d => d.index));
+    const elToIndex = new Map();
+    const indexToEl = new Map();
+    const indexToPage = new Map();
+    const pageToIndex = new Map();
+    let idx = 0;
+    for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
+      const pageEl = pages[pageIndex];
+      pageToIndex.set(pageEl, pageIndex);
+      for (const el of P.all(pageEl, "*")) {
+        const s = P.style(el, null);
+        if (s.display === "none") continue;
+        elToIndex.set(el, idx);
+        if (indexSet.has(idx)) { indexToEl.set(idx, el); indexToPage.set(idx, pageEl); }
+        idx += 1;
+      }
+    }
+    const pageDyByPage = new Map();
+    for (const item of driftedInput) {
+      const el = indexToEl.get(item.index);
+      const pageEl = indexToPage.get(item.index);
+      if (!el || !pageEl) return { ok: false };
+      if (P.hasAttr(el, "data-bl-sid")) return { ok: false };
+      if (P.closest(el, ".pagedjs_footnote_area") !== null || P.closest(el, ".pagedjs_margin") !== null) return { ok: false };
+      const content = P.closest(el, ".pagedjs_page_content");
+      if (!content) return { ok: false };
+      const style = P.style(el, null);
+      if (style.position !== "absolute") return { ok: false };
+      const parent = P.offsetParent(el);
+      if (!parent || P.closest(parent, ".pagedjs_page_content") !== content) return { ok: false };
+      const parentIdx = elToIndex.get(parent);
+      if (parentIdx === undefined || indexSet.has(parentIdx)) return { ok: false };
+      const parentRect = P.rect(parent);
+      const parentStyle = P.style(parent, null);
+      const contentRect = P.rect(content);
+      const pageIndex = pageToIndex.get(pageEl) ?? 0;
+      const leftPx = parseFloat(style.left);
+      const topPx = parseFloat(style.top);
+      const bl = parseFloat(parentStyle.borderLeftWidth) || 0;
+      const bt = parseFloat(parentStyle.borderTopWidth) || 0;
+      if (!Number.isFinite(leftPx) || !Number.isFinite(topPx)) return { ok: false };
+      const expectedX = parentRect.x + bl + leftPx;
+      const expectedY = parentRect.y + bt + topPx;
+      if (Math.abs(expectedX - item.before.x) > 2 || Math.abs(expectedY - item.before.y) > 2) return { ok: false };
+      const dx = item.before.x - item.after.x;
+      const dy = item.before.y - item.after.y;
+      // Chrome's print-mode fragmentainer rounds subpixel CSS page heights (e.g. A4 1122.52 px ->
+      // 1123 px), so pageIndex preceding pages accumulate up to <= 1 px/page difference between
+      // screen contentRect.y and the print fragmentainer's Y origin, while all drifted OOF elements
+      // on the same page lose the identical fragmentainer Y offset.
+      const maxPrintRoundingDrift = pageIndex * 1.0 + 2.5;
+      if (Math.abs(dx - contentRect.x) > 1.5 || Math.abs(dy - contentRect.y) > maxPrintRoundingDrift) {
+        return { ok: false };
+      }
+      const prevPageDy = pageDyByPage.get(pageEl);
+      if (prevPageDy === undefined) {
+        pageDyByPage.set(pageEl, dy);
+      } else if (Math.abs(dy - prevPageDy) > 0.5) {
+        return { ok: false };
+      }
+    }
+    return { ok: true };
+  })(${JSON.stringify(drifted)})`);
+  return details.ok === true;
 }
 
 export function integrityStatusSource(capability: string): string {
@@ -1446,6 +1735,7 @@ export function paginationApparatusSource(capability: string): string {
     if (P.all(document, ".pagedjs_page").length > 0) {
       throw new Error("pagination began before the Node-controlled apparatus was installed");
     }
+    P.integrityMarkPaginationStart(${JSON.stringify(capability)});
     const apparatus = P.pagedApparatus(${JSON.stringify(capability)});
     const Paged = apparatus.value;
     const Previewer = apparatus.Previewer;
@@ -1643,6 +1933,8 @@ async function openContentPage(
   signal: AbortSignal,
   observeNetwork?: (network: NetworkTracker) => void,
   omittedDeploymentRoutes: ReadonlySet<string> = new Set(),
+  explicitlyReferencedRoutes: ReadonlySet<string> = new Set(),
+  capturePrePaginationFigureTree = false,
 ): Promise<OpenedContentPage> {
   if (!context.browser.createBrowserContext) {
     throw new Error("the browser driver exposes no isolated browser-context boundary");
@@ -1739,7 +2031,7 @@ async function openContentPage(
     await page.evaluateOnNewDocument(primitivesSource(apparatusCapability));
     await page.evaluateOnNewDocument(integritySourceWithCapability(expectedSids, apparatusCapability));
     network = await abortable(
-      trackOwnership(configureNetwork(ownedPage, origin, context.options, context.blocked, omittedDeploymentRoutes), async lateNetwork => {
+      trackOwnership(configureNetwork(ownedPage, origin, context.options, context.blocked, omittedDeploymentRoutes, explicitlyReferencedRoutes), async lateNetwork => {
         await withTimeout(lateNetwork.close(), BROWSER_CLOSE_TIMEOUT_MS, "late network session.detach");
       }), signal, "configureNetwork",
     );
@@ -1749,12 +2041,30 @@ async function openContentPage(
     await page.goto(`${origin}${documentRoute}`, { waitUntil: "networkidle0", timeout: PAGINATION_TIMEOUT_MS });
     if (pageErrors.length > 0) throw new Error(`content page error before apparatus install: ${pageErrors.join(" | ")}`);
     await enforceOperationalLimits(page, network, 0, "pre-pagination");
+    const prePaginationFigureTreeBefore = capturePrePaginationFigureTree
+      ? await page.evaluate<RawRuntimeFigureTree>(prePaginationFigureProbeSource(apparatusCapability))
+      : null;
     await page.evaluate<void>(paginationBundleSource(context.pagedjsSource));
     if (collectorNonce) await page.evaluate<void>(collectorSource(apparatusCapability, collectorNonce));
-  await page.evaluate<void>(paginationApparatusSource(apparatusCapability));
+    await page.evaluate<void>(paginationApparatusSource(apparatusCapability));
     await page.evaluate<void>(ANIMATION_FREEZE_SOURCE);
     await verifyAnimationIntervention(page, "pre-pagination");
+    // Re-sample the figure/ID/anchor/reference tree AFTER installing the animation-freeze style
+    // (before Paged.js runs) so a page MutationObserver reacting to the style insertion cannot
+    // mutate href/id/figure links undetected after the first probe.
+    const prePaginationFigureTreeAfter = capturePrePaginationFigureTree
+      ? await page.evaluate<RawRuntimeFigureTree>(prePaginationFigureProbeSource(apparatusCapability))
+      : null;
+    const prePaginationFigureTree = prePaginationFigureTreeBefore && prePaginationFigureTreeAfter &&
+      prePaginationFigureTreeBefore.elementCount === prePaginationFigureTreeAfter.elementCount &&
+      JSON.stringify(prePaginationFigureTreeBefore.ids) === JSON.stringify(prePaginationFigureTreeAfter.ids) &&
+      JSON.stringify(prePaginationFigureTreeBefore.namedAnchors) === JSON.stringify(prePaginationFigureTreeAfter.namedAnchors) &&
+      JSON.stringify(prePaginationFigureTreeBefore.figures) === JSON.stringify(prePaginationFigureTreeAfter.figures) &&
+      JSON.stringify(prePaginationFigureTreeBefore.referenceBlocks) === JSON.stringify(prePaginationFigureTreeAfter.referenceBlocks)
+      ? prePaginationFigureTreeAfter
+      : null;
     const prePagination = await page.evaluate<RuntimeIntegrityStatus>(integrityStatusSource(apparatusCapability));
+    const prePaginationScriptMutations = prePaginationFigureTreeBefore?.prePaginationScriptMutations ?? 0;
     const sidIssues = validateRuntimeSidState(expectedSids, prePagination);
     if (sidIssues.length > 0) throw new Error(`runtime source-id integrity failed: ${sidIssues.join("; ")}`);
     // Print-only font faces do not enter the FontFaceSet until the print media query applies.
@@ -1850,7 +2160,8 @@ async function openContentPage(
     if (pageErrors.length > 0) throw new Error(`content page error during pagination: ${pageErrors.join(" | ")}`);
     return {
       page, browserContext, apparatusCapability, collectorNonce, pageErrors, cascadeHints, sourceLayoutRisks,
-      imageFailures, network, close,
+      imageFailures, prePaginationFigureTree, prePaginationScriptMutations,
+      postPaginationMutations: postPagination.mutationRecordsAfterRendered, network, close,
     };
   } catch (error) {
     const cleanupErrors: string[] = [];
@@ -1975,10 +2286,11 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
     await openedMain.close();
   };
   try {
+    const explicitRoutes = explicitlyReferencedLocalRoutes(original, served.documentRoute, assets);
     let controlSignature: ControlSignature | null = null;
     if (context.options.sourceMapInjection) {
       served.select("control");
-      const controlOpened = await openContentPage(context, served.origin, served.documentRoute, [], false, signal, observeNetwork, externalDeploymentRequiredRoutes);
+      const controlOpened = await openContentPage(context, served.origin, served.documentRoute, [], false, signal, observeNetwork, externalDeploymentRequiredRoutes, explicitRoutes, false);
       try {
         await controlOpened.page.evaluate<void>(freezeSource(controlOpened.apparatusCapability));
         const controlStable = await awaitStableLayout({
@@ -2002,6 +2314,7 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
     const expectedSids = context.options.sourceMapInjection
       ? orderedSourceSids(injected.map).filter((key) => key.startsWith("s"))
       : [];
+    const needRuntimeFigureCheck = context.options.sourceMapInjection && sourceModel.scriptBearing && sourceModel.figureIndexStructuralComplete === true;
     const opened = await openContentPage(
       context,
       served.origin,
@@ -2011,6 +2324,8 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
       signal,
       observeNetwork,
       externalDeploymentRequiredRoutes,
+      explicitRoutes,
+      needRuntimeFigureCheck,
     );
     openedMain = opened;
     const page = opened.page;
@@ -2228,6 +2543,11 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
         }],
       };
     }
+    const runtimeFigureVerified = needRuntimeFigureCheck &&
+      opened.prePaginationScriptMutations === 0 &&
+      integrityAtSnapshot.mutationRecordsAfterRendered === opened.postPaginationMutations &&
+      integrityAtSnapshot.sidMutations === 0 &&
+      runtimeFigureTreeMatches(sourceModel.figureIndex, opened.prePaginationFigureTree, sourceModel.elementCount);
     const snapshot = assembleSnapshot({
       raw,
       collector,
@@ -2235,6 +2555,7 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
       sourceMap: injected.map,
       originalSourceMap: originalMap,
       sourceMapInjection: context.options.sourceMapInjection,
+      runtimeFigureVerification: { verified: runtimeFigureVerified },
       renderer: context.rendererPath,
       browserVersion: context.browserVersion,
       pagedjsVersion: context.pagedjsVersion,
@@ -2334,11 +2655,18 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
       const afterIntegrity = await page.evaluate<RuntimeIntegrityStatus>(integrityStatusSource(opened.apparatusCapability));
       const afterSidIssues = validateRuntimeSidState(expectedSids, afterIntegrity);
       const drifted = driftedComponents(beforeParts, afterParts);
-      const changed = drifted.length > 0 ||
+      const nonBoxChanged =
         afterIntegrity.mutationRecordsAfterRendered !== beforeIntegrity.mutationRecordsAfterRendered ||
         afterIntegrity.sidMutations !== beforeIntegrity.sidMutations || afterSidIssues.length > 0 ||
         opened.pageErrors.length > 0 || opened.network.activityAfterRendered > 0 ||
         opened.network.inFlight.size > 0 || opened.network.pendingBodies.size > 0;
+      let changed = drifted.length > 0 || nonBoxChanged;
+      if (changed && !nonBoxChanged && residueBefore.count === 0 &&
+          drifted.length === 1 && drifted[0] === "boxes") {
+        if (await isVerifiedPostPdfOofCoordinateArtifact(page, beforeParts.boxes, afterParts.boxes)) {
+          changed = false;
+        }
+      }
       await verifyAnimationIntervention(page, `${stage}-pdf-after`);
       if (changed) {
         // `render-unstable`, not `checker-crashed`: nothing crashed. The PDF does not reproduce
@@ -2366,6 +2694,18 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
       }
       return pdf;
     };
+    const blankPages = new Set(snapshot.pages.filter((p) => p.blank).map((p) => p.pageNumber));
+    const pxPerMm = 96 / 25.4;
+    const blankPageContentBoxes = new Map<number, { leftMm: number; topMm: number; rightMm: number; bottomMm: number }>();
+    for (const p of snapshot.pages) {
+      if (!p.blank || !p.pageBox) continue;
+      blankPageContentBoxes.set(p.pageNumber, {
+        leftMm: (p.contentBox.x - p.pageBox.x) / pxPerMm,
+        topMm: (p.contentBox.y - p.pageBox.y) / pxPerMm,
+        rightMm: (p.contentBox.x + p.contentBox.width - p.pageBox.x) / pxPerMm,
+        bottomMm: (p.contentBox.y + p.contentBox.height - p.pageBox.y) / pxPerMm,
+      });
+    }
     const evidence = await produceEvidence({
       page,
       apparatusCapability: opened.apparatusCapability,
@@ -2376,6 +2716,8 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
         outDir: context.options.outDir,
         documentKey,
         binding: context.options.evidenceBinding && context.options.sourceMapInjection,
+        blankPages,
+        blankPageContentBoxes,
       },
     });
     if (evidence.overlayInstalled) {

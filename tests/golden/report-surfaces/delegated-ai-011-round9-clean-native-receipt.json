@@ -1,0 +1,1145 @@
+{
+  "kind": "delegatedAI-native-image-read-receipt",
+  "release": "0.11.0",
+  "state": "clean",
+  "requestedModel": "opus",
+  "actual_model": "claude-opus-5-5",
+  "nativeSessionId": "61557ecf-390c-49ef-8940-d58534f6aa41",
+  "nativePID": 34265,
+  "directExit": 0,
+  "nativeEndedUTC": "2026-11-21T10:45:30.962Z",
+  "nativeCLIRecordedVersion": "2.1.326",
+  "nativeStream": {
+    "bytes": 15538417,
+    "sha256": "83684ecdd6ffffd2cf09f426ad4e2669f2f023b1139807dbd71965b4266bc7e1"
+  },
+  "nativeStderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "promptSha256": "36572aa420c57499a61133811ee362acb221afe88ae416a9a743726f4816f631",
+  "outputSha256": "83684ecdd6ffffd2cf09f426ad4e2669f2f023b1139807dbd71965b4266bc7e1",
+  "imageCount": 35,
+  "imageReads": [
+    {
+      "path": "clean--light--desktop.png",
+      "sourceBytes": 377779,
+      "sourceSha256": "b5ef199a1170980240799ceda34ae49f613cbdd41812ebda0970753c156a5399",
+      "sourceDimensions": [
+        1440,
+        2937
+      ],
+      "toolCallId": "toolu_01Le8LWFzmpNHEPLoaRP5YuD",
+      "toolUse": {
+        "line": 2,
+        "byteOffset": 5558,
+        "bytes": 1135,
+        "sha256": "4174a075416d803e955b357bb386b42cc577b4bc4a4254dadf698a21838115c1"
+      },
+      "toolResult": {
+        "line": 3,
+        "byteOffset": 6693,
+        "bytes": 1153501,
+        "sha256": "de7aa0d5eb893acb542554873a2b03494f4ec63fec73c6cda54276c48764bc6a"
+      },
+      "nativePayloadBytes": 432294,
+      "nativePayloadSha256": "4c0c5a51b7b21cf7df038c2e9686c29b19c95a3ed2eb263c91bbf6e5ec4581f2",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        981,
+        2000
+      ],
+      "payloadByteEqualSource": false,
+      "transformationStatus": "NATIVE_PAYLOAD_DIFFERS_SOURCE_RESIZE_OR_REENCODE_CAUSE_NOT_PROVED",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--light--desktop--tile-01.png",
+      "sourceBytes": 145920,
+      "sourceSha256": "d090ecf677d2bcf178f8f0bed27c7408a37f3da6a28c893600eb4513d6475ec6",
+      "sourceDimensions": [
+        1440,
+        1000
+      ],
+      "toolCallId": "toolu_013L36nE6CCfFbyRMvkBQrcy",
+      "toolUse": {
+        "line": 5,
+        "byteOffset": 1160562,
+        "bytes": 1153,
+        "sha256": "3bf62ef01f0daf743dd774d050f1c48203bd97c85befc4ec6c2c0e55d42d1d8d"
+      },
+      "toolResult": {
+        "line": 6,
+        "byteOffset": 1161715,
+        "bytes": 389838,
+        "sha256": "49161dd3dbe6399d10e07a95e89cd75df176896a03f14f55c8621c7ecd26fa0e"
+      },
+      "nativePayloadBytes": 145920,
+      "nativePayloadSha256": "d090ecf677d2bcf178f8f0bed27c7408a37f3da6a28c893600eb4513d6475ec6",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        1440,
+        1000
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--light--desktop--tile-02.png",
+      "sourceBytes": 224360,
+      "sourceSha256": "abd96e4200b61eae7f1b1691d2a2ebd5ac237f6f660f4411a40127eb03bc7864",
+      "sourceDimensions": [
+        1440,
+        1000
+      ],
+      "toolCallId": "toolu_01QrD6nLYQK1kMutvySEmG9a",
+      "toolUse": {
+        "line": 7,
+        "byteOffset": 1551553,
+        "bytes": 1153,
+        "sha256": "2abcc28a97086c18784265a41c835aff54002368872463b6f4ba5e138c54d1d0"
+      },
+      "toolResult": {
+        "line": 8,
+        "byteOffset": 1552706,
+        "bytes": 599014,
+        "sha256": "25266ff1e12edf885ecea15ccbbb5a3d20166cba95255112f02fec13cb3f2f5e"
+      },
+      "nativePayloadBytes": 224360,
+      "nativePayloadSha256": "abd96e4200b61eae7f1b1691d2a2ebd5ac237f6f660f4411a40127eb03bc7864",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        1440,
+        1000
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--light--desktop--tile-03.png",
+      "sourceBytes": 210346,
+      "sourceSha256": "9f6c4763ff9bc675791c862ae7b7de48b516c2167fe7f7fce6742878a6cb3145",
+      "sourceDimensions": [
+        1440,
+        937
+      ],
+      "toolCallId": "toolu_01Qrn89NUsWQB8EjgFpUzZ5m",
+      "toolUse": {
+        "line": 9,
+        "byteOffset": 2151720,
+        "bytes": 1153,
+        "sha256": "753d5925fe66a2aa8eb93cc8a8033f67629d99de391531ddc0f96056d0aba884"
+      },
+      "toolResult": {
+        "line": 10,
+        "byteOffset": 2152873,
+        "bytes": 561644,
+        "sha256": "3b05273da3da8e9ca87837a5c729a34528fc26fcf11098b2d0e393b7d7b02303"
+      },
+      "nativePayloadBytes": 210346,
+      "nativePayloadSha256": "9f6c4763ff9bc675791c862ae7b7de48b516c2167fe7f7fce6742878a6cb3145",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        1440,
+        937
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--light--tablet.png",
+      "sourceBytes": 364445,
+      "sourceSha256": "96f8f8cc59904b3c9d19bbb4126a105ed69915a9b673134a8ccae8907e2b28a7",
+      "sourceDimensions": [
+        768,
+        3411
+      ],
+      "toolCallId": "toolu_01APEQhhe5dg2455zwKHyDiy",
+      "toolUse": {
+        "line": 11,
+        "byteOffset": 2714517,
+        "bytes": 1133,
+        "sha256": "593e4b73415ef44ab7307719488c5585b8e79d602fcbf8b57b5a2379b1d83a7b"
+      },
+      "toolResult": {
+        "line": 12,
+        "byteOffset": 2715650,
+        "bytes": 883628,
+        "sha256": "55b09ed24d7db260943f31458783d37e8dc86a71f57367341c98bce35b529e64"
+      },
+      "nativePayloadBytes": 331091,
+      "nativePayloadSha256": "2febc6b706a5be9bd03766510098397f4db242c74ccaac4374c130af2c9abce4",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        450,
+        1999
+      ],
+      "payloadByteEqualSource": false,
+      "transformationStatus": "NATIVE_PAYLOAD_DIFFERS_SOURCE_RESIZE_OR_REENCODE_CAUSE_NOT_PROVED",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--light--tablet--tile-01.png",
+      "sourceBytes": 119776,
+      "sourceSha256": "4a4532be01bd8f4f937800bcd6c7349eef7d2b88e9b965bee67c15434e453793",
+      "sourceDimensions": [
+        768,
+        1024
+      ],
+      "toolCallId": "toolu_01UfJ5g533rEHSndgo1GgqBL",
+      "toolUse": {
+        "line": 14,
+        "byteOffset": 3599645,
+        "bytes": 1151,
+        "sha256": "d4a5ec226fae580f92a133590ea76943443c26e668805b06d29bcba7160379e4"
+      },
+      "toolResult": {
+        "line": 16,
+        "byteOffset": 3601269,
+        "bytes": 320124,
+        "sha256": "3d734cf171628fd0d3490753c098442ba4b1e79de30c054836040c834f7d3c05"
+      },
+      "nativePayloadBytes": 119776,
+      "nativePayloadSha256": "4a4532be01bd8f4f937800bcd6c7349eef7d2b88e9b965bee67c15434e453793",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        768,
+        1024
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--light--tablet--tile-02.png",
+      "sourceBytes": 173189,
+      "sourceSha256": "5471c74e19cae82b9cd3c7136179220cce5d46edc48539248d3825f6b82789dd",
+      "sourceDimensions": [
+        768,
+        1024
+      ],
+      "toolCallId": "toolu_018Q8Qe24q7fWJWkmQe4vPVs",
+      "toolUse": {
+        "line": 17,
+        "byteOffset": 3921393,
+        "bytes": 1151,
+        "sha256": "d9f172492d65213d4a5ddd9a4c6fe55f2cc7e466b165695fdc840143126c4f08"
+      },
+      "toolResult": {
+        "line": 18,
+        "byteOffset": 3922544,
+        "bytes": 462556,
+        "sha256": "311e9cde9f5a9311a5cbe61a013d8afc62ffdea777fbf97fb929d6c8e9ce8073"
+      },
+      "nativePayloadBytes": 173189,
+      "nativePayloadSha256": "5471c74e19cae82b9cd3c7136179220cce5d46edc48539248d3825f6b82789dd",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        768,
+        1024
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--light--tablet--tile-03.png",
+      "sourceBytes": 212263,
+      "sourceSha256": "2215f722333b8f3a903f99cac88f80fd488441cb97f3c9814e79f3b9a72e680c",
+      "sourceDimensions": [
+        768,
+        1024
+      ],
+      "toolCallId": "toolu_015Mvvh1im8ZA6upe6WVHAZX",
+      "toolUse": {
+        "line": 19,
+        "byteOffset": 4385100,
+        "bytes": 1151,
+        "sha256": "f9b5a00f70ebcf0f998f8373e67995a70a68eb9e00b15839e58ecca3bd3cc849"
+      },
+      "toolResult": {
+        "line": 20,
+        "byteOffset": 4386251,
+        "bytes": 566756,
+        "sha256": "72b6de97ae50c751824ff27c7aa687023938e9c6995216a32d4663ea9716c967"
+      },
+      "nativePayloadBytes": 212263,
+      "nativePayloadSha256": "2215f722333b8f3a903f99cac88f80fd488441cb97f3c9814e79f3b9a72e680c",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        768,
+        1024
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--light--tablet--tile-04.png",
+      "sourceBytes": 58474,
+      "sourceSha256": "7f1a478d548a1a39bace34f307c0e224695fd6319f4734fe8266e653415d5cea",
+      "sourceDimensions": [
+        768,
+        339
+      ],
+      "toolCallId": "toolu_019EiwtkSaqsQjBraqjc7W6q",
+      "toolUse": {
+        "line": 21,
+        "byteOffset": 4953007,
+        "bytes": 1151,
+        "sha256": "b62cffd375816e631aad36814209ab03f6dd00d59a14dcee52c794fcbfe4c969"
+      },
+      "toolResult": {
+        "line": 22,
+        "byteOffset": 4954158,
+        "bytes": 156649,
+        "sha256": "bf1f94a7f2460306910794501b7034a833d3a4b7c971d955abe140d04126488d"
+      },
+      "nativePayloadBytes": 58474,
+      "nativePayloadSha256": "7f1a478d548a1a39bace34f307c0e224695fd6319f4734fe8266e653415d5cea",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        768,
+        339
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--light--mobile.png",
+      "sourceBytes": 352681,
+      "sourceSha256": "e01686bb1e280ad80f01173b8dce4c336ee7244937d7cfd76b642dc58694f8c2",
+      "sourceDimensions": [
+        390,
+        4752
+      ],
+      "toolCallId": "toolu_01WZRbvuYTystNrRyXhMRro9",
+      "toolUse": {
+        "line": 23,
+        "byteOffset": 5110807,
+        "bytes": 1133,
+        "sha256": "14894fe4e92b731002a2f6ee8cd168562b680d3ce9b6185e0cdc859282295ff6"
+      },
+      "toolResult": {
+        "line": 24,
+        "byteOffset": 5111940,
+        "bytes": 509812,
+        "sha256": "b419a214cfd5cc6b78d335b943a6a2d8b4edd7a61c681d0c6244e8914d2cc4cc"
+      },
+      "nativePayloadBytes": 190909,
+      "nativePayloadSha256": "5462ad04b38aafe2a4b77c51ddac8506a6b3177756b41a51aff7b3e925403d46",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        164,
+        1998
+      ],
+      "payloadByteEqualSource": false,
+      "transformationStatus": "NATIVE_PAYLOAD_DIFFERS_SOURCE_RESIZE_OR_REENCODE_CAUSE_NOT_PROVED",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--light--mobile--tile-01.png",
+      "sourceBytes": 92103,
+      "sourceSha256": "e7385cbb085607034a4337929e71a102fed36da58de12a79edbb9f78047c38d3",
+      "sourceDimensions": [
+        390,
+        844
+      ],
+      "toolCallId": "toolu_01PHydgKLvPEFCiL9GLt6Aoc",
+      "toolUse": {
+        "line": 26,
+        "byteOffset": 5622119,
+        "bytes": 1151,
+        "sha256": "80e3e689cda3804a22047601c96413bc25dcb9656c5879819e1a762f27e2f9ee"
+      },
+      "toolResult": {
+        "line": 27,
+        "byteOffset": 5623270,
+        "bytes": 246321,
+        "sha256": "9f170c96e032780ebc09b0a55540e6c3842fd911e7a98474b725e32f5f024621"
+      },
+      "nativePayloadBytes": 92103,
+      "nativePayloadSha256": "e7385cbb085607034a4337929e71a102fed36da58de12a79edbb9f78047c38d3",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        390,
+        844
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--light--mobile--tile-02.png",
+      "sourceBytes": 38918,
+      "sourceSha256": "d47d41be606e0baa9622cc2f9f1f38dcac8d373fc48189d3d31fae422859c6b6",
+      "sourceDimensions": [
+        390,
+        844
+      ],
+      "toolCallId": "toolu_01RSUjWWG2sNU9xkx7UDUbKw",
+      "toolUse": {
+        "line": 28,
+        "byteOffset": 5869591,
+        "bytes": 1151,
+        "sha256": "137f90c520b286b721fd706cf3e7df398cca6d4c69c07c8ce0eaee08f82fcc8d"
+      },
+      "toolResult": {
+        "line": 29,
+        "byteOffset": 5870742,
+        "bytes": 104497,
+        "sha256": "53febf7bcc6176cce3e65a93c7e4940c1fa4e95bfb6739f164e498bb8413d62f"
+      },
+      "nativePayloadBytes": 38918,
+      "nativePayloadSha256": "d47d41be606e0baa9622cc2f9f1f38dcac8d373fc48189d3d31fae422859c6b6",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        390,
+        844
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--light--mobile--tile-03.png",
+      "sourceBytes": 125217,
+      "sourceSha256": "fe3ec2bbe250975602361ecfafa91bc8bc1685f82d0c86c5e1ad7e7b36a31a7e",
+      "sourceDimensions": [
+        390,
+        844
+      ],
+      "toolCallId": "toolu_019LJmE5DXGwhgv5Js7UAc8G",
+      "toolUse": {
+        "line": 30,
+        "byteOffset": 5975239,
+        "bytes": 1151,
+        "sha256": "5fb12fbee74655345176b6a4ab7bc082ddaa28244631336d699e343cca11b0aa"
+      },
+      "toolResult": {
+        "line": 31,
+        "byteOffset": 5976390,
+        "bytes": 334626,
+        "sha256": "57b2518a3a7180c73816c0141d08ef1f68ce418e0192d432a7d4853bdf67b747"
+      },
+      "nativePayloadBytes": 125217,
+      "nativePayloadSha256": "fe3ec2bbe250975602361ecfafa91bc8bc1685f82d0c86c5e1ad7e7b36a31a7e",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        390,
+        844
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--light--mobile--tile-04.png",
+      "sourceBytes": 111751,
+      "sourceSha256": "ba20630f48fab9cf49f671fff972808f6cd289a56a1d8a6cb701e50c0270bfce",
+      "sourceDimensions": [
+        390,
+        844
+      ],
+      "toolCallId": "toolu_01JpoZz13PQii4ApRqv7YJHK",
+      "toolUse": {
+        "line": 32,
+        "byteOffset": 6311016,
+        "bytes": 1151,
+        "sha256": "e0ae5fe030b19fac3633fb1ea07c0960f5990416539f9bfd0d2c0fcaa7e0a81d"
+      },
+      "toolResult": {
+        "line": 33,
+        "byteOffset": 6312167,
+        "bytes": 298722,
+        "sha256": "55069ea7e3354b0f390e1eaf299490f0468ea6413f946ed21dd7202d87e98571"
+      },
+      "nativePayloadBytes": 111751,
+      "nativePayloadSha256": "ba20630f48fab9cf49f671fff972808f6cd289a56a1d8a6cb701e50c0270bfce",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        390,
+        844
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--light--mobile--tile-05.png",
+      "sourceBytes": 123609,
+      "sourceSha256": "35c599be15e92e86a434b71cb0a47639271117c24b0797105d4efd0ba5768dfb",
+      "sourceDimensions": [
+        390,
+        844
+      ],
+      "toolCallId": "toolu_01VC1nfyqB9ykcyCGfbSFzLk",
+      "toolUse": {
+        "line": 34,
+        "byteOffset": 6610889,
+        "bytes": 1149,
+        "sha256": "4c58f82bf3e2261850125d59fe1176fd0e62853b55fad0bb089f979b73d22514"
+      },
+      "toolResult": {
+        "line": 35,
+        "byteOffset": 6612038,
+        "bytes": 330338,
+        "sha256": "159f12b0d1098aa70929e157ef93385e5e7b1b08a0cb211de8ba131768cfd6d7"
+      },
+      "nativePayloadBytes": 123609,
+      "nativePayloadSha256": "35c599be15e92e86a434b71cb0a47639271117c24b0797105d4efd0ba5768dfb",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        390,
+        844
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--light--mobile--tile-06.png",
+      "sourceBytes": 64755,
+      "sourceSha256": "a490086771a9005de4803ff334ea290dde370ecd6af43364a5c8fdd7652f4d5e",
+      "sourceDimensions": [
+        390,
+        532
+      ],
+      "toolCallId": "toolu_01KqzsfacXBpPqVqicZY2Esv",
+      "toolUse": {
+        "line": 36,
+        "byteOffset": 6942376,
+        "bytes": 1149,
+        "sha256": "dc32286ef2b363d0188786e3231ca225413c7fea08b7a2ec087444155bb8d7f4"
+      },
+      "toolResult": {
+        "line": 37,
+        "byteOffset": 6943525,
+        "bytes": 173393,
+        "sha256": "5b6d2a0919d0c5b0f68adb345189fbbb729b55ca10203557391d76f0040f11b7"
+      },
+      "nativePayloadBytes": 64755,
+      "nativePayloadSha256": "a490086771a9005de4803ff334ea290dde370ecd6af43364a5c8fdd7652f4d5e",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        390,
+        532
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--dark--desktop.png",
+      "sourceBytes": 376017,
+      "sourceSha256": "4d9f3acdd6feec748fe905d89ad82b5bfeb7c34033ccf23e467c4c9b5f9d575b",
+      "sourceDimensions": [
+        1440,
+        2937
+      ],
+      "toolCallId": "toolu_01664QQMC3SpGSKLYbC6np9V",
+      "toolUse": {
+        "line": 38,
+        "byteOffset": 7116918,
+        "bytes": 1131,
+        "sha256": "b57a90f7f3f5cd3c6d313da0423824e51b6ad84749baa58676fb7f8667f4291b"
+      },
+      "toolResult": {
+        "line": 39,
+        "byteOffset": 7118049,
+        "bytes": 1211845,
+        "sha256": "ef261c34e2f8b7e91d54ad3d3e40c463ce2ec8f03cd34145ac7ca3edd8a8b32a"
+      },
+      "nativePayloadBytes": 454171,
+      "nativePayloadSha256": "d86a6802fa892ee672a5ab57284904845acbd6d06e76e6f9eed74acd82480f0a",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        981,
+        2000
+      ],
+      "payloadByteEqualSource": false,
+      "transformationStatus": "NATIVE_PAYLOAD_DIFFERS_SOURCE_RESIZE_OR_REENCODE_CAUSE_NOT_PROVED",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--dark--desktop--tile-01.png",
+      "sourceBytes": 143655,
+      "sourceSha256": "fd839926d941c09f2fe2e2b5ae80cdd44cb347cecb97cebdf3aaed7c7a713604",
+      "sourceDimensions": [
+        1440,
+        1000
+      ],
+      "toolCallId": "toolu_015AVEQUMQDKHfeaavhDEAXR",
+      "toolUse": {
+        "line": 41,
+        "byteOffset": 8330262,
+        "bytes": 1149,
+        "sha256": "36b3fb20d34d58b5ce94dc9cbdd451aaea9765c3876426462affc26582dc6bca"
+      },
+      "toolResult": {
+        "line": 42,
+        "byteOffset": 8331411,
+        "bytes": 383798,
+        "sha256": "601b5fc90565debfbbc46bf4712d19d10acefffa87fd1c51d094aae84d57fa1e"
+      },
+      "nativePayloadBytes": 143655,
+      "nativePayloadSha256": "fd839926d941c09f2fe2e2b5ae80cdd44cb347cecb97cebdf3aaed7c7a713604",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        1440,
+        1000
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--dark--desktop--tile-02.png",
+      "sourceBytes": 223074,
+      "sourceSha256": "8126f4563a05ad3265de526c9564e69e436d7e87c49d473fb8d3de57e6149841",
+      "sourceDimensions": [
+        1440,
+        1000
+      ],
+      "toolCallId": "toolu_01BgxYeCr92LppsuBZuTb1Vn",
+      "toolUse": {
+        "line": 43,
+        "byteOffset": 8715209,
+        "bytes": 1149,
+        "sha256": "22c653f23dcace1c73acfa4c8ef6b2e5091ed17bad2f1ca48fff7c3196ad9122"
+      },
+      "toolResult": {
+        "line": 44,
+        "byteOffset": 8716358,
+        "bytes": 595582,
+        "sha256": "04d31133ed9b7c0f9a3c89b1106b7949a5f8e71bf5353cdf4fa966bf2cbf5c53"
+      },
+      "nativePayloadBytes": 223074,
+      "nativePayloadSha256": "8126f4563a05ad3265de526c9564e69e436d7e87c49d473fb8d3de57e6149841",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        1440,
+        1000
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--dark--desktop--tile-03.png",
+      "sourceBytes": 207567,
+      "sourceSha256": "6b2e53f8e7ee7dc470c7d0e755dbed981b316ab62476e0b67e12fb6478006d42",
+      "sourceDimensions": [
+        1440,
+        937
+      ],
+      "toolCallId": "toolu_01PjeLC4eEM7tperiH8zEwnp",
+      "toolUse": {
+        "line": 45,
+        "byteOffset": 9311940,
+        "bytes": 1149,
+        "sha256": "3cf2cd071bc324363c2b679175226172037ac905659921902dbdcdca43a7d330"
+      },
+      "toolResult": {
+        "line": 46,
+        "byteOffset": 9313089,
+        "bytes": 554228,
+        "sha256": "48e07e78b304f7a771256c984db1590d49124f4207ceb73ec1d36436428244a1"
+      },
+      "nativePayloadBytes": 207567,
+      "nativePayloadSha256": "6b2e53f8e7ee7dc470c7d0e755dbed981b316ab62476e0b67e12fb6478006d42",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        1440,
+        937
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--dark--tablet.png",
+      "sourceBytes": 362139,
+      "sourceSha256": "c9f4137a937bbe8486b07d47c1098032c6a836ef1311270bfb954b21e2dc7fe4",
+      "sourceDimensions": [
+        768,
+        3411
+      ],
+      "toolCallId": "toolu_016hsV94gVLSNoPrebjxtFDu",
+      "toolUse": {
+        "line": 47,
+        "byteOffset": 9867317,
+        "bytes": 1129,
+        "sha256": "0ed56985f635178f758e3abd67c9a3cea678e19151b165a38b400d97b220f99d"
+      },
+      "toolResult": {
+        "line": 48,
+        "byteOffset": 9868446,
+        "bytes": 926148,
+        "sha256": "bc893e6f27308885d02910d860a79df499dbfeece27af9559330a2154b3279cb"
+      },
+      "nativePayloadBytes": 347037,
+      "nativePayloadSha256": "621378608b8b628d792e067747dbd162a5492360cf6f4330d8adb5a2cf797588",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        450,
+        1999
+      ],
+      "payloadByteEqualSource": false,
+      "transformationStatus": "NATIVE_PAYLOAD_DIFFERS_SOURCE_RESIZE_OR_REENCODE_CAUSE_NOT_PROVED",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--dark--tablet--tile-01.png",
+      "sourceBytes": 117934,
+      "sourceSha256": "a64e84e2cf0f7bd8602fae951e4310e6c14094a239c804837adf8bdd090152f6",
+      "sourceDimensions": [
+        768,
+        1024
+      ],
+      "toolCallId": "toolu_01GYAyQhRnRLW3ufwNsRuQ5g",
+      "toolUse": {
+        "line": 50,
+        "byteOffset": 10794961,
+        "bytes": 1147,
+        "sha256": "d2c8894ac5c7a3abd030ce249d1dbaae1720773ed614e747983189fce7a54113"
+      },
+      "toolResult": {
+        "line": 51,
+        "byteOffset": 10796108,
+        "bytes": 315212,
+        "sha256": "b736e885301b79de0ee1a5ed26cbdb7cb770ee3a94d0f54c4f490eaf15e8d63b"
+      },
+      "nativePayloadBytes": 117934,
+      "nativePayloadSha256": "a64e84e2cf0f7bd8602fae951e4310e6c14094a239c804837adf8bdd090152f6",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        768,
+        1024
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--dark--tablet--tile-02.png",
+      "sourceBytes": 171814,
+      "sourceSha256": "d5c16322cd0660fd674649bd3d3559366ebbc7495622f4073e732a73b53a0c60",
+      "sourceDimensions": [
+        768,
+        1024
+      ],
+      "toolCallId": "toolu_01N1b7poVBk9dEWbF3S2qi6m",
+      "toolUse": {
+        "line": 52,
+        "byteOffset": 11111320,
+        "bytes": 1149,
+        "sha256": "ef908a817c9d1ce65a04129224fb4b0d7d1a6a56e27beb935d0154018349c34e"
+      },
+      "toolResult": {
+        "line": 53,
+        "byteOffset": 11112469,
+        "bytes": 458892,
+        "sha256": "a28181f2961666469e030fdc79452e4adc044405bf5b7ee06ad741714abdfc33"
+      },
+      "nativePayloadBytes": 171814,
+      "nativePayloadSha256": "d5c16322cd0660fd674649bd3d3559366ebbc7495622f4073e732a73b53a0c60",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        768,
+        1024
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--dark--tablet--tile-03.png",
+      "sourceBytes": 209891,
+      "sourceSha256": "3286431c8a78424df7bae85e71f48ea3e0c4e584e41e263590acc1a2355cbee4",
+      "sourceDimensions": [
+        768,
+        1024
+      ],
+      "toolCallId": "toolu_01UHhpdLFViPQdPKVRc5bHEu",
+      "toolUse": {
+        "line": 54,
+        "byteOffset": 11571361,
+        "bytes": 1149,
+        "sha256": "6a643c4552eb0034d7bd9bbb7afacde119c45573ed464f17c603a570c11a1edf"
+      },
+      "toolResult": {
+        "line": 55,
+        "byteOffset": 11572510,
+        "bytes": 560428,
+        "sha256": "6e7db142a0debd90c17400a29f12be1075b651be82433ee10867b7f3e7b12f76"
+      },
+      "nativePayloadBytes": 209891,
+      "nativePayloadSha256": "3286431c8a78424df7bae85e71f48ea3e0c4e584e41e263590acc1a2355cbee4",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        768,
+        1024
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--dark--tablet--tile-04.png",
+      "sourceBytes": 57171,
+      "sourceSha256": "d20a1b158c17e1750575fc4624745deff6c95c0cc1b74403d1e7db2ce2e6422e",
+      "sourceDimensions": [
+        768,
+        339
+      ],
+      "toolCallId": "toolu_01C4empCjbfDUTaw3e6TpGop",
+      "toolUse": {
+        "line": 56,
+        "byteOffset": 12132938,
+        "bytes": 1149,
+        "sha256": "fa700bbf82f15d2e1f3e25b76851c15252e45298faf1e46dece8d1ce6ec68d53"
+      },
+      "toolResult": {
+        "line": 57,
+        "byteOffset": 12134087,
+        "bytes": 153169,
+        "sha256": "2b5751579b3bea5264e50c97d27b4cd5222c0a8c042f4dc488fd2d2dd3ffe8b9"
+      },
+      "nativePayloadBytes": 57171,
+      "nativePayloadSha256": "d20a1b158c17e1750575fc4624745deff6c95c0cc1b74403d1e7db2ce2e6422e",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        768,
+        339
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--dark--mobile.png",
+      "sourceBytes": 350178,
+      "sourceSha256": "8677dd7c24791a92a124e53bb3dd0448200a353f681e25b0f0397b2e137a77c0",
+      "sourceDimensions": [
+        390,
+        4752
+      ],
+      "toolCallId": "toolu_014h6A2ggwK8FcPHV4DV9udX",
+      "toolUse": {
+        "line": 58,
+        "byteOffset": 12287256,
+        "bytes": 1131,
+        "sha256": "362ed6abb254287fee34cef22b03103307a769c383ce1e4821fcad4b2f360aa8"
+      },
+      "toolResult": {
+        "line": 59,
+        "byteOffset": 12288387,
+        "bytes": 532348,
+        "sha256": "092321036e94c06af4c76dbedecab30aa76ddf6fc3186f21e59f17f9ff681423"
+      },
+      "nativePayloadBytes": 199362,
+      "nativePayloadSha256": "d55e4c6b06e3b50b2f1d8976ec4ddbd6bae01605700aa1dddcfab0040b3f7bf7",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        164,
+        1998
+      ],
+      "payloadByteEqualSource": false,
+      "transformationStatus": "NATIVE_PAYLOAD_DIFFERS_SOURCE_RESIZE_OR_REENCODE_CAUSE_NOT_PROVED",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--dark--mobile--tile-01.png",
+      "sourceBytes": 90798,
+      "sourceSha256": "3f7d8b7031d930f43c8d40f543c6963d928c5baf5e43b23366b3236b7c837570",
+      "sourceDimensions": [
+        390,
+        844
+      ],
+      "toolCallId": "toolu_011cW84b9fe3HfXQFANRCtTu",
+      "toolUse": {
+        "line": 61,
+        "byteOffset": 12821102,
+        "bytes": 1149,
+        "sha256": "c9aacc8035152747d42b390974205c8bd4a21513c7bd1affd14326e296519b11"
+      },
+      "toolResult": {
+        "line": 62,
+        "byteOffset": 12822251,
+        "bytes": 242841,
+        "sha256": "575af6e1188b47b5730cba267d9bab9e98fd1d9edd2c0e12aa72810e7ad72496"
+      },
+      "nativePayloadBytes": 90798,
+      "nativePayloadSha256": "3f7d8b7031d930f43c8d40f543c6963d928c5baf5e43b23366b3236b7c837570",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        390,
+        844
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--dark--mobile--tile-02.png",
+      "sourceBytes": 38263,
+      "sourceSha256": "bb5be3e407ed21f04f2c7e1fe63dcf2ebf9aac08443971aa1e6b0bfc8bb5e4bf",
+      "sourceDimensions": [
+        390,
+        844
+      ],
+      "toolCallId": "toolu_018jgxjdLvxDJoUXex4P7F1S",
+      "toolUse": {
+        "line": 63,
+        "byteOffset": 13065092,
+        "bytes": 1149,
+        "sha256": "cab5b266f82c5568462fe98fcb5f841100aa08621e8451824c5cd3d347bb3c52"
+      },
+      "toolResult": {
+        "line": 64,
+        "byteOffset": 13066241,
+        "bytes": 102753,
+        "sha256": "21d0a331f3dc2340c8b3ecaa00eb79a3d574502bfae508b737211ff4a9a6587e"
+      },
+      "nativePayloadBytes": 38263,
+      "nativePayloadSha256": "bb5be3e407ed21f04f2c7e1fe63dcf2ebf9aac08443971aa1e6b0bfc8bb5e4bf",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        390,
+        844
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--dark--mobile--tile-03.png",
+      "sourceBytes": 124124,
+      "sourceSha256": "f9932315bbe8825f71b765aa6942d3d8479ec3812806c7abc4208b47f7b4db07",
+      "sourceDimensions": [
+        390,
+        844
+      ],
+      "toolCallId": "toolu_01Cfw2zWWHvdZFrGhcfVJW5o",
+      "toolUse": {
+        "line": 65,
+        "byteOffset": 13168994,
+        "bytes": 1149,
+        "sha256": "2fb4c7eb9f5a04fa498531124700218d120f5b8aa2cef699a22eb94b7788f6c8"
+      },
+      "toolResult": {
+        "line": 66,
+        "byteOffset": 13170143,
+        "bytes": 331714,
+        "sha256": "2b43eab78c2e94d53ce898d67dc067da7970e885078babea9d85a29767eb7677"
+      },
+      "nativePayloadBytes": 124124,
+      "nativePayloadSha256": "f9932315bbe8825f71b765aa6942d3d8479ec3812806c7abc4208b47f7b4db07",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        390,
+        844
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--dark--mobile--tile-04.png",
+      "sourceBytes": 111280,
+      "sourceSha256": "a5489988c9193e592e75e83b88ef3da9737fe9ff1d0a9929bf6291f6a6df5746",
+      "sourceDimensions": [
+        390,
+        844
+      ],
+      "toolCallId": "toolu_01F9KS2ggfLApJVoXULSxM5C",
+      "toolUse": {
+        "line": 67,
+        "byteOffset": 13501857,
+        "bytes": 1149,
+        "sha256": "be001d6247694cb742426dfa0badcbc7e50011e5faa9ab2514ff805ca9f1d868"
+      },
+      "toolResult": {
+        "line": 68,
+        "byteOffset": 13503006,
+        "bytes": 297466,
+        "sha256": "3486590ab70f31d7b6f1d3a4f9ca99a1443df59f849379bed80bf98d5a59e813"
+      },
+      "nativePayloadBytes": 111280,
+      "nativePayloadSha256": "a5489988c9193e592e75e83b88ef3da9737fe9ff1d0a9929bf6291f6a6df5746",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        390,
+        844
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--dark--mobile--tile-05.png",
+      "sourceBytes": 121713,
+      "sourceSha256": "5e5330a94ce6df4dfc47313252632efb8c0066e19c456b4bca65326dceeb5a9f",
+      "sourceDimensions": [
+        390,
+        844
+      ],
+      "toolCallId": "toolu_01VJ3DBfMardnYkx3obu93Dd",
+      "toolUse": {
+        "line": 69,
+        "byteOffset": 13800472,
+        "bytes": 1147,
+        "sha256": "63ade7a9a21058fb3fa842e06877d5d46a11dbb59cbcb779073d75fe0a0743b7"
+      },
+      "toolResult": {
+        "line": 70,
+        "byteOffset": 13801619,
+        "bytes": 325282,
+        "sha256": "68abbb10502e75a2717548a06175c37b80bb861eb08d6a6e6720f58985050da5"
+      },
+      "nativePayloadBytes": 121713,
+      "nativePayloadSha256": "5e5330a94ce6df4dfc47313252632efb8c0066e19c456b4bca65326dceeb5a9f",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        390,
+        844
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--dark--mobile--tile-06.png",
+      "sourceBytes": 64158,
+      "sourceSha256": "07e0b97c50c74ca8fc78d9d4952098113f47ef10ca3964ed61ba65b37c902910",
+      "sourceDimensions": [
+        390,
+        532
+      ],
+      "toolCallId": "toolu_01K6hiWgjDYWPoKnkR5ThrH9",
+      "toolUse": {
+        "line": 71,
+        "byteOffset": 14126901,
+        "bytes": 1147,
+        "sha256": "8ce8a3de9af12ece792cbc6db9f41d5fb248335253578022046936365e5d0649"
+      },
+      "toolResult": {
+        "line": 72,
+        "byteOffset": 14128048,
+        "bytes": 171801,
+        "sha256": "cfff97c1782e4341e37d649edb7e2727e947afbd2dde77e711c29bd4e669fcda"
+      },
+      "nativePayloadBytes": 64158,
+      "nativePayloadSha256": "07e0b97c50c74ca8fc78d9d4952098113f47ef10ca3964ed61ba65b37c902910",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        390,
+        532
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--a4-page-1.png",
+      "sourceBytes": 111562,
+      "sourceSha256": "a81fd0249e0c033f13ae819d03f7c099b567a118a10e1413924d7446c64c73fe",
+      "sourceDimensions": [
+        909,
+        1287
+      ],
+      "toolCallId": "toolu_01XYaAnuow7v9XB6fm8pebXS",
+      "toolUse": {
+        "line": 73,
+        "byteOffset": 14299849,
+        "bytes": 1123,
+        "sha256": "6a3f19a9bccd99e7629881e40c7b7dc81b94dafcb77f03607adc82784345715e"
+      },
+      "toolResult": {
+        "line": 74,
+        "byteOffset": 14300972,
+        "bytes": 298220,
+        "sha256": "b27c8454a57faf372275ac4cf5b55d002a8218745c1cf69d9783b339416c864a"
+      },
+      "nativePayloadBytes": 111562,
+      "nativePayloadSha256": "a81fd0249e0c033f13ae819d03f7c099b567a118a10e1413924d7446c64c73fe",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        909,
+        1287
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--a4-page-2.png",
+      "sourceBytes": 159748,
+      "sourceSha256": "22a2d71372374aec7a539d7972c963cc296fd850546b06fe9e4e2632919d6bf0",
+      "sourceDimensions": [
+        909,
+        1287
+      ],
+      "toolCallId": "toolu_013tr7K8ZZwa67fK1Sp1yD69",
+      "toolUse": {
+        "line": 75,
+        "byteOffset": 14599192,
+        "bytes": 1123,
+        "sha256": "472c5f57b8ef861b71c89033187905345a6b9c560f9676f3aaa39da86c2bed1e"
+      },
+      "toolResult": {
+        "line": 76,
+        "byteOffset": 14600315,
+        "bytes": 426716,
+        "sha256": "bc6dcc2a02920ae8deefffbb52d8d8533add80fab5ef05273a02fed5bd7c2552"
+      },
+      "nativePayloadBytes": 159748,
+      "nativePayloadSha256": "22a2d71372374aec7a539d7972c963cc296fd850546b06fe9e4e2632919d6bf0",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        909,
+        1287
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    },
+    {
+      "path": "clean--a4-page-3.png",
+      "sourceBytes": 182237,
+      "sourceSha256": "1346c59692d64579bdfe7eaa25b4ff54cefa8c47c0bff0e3896fcbd8c929eea7",
+      "sourceDimensions": [
+        909,
+        1287
+      ],
+      "toolCallId": "toolu_019r3rrFkwihjU2tGUNCTnLA",
+      "toolUse": {
+        "line": 77,
+        "byteOffset": 15027031,
+        "bytes": 1123,
+        "sha256": "5ea0b55b646f830cae7a242c511a74bcf0cd184251099542c03c94c6832ddeeb"
+      },
+      "toolResult": {
+        "line": 78,
+        "byteOffset": 15028154,
+        "bytes": 486684,
+        "sha256": "b18177e40cd5e9fd7aed5475c4855691f5b085a0621420403baa34dee562c531"
+      },
+      "nativePayloadBytes": 182237,
+      "nativePayloadSha256": "1346c59692d64579bdfe7eaa25b4ff54cefa8c47c0bff0e3896fcbd8c929eea7",
+      "nativeMediaType": "image/png",
+      "nativePNGDimensions": [
+        909,
+        1287
+      ],
+      "payloadByteEqualSource": true,
+      "transformationStatus": "BYTE_EQUAL",
+      "readTextMetadata": []
+    }
+  ]
+}

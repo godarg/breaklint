@@ -17,12 +17,19 @@ export function coverageAccounting(rows: readonly RuleCoverage[]) {
 }
 
 export function coverageAccountingText(counts: ReturnType<typeof coverageAccounting>): string {
+  const unmeasuredUnit = counts.applicableUnmeasured === 1 ? "evaluation" : "evaluations";
   return `${counts.measured} of ${counts.candidates} applicable rule-candidate evaluations measured; ` +
-    `${counts.applicableUnmeasured} applicable evaluations not measured; ` +
+    `${counts.applicableUnmeasured} applicable ${unmeasuredUnit} not measured; ` +
     `outside coverage base: ${counts.notApplicable} not applicable, ${counts.toolUnavailable} unavailable tool capability`;
 }
 
 export const COVERAGE_COUNT_NOTICE = "Counts are rule-candidate evaluations, not unique document objects. Document-level diagnostics are listed separately.";
+
+export type DeclineBaseCategory =
+  | "in coverage base"
+  | "outside base: not applicable"
+  | "outside base: tool unavailable"
+  | "outside rule base";
 
 export interface DeclineReason {
   document: string;
@@ -30,6 +37,14 @@ export interface DeclineReason {
   scope: NotMeasured["scope"];
   reason: NotMeasured["reason"];
   count: number;
+  baseCategory: DeclineBaseCategory;
+}
+
+function classifyDeclineBase(entry: Pick<NotMeasured, "ruleId" | "reason">): DeclineBaseCategory {
+  if (entry.ruleId === null) return "outside rule base";
+  if (IS.nonApplicableEnvId.has(entry.reason)) return "outside base: not applicable";
+  if (IS.toolCapabilityEnvId.has(entry.reason)) return "outside base: tool unavailable";
+  return "in coverage base";
 }
 
 export interface FindingGroup {
@@ -78,7 +93,7 @@ export function projectDecisions(report: Report): ReportDecisions {
       if (existing) existing.count += entry.count;
       else declinesByKey.set(key, {
         document: document.path, ruleId: entry.ruleId, scope: entry.scope,
-        reason: entry.reason, count: entry.count,
+        reason: entry.reason, count: entry.count, baseCategory: classifyDeclineBase(entry),
       });
     }
   }

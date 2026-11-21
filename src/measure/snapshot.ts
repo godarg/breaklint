@@ -37,7 +37,7 @@ import type { BreakCauseCascadeHint } from "../core/enums.ts";
 import type { InjectionResult } from "../source/inject.ts";
 import { coordinateAtUtf8Byte } from "../source/bytes.ts";
 import { isNotRendered } from "../rules/shared.ts";
-import { buildFigureIndex, figureBodyIdentity } from "../source/figure-index.ts";
+import { buildFigureIndexDetail, figureBodyIdentity, isExecutableScript } from "../source/figure-index.ts";
 import { buildTableIndex, measuredTableBodyFragments } from "../source/table-index.ts";
 
 type Node = DefaultTreeAdapterMap["node"];
@@ -74,7 +74,9 @@ export interface SourceModel {
   runs: SourceRunModel[];
   uriRefs: Omit<UriRef, "nodeKey" | "requested">[];
   scriptBearing: boolean;
+  elementCount?: number;
   figureIndex: NonNullable<Snapshot["figureIndex"]>;
+  figureIndexStructuralComplete?: boolean;
   tableIndex: NonNullable<Snapshot["tableIndex"]>;
 }
 
@@ -214,6 +216,7 @@ export function buildSourceModel(
   const runs: SourceRunModel[] = [];
   const uriRefs: SourceModel["uriRefs"] = [];
   let scriptBearing = false;
+  let elementCount = 0;
 
   const walk = (
     node: Node,
@@ -223,10 +226,12 @@ export function buildSourceModel(
     inheritedLang: string,
   ): void => {
     if (isElement(node)) {
+      elementCount += 1;
       const attrs = attrsOf(node);
       const sid = attrs["data-bl-sid"] ?? currentSid;
       const lang = attrs.lang ?? inheritedLang;
-      if (node.tagName.toLowerCase() === "script" || Object.keys(attrs).some((name) => /^on[a-z]/u.test(name))) {
+      if ((node.tagName.toLowerCase() === "script" && isExecutableScript(attrs))
+        || Object.keys(attrs).some((name) => /^on[a-z]/u.test(name))) {
         scriptBearing = true;
       }
       const ownSid = attrs["data-bl-sid"] ?? null;
@@ -286,7 +291,13 @@ export function buildSourceModel(
   for (const sheet of additionalCss) {
     uriRefs.push(...cssUriParts(sheet.text, sheet.origin, distributionRoot, "style-sheet"));
   }
-  return { blocks, orderedBlocks, runs, uriRefs, scriptBearing, figureIndex: buildFigureIndex(document), tableIndex: buildTableIndex(document) };
+  const figureDetail = buildFigureIndexDetail(document);
+  return {
+    blocks, orderedBlocks, runs, uriRefs, scriptBearing, elementCount,
+    figureIndex: figureDetail.index,
+    figureIndexStructuralComplete: figureDetail.structuralComplete,
+    tableIndex: buildTableIndex(document),
+  };
 }
 
 export interface ControlSignature {
@@ -393,7 +404,7 @@ export interface RawSnapshot {
   svg: RawSvg[];
   requestedUrls: string[];
   fontFamilies: string[];
-  figureBodies?: { sid: string; tag: string; authorId: string | null; value: string; page: number; box: BlockRecord["box"]; visible: boolean }[];
+  figureBodies?: { sid: string; tag: string; authorId: string | null; value: string; page: number; box: BlockRecord["box"]; visible: boolean; nonRendered?: boolean }[];
   tables?: (import("../core/types.ts").TableFragment & { sid: string | null })[];
   control: ControlSignature;
 }
@@ -1082,14 +1093,17 @@ export const SNAPSHOT_SOURCE = `(() => {
     // Paint effects can remove all content without removing the root's CSS box. The page
     // location is usable only for this simple body seam; complex clipping stays a decline.
     let simplePaint = true;
+    let displayNone = false;
     for (let at = el; at && at !== page; at = P.parent(at)) {
       const style = P.style(at, null);
-      if (effect(style.clipPath) || effect(style.mask) || effect(style.filter)) { simplePaint = false; break; }
+      if (style.display === "none") displayNone = true;
+      if (effect(style.clipPath) || effect(style.mask) || effect(style.filter)) simplePaint = false;
     }
+    const nonRendered = displayNone && P.rects(el).length === 0;
     const viewport = P.rect(el);
     figureBodies.push({ sid: P.attr(owner, "data-bl-sid"), tag, authorId: P.attr(el, "id"),
       value: tag === "svg" ? P.outerHtml(el) : P.attr(el, "src") || "",
-      page: pageIndex + 1, box: box(el), visible: simplePaint && P.painted(el) === true && (tag === "img"
+      page: pageIndex + 1, box: box(el), ...(nonRendered ? { nonRendered: true } : {}), visible: simplePaint && P.painted(el) === true && (tag === "img"
         ? P.replaced(el).naturalWidth > 0 && P.replaced(el).naturalHeight > 0
         : P.all(el, "rect,circle,ellipse,line,polyline,polygon,path,text,image").some(part => {
           if (P.closest(part, "defs,symbol,clipPath,mask,pattern") || P.closest(P.parent(part), "svg") !== el || P.painted(part) !== true) return false;
@@ -1109,11 +1123,14 @@ export const SNAPSHOT_SOURCE = `(() => {
   pagesEls.forEach((page, pageIndex) => P.all(page, "table").forEach((table) => {
     if (!inFlow(table)) return;
     let flowReason = null;
+    let displayNone = false;
     for (let at = table; at && at !== page; at = P.parent(at)) {
       const style = P.style(at, null);
-      if (style.writingMode && style.writingMode !== "horizontal-tb") { flowReason = "env/vertical-writing"; break; }
-      if (style.columnCount && style.columnCount !== "auto" && style.columnCount !== "1") { flowReason = "env/multicolumn"; break; }
+      if (style.display === "none") displayNone = true;
+      if (flowReason === null && style.writingMode && style.writingMode !== "horizontal-tb") flowReason = "env/vertical-writing";
+      if (flowReason === null && style.columnCount && style.columnCount !== "auto" && style.columnCount !== "1") flowReason = "env/multicolumn";
     }
+    const nonRendered = displayNone && P.rects(table).length === 0;
     const rows = P.all(table, "tr").filter(row => P.closest(row, "table") === table).map(row => ({
       sid: P.attr(row, "data-bl-sid"),
       cells: P.all(row, "td,th").filter(cell => P.closest(cell, "tr") === row && P.closest(cell, "table") === table).map(cell => ({
@@ -1123,7 +1140,7 @@ export const SNAPSHOT_SOURCE = `(() => {
         rowSpan: P.attr(cell, "rowspan") === null ? 1 : Number(P.attr(cell, "rowspan")),
       })),
     }));
-    tables.push({ sid: P.attr(table, "data-bl-sid"), page: pageIndex + 1, box: box(table), visible: P.painted(table) === true, flowReason, rows });
+    tables.push({ sid: P.attr(table, "data-bl-sid"), page: pageIndex + 1, box: box(table), visible: P.painted(table) === true, ...(nonRendered ? { nonRendered: true } : {}), flowReason, rows });
   }));
   return { pages, blocks, textLines, svg, figureBodies, tables,
     requestedUrls: performance.getEntriesByType("resource").map((e) => e.name),
@@ -1156,6 +1173,11 @@ export interface AssembleSnapshotInput {
   /** Partial producer-bound original leaves; sourceMap always describes the inspected input. */
   originalSourceMap?: Record<string, SourceRef>;
   originalSourceAmbiguity?: Record<string, SourceRef[]>;
+  /**
+   * Runtime proof that a script-bearing document produced zero DOM mutations and preserved the
+   * exact static figure/ID/anchor/reference-link tree before and after pagination.
+   */
+  runtimeFigureVerification?: { verified: boolean };
 }
 
 export interface SnapshotInvariantValidation {
@@ -1511,8 +1533,10 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
   // running. An absent inventory is an explicit decline for enabled figure rules.
   const hasFigureSource = (sid: string): boolean =>
     sid.length > 0 && Object.hasOwn(input.sourceMap, sid) && input.sourceMap[sid] !== undefined;
-  const figureIndexAvailable = input.sourceMapInjection && input.sourceModel.figureIndex.complete &&
-    !input.sourceModel.scriptBearing &&
+  const figureScriptsVerified = !input.sourceModel.scriptBearing || input.runtimeFigureVerification?.verified === true;
+  const figureStructurallyComplete = input.sourceModel.figureIndex.complete
+    || (input.sourceModel.figureIndexStructuralComplete === true && figureScriptsVerified);
+  const figureIndexAvailable = input.sourceMapInjection && figureStructurallyComplete && figureScriptsVerified &&
     input.sourceModel.figureIndex.figures.every(figure =>
       hasFigureSource(figure.sid) && figure.captionSids.every(hasFigureSource)) &&
     input.sourceModel.figureIndex.referenceBlocks.every(block => hasFigureSource(block.sid));
@@ -1560,12 +1584,13 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
     },
     ...(figureIndexAvailable ? { figureIndex: {
       ...input.sourceModel.figureIndex,
-      complete: input.sourceMapInjection && input.sourceModel.figureIndex.complete && !input.sourceModel.scriptBearing && input.raw.figureBodies !== undefined,
+      complete: input.sourceMapInjection && figureStructurallyComplete && figureScriptsVerified && input.raw.figureBodies !== undefined,
       figures: input.sourceModel.figureIndex.figures.map(figure => ({ ...figure,
         bodyFragments: figure.body?.tag === "table" ? measuredTableBodyFragments({
           fragments: (input.raw.tables ?? []).filter(table => table.sid === figure.body?.tableSid),
         }, figure.body.identity) : (input.raw.figureBodies ?? []).filter(body => body.sid === figure.sid).map(body => ({
           page: body.page, box: body.box, visible: body.visible,
+          ...(body.nonRendered ? { nonRendered: true } : {}),
           identity: figureBodyIdentity(body.tag, body.authorId, body.value),
         })),
       })),
