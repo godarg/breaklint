@@ -1433,10 +1433,16 @@ function integritySourceWithCapability(expectedSids: readonly string[], capabili
     const P = window.__blPrimitives;
     const expected = ${JSON.stringify(expectedSids)};
     let sidMutations = 0, prePaginationScriptMutations = 0, parseDone = false, paginationStarted = false, late = false, mutationRecordsAfterRendered = 0, paginationPreviewCalls = 0;
+    let previewFigureTree = null;
     const microtask = queueMicrotask;
-    P.on(document, "DOMContentLoaded", () => { microtask(() => { parseDone = true; }); });
-    const Observer = MutationObserver;
-    const observer = new Observer((records) => {
+    // Parse end is taken from a window capture listener registered before any page script, so a
+    // page that stops DOMContentLoaded propagation cannot keep later script mutations uncounted.
+    P.on(window, "DOMContentLoaded", () => { microtask(() => { parseDone = true; }); }, true);
+    // Nodes the apparatus itself inserts before pagination (the animation-freeze style). Identity,
+    // not an attribute, decides: an author node carrying our marker attribute still counts.
+    const ownNodes = [];
+    const isOwn = (node) => { for (let i = 0; i < ownNodes.length; i += 1) if (ownNodes[i] === node) return true; return false; };
+    const process = (records) => {
       for (const record of records) {
         const type = P.mutationType(record);
         if (late) mutationRecordsAfterRendered += 1;
@@ -1446,15 +1452,28 @@ function integritySourceWithCapability(expectedSids: readonly string[], capabili
           // nodes or mutates attributes; after DOMContentLoaded's microtask any mutation is script
           // activity, and any synchronous parse-time element/figure/reference mutation is caught
           // by exact element-count and figure-tree fingerprint parity before pagination.
-          if (parseDone || type === "attributes" || P.mutationRemovedCount(record) > 0) {
+          const added = type === "childList" ? P.mutationAddedNodes(record) : [];
+          let own = type === "childList" && added.length > 0 && P.mutationRemovedCount(record) === 0;
+          for (let i = 0; own && i < added.length; i += 1) own = isOwn(added[i]);
+          if (!own && (parseDone || type === "attributes" || P.mutationRemovedCount(record) > 0)) {
             prePaginationScriptMutations += 1;
           }
         }
         if (type === "attributes" && P.startsWith(P.mutationAttributeName(record) || "", "data-bl-")) sidMutations += 1;
       }
-    });
+    };
+    const Observer = MutationObserver;
+    const observer = new Observer(process);
     observer.observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
-    const markPaginationStart = () => { if (paginationStarted) return false; paginationStarted = true; return true; };
+    // Called synchronously inside the guarded preview(): records still queued for the observer are
+    // taken and judged as pre-pagination activity before the phase changes.
+    const markPaginationStart = () => {
+      if (paginationStarted) return false;
+      process(P.mutationTakeRecords(observer));
+      paginationStarted = true;
+      return true;
+    };
+    const markOwn = (node) => { ownNodes[ownNodes.length] = node; return true; };
     const armLate = () => { if (late) return false; late = true; return true; };
     // Where each source id sits: outside any page (the source before pagination) or in a page's
     // content is the FLOW, whose order must be the source order; margin boxes hold running-element
@@ -1485,13 +1504,27 @@ function integritySourceWithCapability(expectedSids: readonly string[], capabili
       return { sidMutations, prePaginationScriptMutations, mutationRecordsAfterRendered, paginationPreviewCalls, sids, pageCount: pages.length,
         footnoteSids, pageBoxSids, displacedSids, marginSids, expected };
     };
-    const recordPaginationPreview = () => { paginationPreviewCalls += 1; return paginationPreviewCalls; };
-    P.installIntegrity(${JSON.stringify(capability)}, { markPaginationStart, armLate, recordPreview: recordPaginationPreview, status });
+    const recordPaginationPreview = (tree) => {
+      paginationPreviewCalls += 1;
+      if (paginationPreviewCalls === 1) previewFigureTree = tree === undefined ? null : tree;
+      return paginationPreviewCalls;
+    };
+    P.installIntegrity(${JSON.stringify(capability)}, { markPaginationStart, armLate, recordPreview: recordPaginationPreview, markOwn,
+      previewFigureTree: () => previewFigureTree, status });
   })()`;
 }
 
 function prePaginationFigureProbeSource(capability: string): string {
-  return `(() => {
+  return `(${figureProbeFunctionSource(capability)})()`;
+}
+
+/**
+ * The figure/ID/anchor/reference probe as a function expression. It runs once from Node after the
+ * document loaded and once synchronously inside the guarded preview() call (the last tree sample
+ * before Paged.js starts); the two results must match.
+ */
+function figureProbeFunctionSource(capability: string): string {
+  return `() => {
   const P = window.__blPrimitives;
   const prePaginationScriptMutations = P.integrityStatus(${JSON.stringify(capability)}).prePaginationScriptMutations;
   const ids = Object.create(null);
@@ -1572,7 +1605,7 @@ function prePaginationFigureProbeSource(capability: string): string {
     if (P.attr(allElements[i], "data-breaklint-intervention") !== "animations-disabled") elementCount += 1;
   }
   return { ids, namedAnchors, figures, referenceBlocks: [...refGroups.values()], prePaginationScriptMutations, elementCount };
-})()`;
+}`;
 }
 
 function mapRuntimeFigureBody(body: RawRuntimeFigureBody) {
@@ -1729,13 +1762,17 @@ export function integrityStatusSource(capability: string): string {
   return `window.__blPrimitives.integrityStatus(${JSON.stringify(capability)})`;
 }
 
-export function paginationApparatusSource(capability: string): string {
+export function integrityPreviewFigureTreeSource(capability: string): string {
+  return `window.__blPrimitives.integrityPreviewFigureTree(${JSON.stringify(capability)})`;
+}
+
+export function paginationApparatusSource(capability: string, options: { figureTree?: boolean } = {}): string {
   return `(() => {
     const P = window.__blPrimitives;
     if (P.all(document, ".pagedjs_page").length > 0) {
       throw new Error("pagination began before the Node-controlled apparatus was installed");
     }
-    P.integrityMarkPaginationStart(${JSON.stringify(capability)});
+    const probeFigureTree = ${options.figureTree ? figureProbeFunctionSource(capability) : "null"};
     const apparatus = P.pagedApparatus(${JSON.stringify(capability)});
     const Paged = apparatus.value;
     const Previewer = apparatus.Previewer;
@@ -1747,7 +1784,14 @@ export function paginationApparatusSource(capability: string): string {
     P.registerPagedHandler(${JSON.stringify(capability)}, BreaklintReady);
     const guardedPreview = function() {
       previewCalls += 1;
-      P.integrityRecordPreview(${JSON.stringify(capability)});
+      let tree = null;
+      if (previewCalls === 1) {
+        // Synchronously before the original call: judge pending observer records, change phase,
+        // then take the last figure-tree sample. No page task can run in between.
+        P.integrityMarkPaginationStart(${JSON.stringify(capability)});
+        if (probeFigureTree) { try { tree = probeFigureTree(); } catch (_) { tree = null; } }
+      }
+      P.integrityRecordPreview(${JSON.stringify(capability)}, tree);
       if (previewCalls !== 1) throw new Error("pagination preview was invoked more than once");
       return P.invoke0(originalPreview, this);
     };
@@ -1756,14 +1800,17 @@ export function paginationApparatusSource(capability: string): string {
   })()`;
 }
 
-const ANIMATION_FREEZE_SOURCE = `(() => {
+function animationFreezeSource(capability: string): string {
+  return `(() => {
   const P = window.__blPrimitives;
   if (P.all(document, 'style[data-breaklint-intervention="animations-disabled"]').length > 0) return;
   const style = P.create("style");
   P.setAttr(style, "data-breaklint-intervention", "animations-disabled");
   P.setText(style, "*,*::before,*::after{animation:none!important;transition:none!important}");
+  P.integrityMarkOwn(${JSON.stringify(capability)}, style);
   P.append(document.head || document.documentElement, style);
 })()`;
+}
 
 const ANIMATION_STATUS_SOURCE = `(() => {
   const P = window.__blPrimitives;
@@ -2046,25 +2093,10 @@ async function openContentPage(
       : null;
     await page.evaluate<void>(paginationBundleSource(context.pagedjsSource));
     if (collectorNonce) await page.evaluate<void>(collectorSource(apparatusCapability, collectorNonce));
-    await page.evaluate<void>(paginationApparatusSource(apparatusCapability));
-    await page.evaluate<void>(ANIMATION_FREEZE_SOURCE);
+    await page.evaluate<void>(paginationApparatusSource(apparatusCapability, { figureTree: capturePrePaginationFigureTree }));
+    await page.evaluate<void>(animationFreezeSource(apparatusCapability));
     await verifyAnimationIntervention(page, "pre-pagination");
-    // Re-sample the figure/ID/anchor/reference tree AFTER installing the animation-freeze style
-    // (before Paged.js runs) so a page MutationObserver reacting to the style insertion cannot
-    // mutate href/id/figure links undetected after the first probe.
-    const prePaginationFigureTreeAfter = capturePrePaginationFigureTree
-      ? await page.evaluate<RawRuntimeFigureTree>(prePaginationFigureProbeSource(apparatusCapability))
-      : null;
-    const prePaginationFigureTree = prePaginationFigureTreeBefore && prePaginationFigureTreeAfter &&
-      prePaginationFigureTreeBefore.elementCount === prePaginationFigureTreeAfter.elementCount &&
-      JSON.stringify(prePaginationFigureTreeBefore.ids) === JSON.stringify(prePaginationFigureTreeAfter.ids) &&
-      JSON.stringify(prePaginationFigureTreeBefore.namedAnchors) === JSON.stringify(prePaginationFigureTreeAfter.namedAnchors) &&
-      JSON.stringify(prePaginationFigureTreeBefore.figures) === JSON.stringify(prePaginationFigureTreeAfter.figures) &&
-      JSON.stringify(prePaginationFigureTreeBefore.referenceBlocks) === JSON.stringify(prePaginationFigureTreeAfter.referenceBlocks)
-      ? prePaginationFigureTreeAfter
-      : null;
     const prePagination = await page.evaluate<RuntimeIntegrityStatus>(integrityStatusSource(apparatusCapability));
-    const prePaginationScriptMutations = prePaginationFigureTreeBefore?.prePaginationScriptMutations ?? 0;
     const sidIssues = validateRuntimeSidState(expectedSids, prePagination);
     if (sidIssues.length > 0) throw new Error(`runtime source-id integrity failed: ${sidIssues.join("; ")}`);
     // Print-only font faces do not enter the FontFaceSet until the print media query applies.
@@ -2127,7 +2159,7 @@ async function openContentPage(
     // Paged.js rebuilds stylesheet ownership while it constructs the page tree and may consume
     // the source intervention node. Re-establish the same idempotent rule on the final tree, then
     // verify both its connection and computed effect rather than reporting a consumed node.
-    await page.evaluate<void>(ANIMATION_FREEZE_SOURCE);
+    await page.evaluate<void>(animationFreezeSource(apparatusCapability));
     await verifyAnimationIntervention(page, "post-pagination");
     const postPagination = await page.evaluate<RuntimeIntegrityStatus>(integrityStatusSource(apparatusCapability));
     const postPaginationSidIssues = validateRuntimeSidState(expectedSids, postPagination);
@@ -2137,6 +2169,20 @@ async function openContentPage(
     if (postPagination.paginationPreviewCalls !== 1) {
       throw new Error(`pagination apparatus epoch violated: ${postPagination.paginationPreviewCalls} preview call(s)`);
     }
+    // The last figure-tree sample was taken synchronously inside preview(); it must equal the one
+    // taken after load. The counter is read after the phase change, so it covers the whole window.
+    const prePaginationFigureTreeAtPreview = capturePrePaginationFigureTree
+      ? await page.evaluate<RawRuntimeFigureTree | null>(integrityPreviewFigureTreeSource(apparatusCapability))
+      : null;
+    const prePaginationFigureTree = prePaginationFigureTreeBefore && prePaginationFigureTreeAtPreview &&
+      prePaginationFigureTreeBefore.elementCount === prePaginationFigureTreeAtPreview.elementCount &&
+      JSON.stringify(prePaginationFigureTreeBefore.ids) === JSON.stringify(prePaginationFigureTreeAtPreview.ids) &&
+      JSON.stringify(prePaginationFigureTreeBefore.namedAnchors) === JSON.stringify(prePaginationFigureTreeAtPreview.namedAnchors) &&
+      JSON.stringify(prePaginationFigureTreeBefore.figures) === JSON.stringify(prePaginationFigureTreeAtPreview.figures) &&
+      JSON.stringify(prePaginationFigureTreeBefore.referenceBlocks) === JSON.stringify(prePaginationFigureTreeAtPreview.referenceBlocks)
+      ? prePaginationFigureTreeAtPreview
+      : null;
+    const prePaginationScriptMutations = postPagination.prePaginationScriptMutations ?? 0;
     network.afterRendered = true;
     const quiet = await awaitNetworkQuiet(network, PAGINATION_TIMEOUT_MS, signal);
     if (!quiet) {

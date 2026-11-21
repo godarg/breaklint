@@ -7,6 +7,9 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { after, before, describe, it } from "node:test";
 import type { Report } from "../../src/core/types.ts";
+import { launchBrowser, resolvePackageRoot } from "../../src/acquire/browser.ts";
+import * as renderRun from "../../src/acquire/render-run.ts";
+import { PRIMITIVES_SOURCE, TEST_PRIMITIVES_CAPABILITY } from "../../src/measure/primitives.ts";
 const repo = fileURLToPath(new URL("../..", import.meta.url));
 const root = mkdtempSync(join(tmpdir(), "breaklint-figure-live-"));
 const expected = JSON.parse(readFileSync(join(repo, "tests/fixtures/figures/expected.json"), "utf8")) as {
@@ -112,6 +115,82 @@ it("runtime-verifies figure index for data/inert scripts and fails closed on DOM
   assert.equal(mutRun.status, 4, `mutating script must decline figure index: ${mutRun.stdout}${mutRun.stderr}`);
   const mutReport = JSON.parse(readFileSync(join(mutDir, "report.json"), "utf8")) as Report;
   assert.ok(mutReport.documents[0]!.notMeasured.some(n => n.reason === "env/figure-index-unavailable"));
+});
+it("observes script mutations up to the guarded preview call and keeps a clean scripted figure verified (P3)", () => {
+  const runCase = (name: string, script: string, expectedExit: number) => {
+    const dir = join(root, name); mkdirSync(dir);
+    symlinkSync(join(repo, "node_modules"), join(dir, "node_modules"));
+    writeFileSync(join(dir, "doc.html"), `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Guarded preview ${name}</title>
+<style>@page { size: 120mm 140mm; margin: 10mm; } body { font: 14px/1.5 serif; } figure { margin: 0; }</style></head>
+<body><p id="lead">See <a href="#fig-1">Figure 1</a>.</p>
+<figure id="fig-1"><svg width="80" height="60"><rect width="80" height="60" fill="#eee"/></svg><figcaption>Figure 1: Guarded</figcaption></figure>
+<p id="tail">End.</p><script>${script}</script></body></html>`);
+    const res = spawnSync(process.execPath, [
+      join(repo, "dist/cli/index.js"), "--only", "figure/dangling-reference",
+      "--fail-on", "warn", "--format", "json", "--out", "report.json", "--out-dir", "evidence", "doc.html",
+    ], { cwd: dir, encoding: "utf8", timeout: 300_000 });
+    assert.equal(res.status, expectedExit, `${name}: ${res.stdout}${res.stderr}`);
+    return JSON.parse(readFileSync(join(dir, "report.json"), "utf8")) as Report;
+  };
+  // Positive control: an inert script leaves the figure index runtime-verified and measured.
+  const clean = runCase("guarded-clean", "window.__guardedClean = 1;", 0);
+  assert.equal(clean.documents[0]!.coverage["figure/dangling-reference"]!.measured, 1);
+  // Red control (CODE-PRINT-2): an attribute set by a timer after DOMContentLoaded on a
+  // non-figure element. Only the mutation counter can see it (no element, id or link changes).
+  const timer = runCase("guarded-timer-attribute",
+    'document.addEventListener("DOMContentLoaded", () => setTimeout(() => document.getElementById("tail").setAttribute("data-state", "late"), 0));', 4);
+  assert.ok(timer.documents[0]!.notMeasured.some(n => n.reason === "env/figure-index-unavailable"));
+  // The window between apparatus install and preview() (CDX-11) cannot be hit deterministically by
+  // a page script through the CLI (print media change events only fire on a rendering update, and
+  // then again during page.pdf()); the next test drives that window directly.
+  // Red control (CODE-PRINT-2b): the page stops DOMContentLoaded at window capture, then rewrites
+  // caption text. Parse-end detection must not depend on a listener the page can suppress.
+  const suppressed = runCase("guarded-suppressed-dcl",
+    'window.addEventListener("DOMContentLoaded", e => e.stopImmediatePropagation(), true); window.addEventListener("load", () => { document.querySelector("figcaption").firstChild.data = "Figure 9: rewritten"; });', 4);
+  assert.ok(suppressed.documents[0]!.notMeasured.some(n => n.reason === "env/figure-index-unavailable"));
+});
+it("counts mutations between apparatus install and the guarded preview call, including pending records (P3)", async () => {
+  const pagedjs = readFileSync(join(resolvePackageRoot("pagedjs", repo)!, "dist", "paged.js"), "utf8");
+  const launched = await launchBrowser(repo);
+  assert.ok(launched.browser, launched.detail);
+  const browser = launched.browser;
+  const html = '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Window</title></head><body>' +
+    '<p id="lead">See <a href="#fig-1">Figure 1</a>.</p><figure id="fig-1"><svg width="80" height="60"><rect width="80" height="60"/></svg>' +
+    '<figcaption>Figure 1</figcaption></figure><p id="tail">End.</p></body></html>';
+  // The test plays the page script: it mutates in the window after the apparatus is installed
+  // and before Paged.js starts, which is where print-media handlers and timers can act.
+  const run = async (mutate: string, beforePreview: string) => {
+    const page = await browser.newPage();
+    try {
+      await (page as unknown as { evaluateOnNewDocument(s: string): Promise<unknown> }).evaluateOnNewDocument(PRIMITIVES_SOURCE);
+      await (page as unknown as { evaluateOnNewDocument(s: string): Promise<unknown> }).evaluateOnNewDocument(renderRun.integritySource([]));
+      await page.goto(`data:text/html,${encodeURIComponent(html)}`, { waitUntil: "load", timeout: 30_000 });
+      await page.evaluate<void>(renderRun.paginationBundleSource(pagedjs));
+      await page.evaluate<void>(renderRun.paginationApparatusSource(TEST_PRIMITIVES_CAPABILITY, { figureTree: true }));
+      if (mutate) await page.evaluate<void>(mutate);
+      const preview = await page.evaluate<{ paginationError: string | null }>(`(async () => { ${beforePreview} try { await new Paged.Previewer().preview(); return { paginationError: null }; } catch (error) { return { paginationError: String(error) }; } })()`);
+      assert.equal(preview.paginationError, null);
+      const status = await page.evaluate<renderRun.RuntimeIntegrityStatus>(renderRun.integrityStatusSource(TEST_PRIMITIVES_CAPABILITY));
+      const probe = (renderRun as { integrityPreviewFigureTreeSource?: (capability: string) => string }).integrityPreviewFigureTreeSource;
+      const tree = probe ? await page.evaluate<{ ids: Record<string, number> } | null>(probe(TEST_PRIMITIVES_CAPABILITY)) : null;
+      return { status, tree };
+    } finally { await page.close(); }
+  };
+  try {
+    // Positive control: no author mutation, counter stays zero and the preview-time tree is read.
+    const clean = await run("", "");
+    assert.equal(clean.status.prePaginationScriptMutations, 0);
+    assert.equal(clean.status.paginationPreviewCalls, 1);
+    // Red control: an id rename in the window after install (CDX-11).
+    const renamed = await run('document.getElementById("fig-1").id = "fig-renamed"', "");
+    assert.ok((renamed.status.prePaginationScriptMutations ?? 0) > 0, `renamed: ${renamed.status.prePaginationScriptMutations}`);
+    // Red control: a mutation still pending as an observer record when preview() is called.
+    const pending = await run("", 'document.getElementById("tail").setAttribute("data-state", "pending");');
+    assert.ok((pending.status.prePaginationScriptMutations ?? 0) > 0, `pending: ${pending.status.prePaginationScriptMutations}`);
+    // The last tree probe runs synchronously inside the guarded preview call.
+    assert.deepEqual(clean.tree?.ids, { "fig-1": 1, lead: 1, tail: 1 });
+    assert.equal(renamed.tree?.ids["fig-renamed"], 1);
+  } finally { await browser.close(); }
 });
 it("measures responsive dual-SVG figures when one variant is display:none and fails closed otherwise", () => {
   const runInline = (name: string, html: string, expectedExit: number) => {

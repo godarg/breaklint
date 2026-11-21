@@ -216,7 +216,8 @@ const PRIMITIVES_TEMPLATE = `(() => {
   const mutationTypeGet = getter(MutationRecord.prototype, "type");
   const mutationAttributeNameGet = getter(MutationRecord.prototype, "attributeName");
   const mutationRemovedNodesGet = getter(MutationRecord.prototype, "removedNodes");
-  const readyStateGet = getter(Document.prototype, "readyState");
+  const mutationAddedNodesGet = getter(MutationRecord.prototype, "addedNodes");
+  const takeRecordsFn = MutationObserver.prototype.takeRecords;
   const offsetParentGet = getter(HTMLElement.prototype, "offsetParent");
   let integrity = null;
   let collector = null;
@@ -281,7 +282,9 @@ const PRIMITIVES_TEMPLATE = `(() => {
       },
       integrityArmLate: (capability) => { requireCapability(capability); return integrity.armLate(); },
       integrityMarkPaginationStart: (capability) => { requireCapability(capability); return integrity.markPaginationStart ? integrity.markPaginationStart() : false; },
-      integrityRecordPreview: (capability) => { requireCapability(capability); return integrity.recordPreview(); },
+      integrityRecordPreview: (capability, tree) => { requireCapability(capability); return integrity.recordPreview(tree); },
+      integrityMarkOwn: (capability, node) => { requireCapability(capability); return integrity.markOwn(node); },
+      integrityPreviewFigureTree: (capability) => { requireCapability(capability); return integrity.previewFigureTree(); },
       integrityStatus: (capability) => { requireCapability(capability); return integrity.status(); },
       installCollector: (capability, nonce, value) => {
         requireCapability(capability);
@@ -338,7 +341,8 @@ const PRIMITIVES_TEMPLATE = `(() => {
       mutationType: (record) => call.call(mutationTypeGet, record),
       mutationAttributeName: (record) => call.call(mutationAttributeNameGet, record),
       mutationRemovedCount: (record) => { const list = mutationRemovedNodesGet ? call.call(mutationRemovedNodesGet, record) : null; return list ? list.length : 0; },
-      readyState: () => (readyStateGet ? call.call(readyStateGet, document) : "complete"),
+      mutationAddedNodes: (record) => { const list = mutationAddedNodesGet ? call.call(mutationAddedNodesGet, record) : null; return list ? call.call(sliceFn, list) : []; },
+      mutationTakeRecords: (observer) => call.call(takeRecordsFn, observer),
       offsetParent: (el) => (offsetParentGet && el instanceof HTMLElement ? call.call(offsetParentGet, el) : null),
       randomToken: () => {
         const words = new Uint32Array(4);
@@ -545,9 +549,9 @@ export const PRIMITIVES_CHECK = `(() => {
   for (const name of ["fontsReady", "fontFaces", "fontStatus", "fontFamily", "imageUri", "svgBounds",
     "outerHtml", "painted", "byId", "replaced", "canvas", "spaceAdvance", "styleSheets", "sheetHref", "sheetRules", "ruleCssText", "nestedRules",
     "rects", "setAttr", "setText", "nodeType", "parent", "next", "create", "append", "remove", "setCssText",
-    "setStyle", "on", "invoke0", "installIntegrity", "integrityArmLate", "integrityMarkPaginationStart", "integrityRecordPreview",
+    "setStyle", "on", "invoke0", "installIntegrity", "integrityArmLate", "integrityMarkPaginationStart", "integrityRecordPreview", "integrityMarkOwn", "integrityPreviewFigureTree",
     "integrityStatus", "installCollector", "collectorResult", "lockPagination", "lockPreviewer",
-    "publishFreeze", "publishOverlay", "mutationType", "mutationAttributeName", "mutationRemovedCount", "readyState", "offsetParent", "randomToken", "startsWith"]) {
+    "publishFreeze", "publishOverlay", "mutationType", "mutationAttributeName", "mutationRemovedCount", "mutationAddedNodes", "mutationTakeRecords", "offsetParent", "randomToken", "startsWith"]) {
     if (typeof p[name] !== "function") return { ok: false, reason: "captured primitive missing: " + name };
   }
   return { ok: true, reason: "" };
