@@ -206,14 +206,15 @@ failed or pending one.
 Reviewers are named for what they are, and the reviewer roster is closed:
 <!-- rostered-reviewer-roles: @Brand, @Neo, @Founder -->
 
-- Ledger kind `human` marks one of the **rostered reviewer roles `@Brand`, `@Neo` and `@Founder`**
-  and carries nothing but `kind` and `handle`. The value `human` is the ledger's historical field
-  name, kept so that rounds 1–9 stay byte-identical; it records which role handle was written, not
-  that a person reviewed. A role is part of the maintainer's workflow and may be operated by an
+- Ledger kind `rostered` marks one of the **rostered reviewer roles `@Brand`, `@Neo` and `@Founder`**
+  and carries nothing but `kind` and `handle`. Rounds 1–9 carry the historical value `human` for the
+  same entry and keep it byte for byte; from round 10 on only `rostered` is accepted, and `rostered`
+  is rejected in rounds 1–9 (`LAST_HUMAN_KIND_ROUND`). Either value records which role handle was
+  written, not that a person reviewed. A role is part of the maintainer's workflow and may be operated by an
   agent. The roster is the constant `ROSTERED_REVIEW_ROLES` in
   `tests/tools/report-surface-contract.mjs`; a role is added or removed only by a reviewed change to
   that file, never by editing the ledger, so no reviewer can admit itself by writing the record its
-  review is kept in. A self-chosen handle such as `@some-model` under kind `human` is rejected.
+  review is kept in. A self-chosen handle such as `@some-model` under a rostered kind is rejected.
 - `agent` carries the label of the model or tool that reviewed (`model`) and optionally a handle
   that is not a rostered role. An agent may be recorded as a reviewer of a round and may record a
   failed cell; a cell it marks `pass` is rejected, so an agent entry never satisfies the roster
@@ -223,10 +224,11 @@ Reviewers are named for what they are, and the reviewer roster is closed:
   delegation; the verifier reports the review kind as `delegatedAI`.
 - `not-recorded` states that the record of the time did not name the reviewer (`handle: null`).
 - Within a round one handle is one reviewer of one kind: a handle listed as both `agent` and
-  `human` (rostered) is rejected, and every reviewer entry is closed over its fields, so a model label cannot
+  rostered is rejected, and every reviewer entry is closed over its fields, so a model label cannot
   move into a field of its own.
 
-Every passing cell must name a rostered (`human`) or `delegated-ai` reviewer of its round.
+Every passing cell must name a rostered (`human` in rounds 1–9, `rostered` after) or `delegated-ai`
+reviewer of its round.
 A delegated AI record carries the release-specific Founder delegation (from round 10 on as the
 SHA-256 of the session quote and a fixed neutral statement, never the quote), actual model identity
 from the native runner output, prompt/output hashes, a native receipt with image count (from round
