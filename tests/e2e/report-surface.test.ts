@@ -29,6 +29,8 @@ import {
 import {
   BROWSER_VERSION_PATTERN,
   DECLARED_ENVIRONMENT_FIELDS,
+  DELEGATION_STATEMENT,
+  EXTERNAL_RECEIPT_PREFIX,
   HUMAN_REVIEW_ROLES,
   REQUIRED_BROWSER_RENDER_ARGS,
   REVIEWER_AUTHENTICATION_NOTE,
@@ -480,6 +482,18 @@ describe("report-surface human review gate", () => {
     const previousRounds = JSON.stringify(ledger.rounds);
     const current = structuredClone(ledger.rounds.at(-1)!);
     current.round = ledger.rounds.length + 1;
+    // Rounds after 9 record the delegation as a hash plus a neutral statement, and keep native
+    // receipts outside the repository (R8); a clone of round 9 must be converted to that form.
+    const { sessionQuote, ...delegation } = current.delegation as typeof current.delegation & { sessionQuote?: string };
+    current.delegation = {
+      ...delegation,
+      sessionQuoteSha256: createHash("sha256").update(sessionQuote ?? "synthetic").digest("hex"),
+      statement: DELEGATION_STATEMENT,
+    } as NonNullable<typeof current.delegation>;
+    for (const reviewer of current.reviewers) {
+      const receipt = (reviewer as { nativeReceipt?: { path: string } }).nativeReceipt;
+      if (receipt) receipt.path = `${EXTERNAL_RECEIPT_PREFIX}synthetic/${receipt.path.split("/").at(-1)}`;
+    }
     current.delegation!.release = "0.10.0";
     current.note = "Synthetic later release delegation; no new public review is asserted.";
     ledger.rounds.push(current);
