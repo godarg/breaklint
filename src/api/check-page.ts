@@ -232,24 +232,37 @@ export async function samplePage(page: StructuralPage, input: SampleInput): Prom
       if (tag === "a" && node.hasAttribute("href")) {
         // An inline link surrounded by running text is exempt from the minimum touch-target size,
         // whatever its container's tag; a link that is the only text of its block (a navigation
-        // list item) or stands among other links only (an inline navigation row) is measured.
+        // list item) or stands among other links and separators only (an inline navigation row, a
+        // breadcrumb, a footer link row) is measured.
         return !(getComputedStyle(node).display === "inline" && inRunningText(node));
       }
       return false;
     };
+    // Running text is visible text of the link's block (its nearest ancestor that is not inline or
+    // contents) outside any interactive element, and only text with at least one letter or digit:
+    // separators (|, ›, ·, /, », -) and whitespace between links are not running text, nor are the
+    // labels of neighbouring links or buttons (an inline navigation, breadcrumb or footer link row).
+    // A link inside a navigation landmark is navigation, never running text (a breadcrumb's plain
+    // current-page item does not turn the trail into prose). The answer is per block, so it is
+    // computed once per block (a block with many inline links stays linear).
+    const runningTextByBlock = new Map<Element, boolean>();
+    const RUNNING_TEXT_CHAR = /[\p{L}\p{N}]/u;
     const inRunningText = (node: Element): boolean => {
+      if (node.closest('nav, [role="navigation"]')) return false;
       let block = node.parentElement;
       while (block && ["inline", "contents"].includes(getComputedStyle(block).display)) block = block.parentElement;
       if (!block) return false;
-      // Running text is visible text of the block outside any interactive element: the labels of
-      // neighbouring links or buttons (a row of inline navigation links) are not running text.
+      const cached = runningTextByBlock.get(block);
+      if (cached !== undefined) return cached;
+      let found = false;
       const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
-      for (let text = walker.nextNode(); text; text = walker.nextNode()) {
-        if (node.contains(text) || (text.textContent ?? "").trim().length === 0) continue;
+      for (let text = walker.nextNode(); text && !found; text = walker.nextNode()) {
+        if (!RUNNING_TEXT_CHAR.test(text.textContent ?? "")) continue;
         const owner = text.parentElement?.closest(RUNNING_TEXT_INTERACTIVE) ?? null;
-        if (owner === null || !block.contains(owner)) return true;
+        if (owner === null || !block.contains(owner)) found = true;
       }
-      return false;
+      runningTextByBlock.set(block, found);
+      return found;
     };
     // An element with display: contents has no box of its own, but its direct text renders: its
     // geometry is the union of that text's line boxes (null without visible direct text).

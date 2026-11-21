@@ -217,6 +217,21 @@ describe("screen checkPage host-page adapter, live", () => {
     );
     const navMarked = JSON.stringify(nav.report.evaluations.filter((e) => e.target.selector.startsWith("#") && e.ruleId === "web/small-touch-target").map((e) => [e.target.selector, e.status, e.measurements[0]?.value]));
     for (const id of ["#row-1", "#row-2", "#bar-1", "#bar-2", "#bar-3", "#btn-link"]) assert.ok(nav.report.findings.some((f) => f.ruleId === "web/small-touch-target" && f.target.selector === id), `${id} ${navMarked}`);
+
+    // Separators between links (|, ›, ·) are not running text: a pipe row, a breadcrumb (whose
+    // plain current-page item sits in a navigation landmark) and a footer link row are measured;
+    // two links inside a sentence stay exempt.
+    const rows = await inspect(
+      '<nav><a id="pipe-1" href="#a" style="font-size:10px">Home</a> | <a id="pipe-2" href="#b" style="font-size:10px">About</a></nav>' +
+      '<nav><a id="crumb-1" href="#c" style="font-size:10px">Home</a> \u203a <a id="crumb-2" href="#d" style="font-size:10px">Docs</a> \u203a <span>Page</span></nav>' +
+      '<footer><a id="foot-1" href="#e" style="font-size:10px">Impressum</a> \u00b7 <a id="foot-2" href="#f" style="font-size:10px">Datenschutz</a></footer>' +
+      '<p>See <a id="sent-1" href="#g" style="font-size:10px">docs</a> and <a id="sent-2" href="#h" style="font-size:10px">faq</a>.</p>',
+      "small-touch-separator-rows",
+      { rules: { smallTouchTarget: true } },
+    );
+    const rowsMarked = JSON.stringify(rows.report.evaluations.filter((e) => e.target.selector.startsWith("#") && e.ruleId === "web/small-touch-target").map((e) => [e.target.selector, e.status, e.measurements[0]?.value]));
+    for (const id of ["#pipe-1", "#pipe-2", "#crumb-1", "#crumb-2", "#foot-1", "#foot-2"]) assert.ok(rows.report.findings.some((f) => f.ruleId === "web/small-touch-target" && f.severity === "warn" && f.target.selector === id), `${id} ${rowsMarked}`);
+    for (const id of ["#sent-1", "#sent-2"]) assert.equal(rows.report.evaluations.some((e) => e.ruleId === "web/small-touch-target" && e.target.selector === id), false, `${id} ${rowsMarked}`);
   });
 
   it("binds verified-container-only only to the output id the opened page renders, before and after capture", async (t) => {

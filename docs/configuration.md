@@ -55,7 +55,10 @@ check. `web/small-text` compares the computed `font-size` of elements with their
 a CSS `transform` is not applied, so scaled text can be reported too small or missed.
 `web/small-touch-target` is a size heuristic, not a WCAG 2.5.8 check: an inline link surrounded by
 running text is exempt, while a link that is the only text of its block, such as a navigation list
-item, is measured. Absolutely positioned siblings are not excluded wholesale; name an intended overlay such as a
+item, is measured. Running text is text with at least one letter or digit outside links and buttons,
+so a row of links divided only by separators (`|`, `›`, `·`) such as a footer link row is measured,
+and so is every link inside a navigation landmark (`nav`, `role="navigation"`), such as a
+breadcrumb with a plain current-page item. Absolutely positioned siblings are not excluded wholesale; name an intended overlay such as a
 badge in `intentionalOverlays`. An intentional overlay exempts its subtree. An allowed scroll
 container exempts only its own horizontal overflow and the clipping it causes (content it cuts or
 scrolls out of view); its descendants are still measured. An exception that matches `html` or `body`
