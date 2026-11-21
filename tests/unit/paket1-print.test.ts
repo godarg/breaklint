@@ -312,6 +312,30 @@ describe("Paket 1: G-78 parity-blank page evidence verification", () => {
         options: { outDir, documentKey: "incontent", binding: true, blankPages: new Set([2]), blankPageContentBoxes: contentBoxes },
       });
       assert.equal(inContentText.evidence[1]!.bindsFinding, false);
+
+      // P8a (CODE-PRINT-3): a text item that STARTS in the left margin (15 mm, content box from
+      // 20 mm) but runs across the content area must not leave the blank page verified. The whole
+      // range [x, x + width] from pdf.js is checked, not only the origin.
+      const ptPerMm = 72 / 25.4;
+      const crossing = await produceEvidence({
+        page: fakePage(marks),
+        closePage: async () => {},
+        rasterizer: fakeRasterizer([textPages[0]!, { pageNumber: 2, widthPt: 595, heightPt: 842,
+          items: [{ text: "Hanging indent running across the body", x: 15 * ptPerMm, y: inContentY, width: 120 * ptPerMm } as { text: string; x: number; y: number }] }]),
+        options: { outDir, documentKey: "crossing", binding: true, blankPages: new Set([2]), blankPageContentBoxes: contentBoxes },
+      });
+      assert.equal(crossing.evidence[1]!.bindsFinding, false);
+      assert.notEqual(crossing.evidence[1]!.pdfConformance, "verified");
+      // Positive control: a short margin note that ends before the content box stays allowed.
+      const marginNote = await produceEvidence({
+        page: fakePage(marks),
+        closePage: async () => {},
+        rasterizer: fakeRasterizer([textPages[0]!, { pageNumber: 2, widthPt: 595, heightPt: 842,
+          items: [{ text: "§", x: 15 * ptPerMm, y: inContentY, width: 3 * ptPerMm } as { text: string; x: number; y: number }] }]),
+        options: { outDir, documentKey: "marginnote", binding: true, blankPages: new Set([2]), blankPageContentBoxes: contentBoxes },
+      });
+      assert.equal(marginNote.evidence[1]!.bindsFinding, true);
+      assert.equal(marginNote.evidence[1]!.pdfConformance, "verified");
     } finally {
       rmSync(outDir, { recursive: true, force: true });
     }

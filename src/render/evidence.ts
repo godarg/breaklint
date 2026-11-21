@@ -807,11 +807,16 @@ async function finish(input: FinishInput): Promise<EvidenceOutcome> {
           if (/^BLSID\d+[AE]$/u.test(compact)) return false;
           if (!blankContentBoxMm) return false;
           const xMm = item.x * MM_PER_PT;
+          // The whole horizontal range [x, x + width] counts, not only the origin: text starting in
+          // the margin can run across the content area (CODE-PRINT-3). An unknown width is taken
+          // to reach the page edge, which can only withhold verification, never grant it.
+          const widthPt = typeof item.width === "number" && Number.isFinite(item.width) ? Math.abs(item.width) : Infinity;
+          const endMm = (item.x + widthPt) * MM_PER_PT;
           const yMm = (blankTextPage.heightPt - item.y) * MM_PER_PT;
           // Reject any visible PDF text inside the page's content box (with 0.5 mm safety margin),
           // while allowing CSS @page running headers/footers located strictly in page margin boxes.
           const insideContentBox =
-            xMm >= blankContentBoxMm.leftMm - 0.5 &&
+            endMm >= blankContentBoxMm.leftMm - 0.5 &&
             xMm <= blankContentBoxMm.rightMm + 0.5 &&
             yMm >= blankContentBoxMm.topMm - 0.5 &&
             yMm <= blankContentBoxMm.bottomMm + 0.5;
