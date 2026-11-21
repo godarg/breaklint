@@ -86,7 +86,11 @@ source/config/lock files before and after the screenshot, checks every digest an
 then checks the rendered build ID meta element and the output build ID the page renders in
 `sourceBinding.compiledOutputAttribute` (on the same element) against the output receipt. Without
 that rendered output ID, or when it differs, the binding stays `declared`: two builds of the same
-sources share the source build ID. A verified result is only
+sources share the source build ID. With output receipt version 2 the page can only render its
+output ID when the receipt names a `buildMarkerPath`: without it the `buildId` must equal
+`filesSha256`, a digest over the output files, so a page among those files cannot contain it and the
+binding can never become verified. Existing version-2 bindings without `buildMarkerPath` or without
+`compiledOutputAttribute` report `declared` from 0.11.1 on. A verified result is only
 `verified-container-only` via `build-bound-component-container`; it is never an exact source-line
 claim. Missing, stale, or changed proof remains declared/unknown with a typed event.
 
