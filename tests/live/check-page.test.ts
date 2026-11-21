@@ -205,6 +205,18 @@ describe("screen checkPage host-page adapter, live", () => {
     assert.ok(res.report.findings.some((f) => f.ruleId === "web/small-touch-target" && f.target.selector === "#nav-link"), marked);
     // Inline links surrounded by running text are exempt whatever the container tag.
     for (const id of ["#div-link", "#prose-link"]) assert.equal(res.report.findings.some((f) => f.ruleId === "web/small-touch-target" && f.target.selector === id), false, `${id} ${marked}`);
+
+    // A row of inline links without list items is navigation too: the other links' text is not
+    // running text, so every link in it is measured (as in 0.11.0).
+    const nav = await inspect(
+      '<nav><a id="row-1" href="#a" style="font-size:10px">Home</a> <a id="row-2" href="#b" style="font-size:10px">About</a></nav>' +
+      '<div><a id="bar-1" href="#c" style="font-size:10px">Home</a><a id="bar-2" href="#d" style="font-size:10px">About</a><a id="bar-3" href="#e" style="font-size:10px">Blog</a></div>' +
+      '<div><button id="row-btn" style="font-size:10px;padding:0">Menu</button> <a id="btn-link" href="#f" style="font-size:10px">Help</a></div>',
+      "small-touch-inline-nav",
+      { rules: { smallTouchTarget: { minSizePx: 24 } } },
+    );
+    const navMarked = JSON.stringify(nav.report.evaluations.filter((e) => e.target.selector.startsWith("#") && e.ruleId === "web/small-touch-target").map((e) => [e.target.selector, e.status, e.measurements[0]?.value]));
+    for (const id of ["#row-1", "#row-2", "#bar-1", "#bar-2", "#bar-3", "#btn-link"]) assert.ok(nav.report.findings.some((f) => f.ruleId === "web/small-touch-target" && f.target.selector === id), `${id} ${navMarked}`);
   });
 
   it("binds verified-container-only only to the output id the opened page renders, before and after capture", async (t) => {

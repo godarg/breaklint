@@ -221,6 +221,7 @@ export async function samplePage(page: StructuralPage, input: SampleInput): Prom
 
     const INTERACTIVE_TAGS = new Set(["button", "select", "textarea", "summary"]);
     const INTERACTIVE_ROLES = new Set(["button", "link", "checkbox", "radio", "switch", "tab"]);
+    const RUNNING_TEXT_INTERACTIVE = 'a[href], button, [role="link"], [role="button"]';
     const REPLACED_TAGS = new Set(["img", "video", "canvas", "input", "button", "select", "textarea", "iframe", "svg"]);
 
     const isInteractiveControl = (node: Element, tag: string): boolean => {
@@ -231,7 +232,7 @@ export async function samplePage(page: StructuralPage, input: SampleInput): Prom
       if (tag === "a" && node.hasAttribute("href")) {
         // An inline link surrounded by running text is exempt from the minimum touch-target size,
         // whatever its container's tag; a link that is the only text of its block (a navigation
-        // list item) is measured.
+        // list item) or stands among other links only (an inline navigation row) is measured.
         return !(getComputedStyle(node).display === "inline" && inRunningText(node));
       }
       return false;
@@ -240,9 +241,13 @@ export async function samplePage(page: StructuralPage, input: SampleInput): Prom
       let block = node.parentElement;
       while (block && ["inline", "contents"].includes(getComputedStyle(block).display)) block = block.parentElement;
       if (!block) return false;
+      // Running text is visible text of the block outside any interactive element: the labels of
+      // neighbouring links or buttons (a row of inline navigation links) are not running text.
       const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
       for (let text = walker.nextNode(); text; text = walker.nextNode()) {
-        if (!node.contains(text) && (text.textContent ?? "").trim().length > 0) return true;
+        if (node.contains(text) || (text.textContent ?? "").trim().length === 0) continue;
+        const owner = text.parentElement?.closest(RUNNING_TEXT_INTERACTIVE) ?? null;
+        if (owner === null || !block.contains(owner)) return true;
       }
       return false;
     };
