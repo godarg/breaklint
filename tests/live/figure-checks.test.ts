@@ -113,5 +113,52 @@ it("runtime-verifies figure index for data/inert scripts and fails closed on DOM
   const mutReport = JSON.parse(readFileSync(join(mutDir, "report.json"), "utf8")) as Report;
   assert.ok(mutReport.documents[0]!.notMeasured.some(n => n.reason === "env/figure-index-unavailable"));
 });
+it("measures responsive dual-SVG figures when one variant is display:none and fails closed otherwise", () => {
+  const runInline = (name: string, html: string, expectedExit: number) => {
+    const dir = join(root, name); mkdirSync(dir);
+    symlinkSync(join(repo, "node_modules"), join(dir, "node_modules"));
+    writeFileSync(join(dir, "doc.html"), html);
+    const res = spawnSync(process.execPath, [
+      join(repo, "dist/cli/index.js"), "--only", "figure/caption-separated",
+      "--fail-on", "warn", "--format", "json", "--out", "report.json", "--out-dir", "evidence", "doc.html",
+    ], { cwd: dir, encoding: "utf8", timeout: 300_000 });
+    assert.equal(res.status, expectedExit, `${name}: ${res.stdout}${res.stderr}`);
+    return JSON.parse(readFileSync(join(dir, "report.json"), "utf8")) as Report;
+  };
+  const bodyHtml = `<figure id="resp-fig">
+    <svg class="fig-wide" width="160" height="70"><rect width="160" height="70" fill="#ddd"/><text x="10" y="30">WIDE</text></svg>
+    <svg class="fig-narrow" width="80" height="120"><rect width="80" height="120" fill="#ccc"/><text x="10" y="30">NARROW</text></svg>
+    <figcaption>Figure 1: Responsive dual-SVG test</figcaption>
+  </figure>`;
+
+  // Green/finding control: wide visible, narrow display:none, caption forced to page 2 -> Exit 1, measured=1
+  const separated = runInline("responsive-separated", `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Responsive Separated</title>
+<style>@page { size: 120mm 140mm; margin: 10mm; } body { font: 14px/1.5 serif; } figure { margin: 0; } .fig-narrow { display: none; } figcaption { break-before: page; }</style></head>
+<body>${bodyHtml}</body></html>`, 1);
+  assert.equal(separated.documents[0]!.coverage["figure/caption-separated"]!.measured, 1);
+  assert.equal(separated.findings.length, 1);
+  assert.equal(separated.findings[0]!.evidence.bindsFinding, true);
+
+  // Clean control with inert script: verifies runtime figure tree parity with bodyCandidates -> Exit 0, measured=1
+  const clean = runInline("responsive-clean-script", `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Responsive Clean</title>
+<style>@page { size: 120mm 140mm; margin: 10mm; } body { font: 14px/1.5 serif; } figure { margin: 0; } .fig-narrow { display: none; }</style></head>
+<body>${bodyHtml}<script>window.__inertResponsive = true;</script></body></html>`, 0);
+  assert.equal(clean.documents[0]!.coverage["figure/caption-separated"]!.measured, 1);
+  assert.deepEqual(clean.findings, []);
+
+  // Fail-closed red control 1: both SVGs visible -> Exit 4, env/figure-body-unsupported
+  const bothVisible = runInline("responsive-both-visible", `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Responsive Both Visible</title>
+<style>@page { size: 120mm 140mm; margin: 10mm; } body { font: 14px/1.5 serif; } figure { margin: 0; }</style></head>
+<body>${bodyHtml}</body></html>`, 4);
+  assert.equal(bothVisible.documents[0]!.coverage["figure/caption-separated"]!.measured, 0);
+  assert.ok(bothVisible.documents[0]!.notMeasured.some(n => n.reason === "env/figure-body-unsupported"));
+
+  // Fail-closed red control 2: narrow hidden via opacity:0 instead of display:none -> Exit 4, env/figure-body-unsupported
+  const opacityHidden = runInline("responsive-opacity-hidden", `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Responsive Opacity Hidden</title>
+<style>@page { size: 120mm 140mm; margin: 10mm; } body { font: 14px/1.5 serif; } figure { margin: 0; } .fig-narrow { opacity: 0; }</style></head>
+<body>${bodyHtml}</body></html>`, 4);
+  assert.equal(opacityHidden.documents[0]!.coverage["figure/caption-separated"]!.measured, 0);
+  assert.ok(opacityHidden.documents[0]!.notMeasured.some(n => n.reason === "env/figure-body-unsupported"));
+});
 after(() => { if (process.env.BREAKLINT_FIGURE_LIVE_KEEP !== "1") rmSync(root, { recursive: true, force: true }); });
 });

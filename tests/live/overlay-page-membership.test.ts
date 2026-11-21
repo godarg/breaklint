@@ -72,11 +72,17 @@ const DEFERRED_FIXTURE = `<!doctype html><html lang="en"><head><meta charset="ut
   .pagedjs_footnote_area { position: absolute; top: 1000px; height: 40px; overflow: hidden; }
   .clipped-note { position: absolute; top: 39px; height: 20px; }
   .zero-height-bottom { position: absolute; left: 0; top: 994px; width: 733px; height: 0; }
+  .zero-height-inner-band { position: absolute; left: 0; top: 993.3px; width: 733px; height: 0; }
+  .inner-band-end { position: absolute; left: 0; top: 950px; width: 733px; height: 43.25px; }
+  .overflow-bottom { position: absolute; left: 0; top: 950px; width: 733px; height: 45.5px; }
 </style></head><body>
   <div class="pagedjs_page"><div class="pagedjs_sheet"><div class="pagedjs_pagebox"><div class="pagedjs_area">
     <div class="pagedjs_page_content">
       <section class="continued" data-bl-sid="continued"><p>visible first fragment</p></section>
       <div class="zero-height-bottom" data-bl-sid="zero-height-bottom"></div>
+      <div class="zero-height-inner-band" data-bl-sid="zero-height-inner-band"></div>
+      <div class="inner-band-end" data-bl-sid="inner-band-end">ends 0.75px inside content area</div>
+      <div class="overflow-bottom" data-bl-sid="overflow-bottom">overflows 1.5px below content area</div>
       <div class="deferred" data-bl-sid="deferred"><p data-bl-sid="deferred-child">next page only</p></div>
       <div class="deferred" data-bl-sid="deferred-later">two pages later</div>
       <div class="deferred" data-bl-sid="clipped-note">same SID as the separately clipped footnote</div>
@@ -221,6 +227,18 @@ describe("evidence overlay page membership, live", () => {
         "a zero-height opening wrapper flush with areaBox.bottom must be placed inside the physical page");
       assert.equal(installation.unplacedMarks.some((mark) => mark.page === 1 && mark.sid === "zero-height-bottom"), false,
         "a zero-height opening wrapper flush with areaBox.bottom must not emit env/evidence-fragment-outside-page");
+      assert.ok(installation.marks.some((mark) => mark.page === 1 && mark.sid === "zero-height-inner-band" && mark.side === "start") &&
+        installation.marks.some((mark) => mark.page === 1 && mark.sid === "zero-height-inner-band" && mark.side === "end"),
+      "a zero-height split wrapper strictly inside the final 1 px of areaBox must place both marks");
+      assert.equal(installation.unplacedMarks.some((mark) => mark.page === 1 && mark.sid === "zero-height-inner-band"), false,
+        "a zero-height split wrapper strictly inside areaBox must not emit env/evidence-fragment-outside-page");
+      assert.ok(installation.marks.some((mark) => mark.page === 1 && mark.sid === "inner-band-end" && mark.side === "end"),
+        "a container ending 0.75 px strictly inside areaBox must place its end mark");
+      assert.equal(installation.unplacedMarks.some((mark) => mark.page === 1 && mark.sid === "inner-band-end"), false,
+        "a container ending strictly inside areaBox must not emit env/evidence-fragment-outside-page");
+      assert.deepEqual(installation.unplacedMarks.filter((mark) => mark.page === 1 && mark.sid === "overflow-bottom")
+        .map((mark) => mark.side), ["end"],
+      "a genuine 1.5 px overflow below areaBox.bottom must still refuse its end mark");
       assert.equal(installation.unplacedMarks.some((mark) => mark.page === 1 && mark.sid === "deferred"), false,
         "the next-page clone remained a phantom fragment of page 1");
       assert.equal(installation.unplacedMarks.some((mark) => mark.page === 1 && mark.sid === "deferred-child"), false,

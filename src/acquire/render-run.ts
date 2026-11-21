@@ -1167,6 +1167,13 @@ interface OpenedContentPage {
   close(): Promise<void>;
 }
 
+interface RawRuntimeFigureBody {
+  tag: "img" | "svg" | "table";
+  authorId: string | null;
+  value: string;
+  tableSid: string;
+}
+
 interface RawRuntimeFigureTree {
   ids: Record<string, number>;
   namedAnchors: Record<string, number>;
@@ -1174,7 +1181,8 @@ interface RawRuntimeFigureTree {
     sid: string;
     captionSids: string[];
     captionPosition: "before" | "after" | null;
-    body: { tag: "img" | "svg" | "table"; authorId: string | null; value: string; tableSid: string } | null;
+    body: RawRuntimeFigureBody | null;
+    bodyCandidates?: RawRuntimeFigureBody[];
   }[];
   referenceBlocks: { sid: string; references: { href: string; targetId: string | null }[] }[];
   prePaginationScriptMutations?: number;
@@ -1490,7 +1498,10 @@ function prePaginationFigureProbeSource(capability: string): string {
   const ids = Object.create(null);
   const namedAnchors = Object.create(null);
   const figures = [];
-  const bodyCounts = new Map();
+  const candidatesByFigure = new Map();
+  const seenCaption = new Set();
+  const bodiesBeforeCaption = new Map();
+  const bodiesAfterCaption = new Map();
   const refGroups = new Map();
   const walk = (node, blockSid, figure, inCaption, insideSvg) => {
     if (!node || P.nodeType(node) !== 1) {
@@ -1515,18 +1526,21 @@ function prePaginationFigureProbeSource(capability: string): string {
       if (current) {
         const capSid = P.attr(node, "data-bl-sid");
         if (capSid) current.captionSids.push(capSid);
-        current.captionPosition = (bodyCounts.get(current) || 0) === 0 ? "before" : "after";
+        seenCaption.add(current);
       }
     }
     if (current && !caption && !insideSvg && (tag === "img" || tag === "svg" || tag === "table")) {
-      const count = bodyCounts.get(current) || 0;
-      bodyCounts.set(current, count + 1);
-      current.body = count === 0 ? {
+      const candidate = {
         tag,
         authorId: idAttr || null,
         value: tag === "svg" ? P.outerHtml(node) : (P.attr(node, "src") || ""),
         tableSid: tag === "table" ? (P.attr(node, "data-bl-sid") || "") : "",
-      } : null;
+      };
+      let list = candidatesByFigure.get(current);
+      if (!list) { list = []; candidatesByFigure.set(current, list); }
+      list.push(candidate);
+      if (seenCaption.has(current)) bodiesAfterCaption.set(current, (bodiesAfterCaption.get(current) || 0) + 1);
+      else bodiesBeforeCaption.set(current, (bodiesBeforeCaption.get(current) || 0) + 1);
     }
     const hrefAttr = P.attr(node, "href");
     if (tag === "a" && hrefAttr && P.startsWith(hrefAttr, "#") &&
@@ -1542,9 +1556,25 @@ function prePaginationFigureProbeSource(capability: string): string {
     for (const child of P.children(node)) walk(child, sid, current, caption, insideSvg || tag === "svg");
   };
   walk(document.documentElement, null, null, false, false);
-  for (const figure of figures) if (bodyCounts.get(figure) !== 1) figure.body = null;
+  for (const figure of figures) {
+    const candidates = candidatesByFigure.get(figure) || [];
+    if (candidates.length === 1) figure.body = candidates[0];
+    else if (candidates.length >= 2) { figure.body = null; figure.bodyCandidates = candidates; }
+    else figure.body = null;
+    if (seenCaption.has(figure)) {
+      const before = bodiesBeforeCaption.get(figure) || 0;
+      const after = bodiesAfterCaption.get(figure) || 0;
+      figure.captionPosition = before === 0 ? "before" : after === 0 ? "after" : null;
+    }
+  }
   return { ids, namedAnchors, figures, referenceBlocks: [...refGroups.values()], prePaginationScriptMutations, elementCount: P.all(document, "*").length };
 })()`;
+}
+
+function mapRuntimeFigureBody(body: RawRuntimeFigureBody) {
+  return body.tag === "table"
+    ? { tag: "table" as const, identity: `table:${body.tableSid}`, tableSid: body.tableSid }
+    : { tag: body.tag, identity: figureBodyIdentity(body.tag, body.authorId, body.value) };
 }
 
 export function runtimeFigureTreeMatches(
@@ -1563,9 +1593,10 @@ export function runtimeFigureTreeMatches(
       sid: figure.sid,
       captionSids: figure.captionSids,
       captionPosition: figure.captionPosition,
-      body: figure.body === null ? null : figure.body.tag === "table"
-        ? { tag: "table" as const, identity: `table:${figure.body.tableSid}`, tableSid: figure.body.tableSid }
-        : { tag: figure.body.tag, identity: figureBodyIdentity(figure.body.tag, figure.body.authorId, figure.body.value) },
+      body: figure.body === null ? null : mapRuntimeFigureBody(figure.body),
+      ...(figure.bodyCandidates && figure.bodyCandidates.length >= 2
+        ? { bodyCandidates: figure.bodyCandidates.map(mapRuntimeFigureBody) }
+        : {}),
       bodyFragments: [],
     })),
     referenceBlocks: raw.referenceBlocks,

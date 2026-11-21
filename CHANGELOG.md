@@ -7,14 +7,19 @@ for existing public APIs, Round-8 report-surface follow-ups (`G-148`–`G-151`),
 `puppeteer-core@25.16.0` consumer-pin update.
 
 ### Print profile
-- **Runtime-verified figure index**: non-executing data scripts (`<script type="application/ld+json">`,
-  `<script type="application/json">`) no longer mark a document `scriptBearing`. Documents with
-  executable scripts or inline `on*` handlers unlock `figure/caption-separated` and
-  `figure/dangling-reference` only when the pre-pagination `MutationObserver` observes zero script
-  mutations, post-pagination mutations remain at baseline, `data-bl-*` attributes are untouched,
-  and both the DOM element count and the pre-pagination figure/ID/anchor/reference-link tree
-  fingerprint match the static `parse5` source tree exactly. Any DOM mutation or structural
-  disqualifier (`<base>`, authored `data-ref` / `data-next-break-before`) remains strictly fail-closed.
+- **Runtime-verified figure index & responsive multi-variant `<figure>` bodies**: non-executing data
+  scripts (`<script type="application/ld+json">`, `<script type="application/json">`) no longer mark
+  a document `scriptBearing`. Documents with executable scripts or inline `on*` handlers unlock
+  `figure/caption-separated` and `figure/dangling-reference` only when the pre-pagination
+  `MutationObserver` observes zero script mutations, post-pagination mutations remain at baseline,
+  `data-bl-*` attributes are untouched, and both the DOM element count and the pre-pagination
+  figure/ID/anchor/reference-link tree fingerprint match the static `parse5` source tree exactly.
+  Responsive `<figure>` elements with multiple authored body candidates (`img`/`svg`/`table`) are
+  now measurable when **exactly one** authored candidate renders visible with a verified source
+  identity and every other authored candidate is witnessed non-rendered (`display: none` with zero
+  layout boxes); 0 or >=2 rendered candidates, non-`display: none` hidden/broken variants, dropped
+  or mismatched candidates, DOM mutations, and structural disqualifiers (`<base>`, authored
+  `data-ref` / `data-next-break-before` / `data-undisplayed`) remain strictly fail-closed.
 - **Tables with simple regular `colspan` rows**: `layout/table-header-not-repeated` and
   `layout/table-column-drift` now measure tables whose rows have `rowSpan === 1` and uniform total
   column width (supporting full-width group/separator rows and grouped headers). Irregular spans
@@ -26,12 +31,14 @@ for existing public APIs, Round-8 report-surface follow-ups (`G-148`–`G-151`),
   out-of-flow (`position: absolute`) coordinate-cache artifact is tolerated only when `offsetParent`,
   computed `left`/`top`, element dimensions, fragmentainer residue (`0`), and DOM mutations (`0`)
   are all verified unchanged.
-- **Evidence binding (`G-78` & bottom-edge zero-height wrappers)**: confirmed parity-blank pages
+- **Evidence binding (`G-78` & bottom-edge area-bound monotonicity)**: confirmed parity-blank pages
   with zero flow blocks, zero unplaced marks, zero stray `BLSID*` tokens in the PDF text stream,
   and verified document-level mark conformance now bind cleanly (`pdfConformance: "verified"`).
-  Zero-height opening wrapper fragments flush with `areaBox.bottom` inside the physical page box
-  (outside `.pagedjs_footnote_area`) are placed instead of emitting false
-  `env/evidence-fragment-outside-page`.
+  Observed fragment edges strictly inside the content area (`relativeY <= areaBox.height`, closing
+  the former 0.5–1.0 px bottom-band dead zone) as well as continuation end edges and zero-height
+  opening wrappers within 0.5 px of `areaBox.bottom` inside the physical page box (strictly outside
+  `.pagedjs_footnote_area`, preserving `G-100`) are placed instead of emitting false
+  `env/evidence-fragment-outside-page`, while genuine overflows below `areaBox.bottom + 0.5` stay refused.
 
 ### Screen profile (`checkPage`, `PublicScreenReport` schema 2)
 - **Screen schema 2** (`SCREEN_REPORT_SCHEMA_VERSION = 2`): `createContextPack()`, `renderReport()`,

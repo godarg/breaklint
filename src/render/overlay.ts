@@ -224,13 +224,19 @@ const OVERLAY_TEMPLATE = `(() => {
           // browser was shown to move them. The bound refuses them rather than depend on that.
           const relativeY = y - areaBox.y;
           const maxAdvance = token.length * 1.2 + 2;
-          // A continuation container can end at the area boundary, or a split wrapper can open with
-          // zero height right at the bottom edge of the content area before its children begin on
-          // the next page. That observed edge lies inside the physical page box; its mark is still
-          // checked against the actual PDF later. Never extend this to the footnote area (G-100).
+          // An edge strictly inside the content area (relativeY <= areaBox.height) still trips
+          // relativeY + 1 > areaBox.height in the final 1 px above areaBox.bottom because the mark
+          // glyph is 1 px tall. That 1 px envelope stays inside the physical sheet whenever
+          // y + 1 <= pageBox.bottom, and is still checked against the actual PDF later.
+          // A continuation container's end edge or a zero-height split wrapper may also sit within
+          // 0.5 px sub-pixel rounding of areaBox.bottom. Never extend either allowance to the
+          // footnote area (G-100); genuine overflow below areaBox.bottom + 0.5 stays refused.
+          const notInFootnote = P.closest(el, ".pagedjs_footnote_area") === null;
           const atAreaBottom = Math.abs(y - areaBox.bottom) <= 0.5;
-          const observedAreaEdge = ((side === "end" && atAreaBottom) || (side === "start" && rect.height === 0 && atAreaBottom)) &&
-            P.closest(el, ".pagedjs_footnote_area") === null && y + 1 <= pageBox.bottom;
+          const observedAreaEdge = notInFootnote && y + 1 <= pageBox.bottom && (
+            relativeY <= areaBox.height ||
+            (atAreaBottom && (side === "end" || (side === "start" && rect.height === 0)))
+          );
           if (
             x < pageBox.left || x + maxAdvance > pageBox.right || y < pageBox.top || y > pageBox.bottom ||
             relativeY < 0 || (relativeY + 1 > areaBox.height && !observedAreaEdge)

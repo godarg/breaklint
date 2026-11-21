@@ -14,11 +14,15 @@ to `schemaVersion: 2` (`SCREEN_REPORT_SCHEMA_VERSION = 2`); screen readers accep
 Print improvements: runtime-verified figure-index unlock for non-executing data scripts and
 mutation-free executable scripts / `on*` handlers (verified against `MutationObserver`, exact
 DOM element-count parity, and static-to-runtime figure/ID/anchor/reference-link tree parity; any
-mutation or structural disqualifier stays fail-closed), simple regular `colspan` table rows in
+mutation or structural disqualifier stays fail-closed), responsive multi-variant `<figure>` body
+measurement when exactly one authored `img`/`svg`/`table` candidate renders visible with a verified
+source identity and all other authored candidates are witnessed non-rendered (`display: none` with
+zero layout boxes), simple regular `colspan` table rows in
 `layout/table-header-not-repeated` and `layout/table-column-drift`, unreferenced `/favicon.ico`
 `204 No Content` handling (explicitly linked `/favicon.ico` stays fail-closed), strict verification
 of Chrome's post-`page.pdf()` out-of-flow coordinate-cache artifact, `G-78` parity-blank page
-evidence verification, and bottom-edge zero-height wrapper placement.
+evidence verification, and monotonic bottom-edge content-area overlay placement (preserving `G-100`
+footnote isolation and refusing genuine overflows below `areaBox.bottom + 0.5`).
 
 Screen profile v2 (`checkPage`, `schemaVersion: 2`): CSS Color 4 alpha parsing (`oklch()`,
 `oklab()`, `lab()`, `lch()`, `hwb()`, `color(...)`), geometry-correct paint evaluation under
@@ -697,7 +701,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=781 aggregateTests=947 liveTests=122 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=782 aggregateTests=948 liveTests=123 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against

@@ -404,7 +404,7 @@ export interface RawSnapshot {
   svg: RawSvg[];
   requestedUrls: string[];
   fontFamilies: string[];
-  figureBodies?: { sid: string; tag: string; authorId: string | null; value: string; page: number; box: BlockRecord["box"]; visible: boolean }[];
+  figureBodies?: { sid: string; tag: string; authorId: string | null; value: string; page: number; box: BlockRecord["box"]; visible: boolean; nonRendered?: boolean }[];
   tables?: (import("../core/types.ts").TableFragment & { sid: string | null })[];
   control: ControlSignature;
 }
@@ -1093,14 +1093,17 @@ export const SNAPSHOT_SOURCE = `(() => {
     // Paint effects can remove all content without removing the root's CSS box. The page
     // location is usable only for this simple body seam; complex clipping stays a decline.
     let simplePaint = true;
+    let displayNone = false;
     for (let at = el; at && at !== page; at = P.parent(at)) {
       const style = P.style(at, null);
-      if (effect(style.clipPath) || effect(style.mask) || effect(style.filter)) { simplePaint = false; break; }
+      if (style.display === "none") displayNone = true;
+      if (effect(style.clipPath) || effect(style.mask) || effect(style.filter)) simplePaint = false;
     }
+    const nonRendered = displayNone && P.rects(el).length === 0;
     const viewport = P.rect(el);
     figureBodies.push({ sid: P.attr(owner, "data-bl-sid"), tag, authorId: P.attr(el, "id"),
       value: tag === "svg" ? P.outerHtml(el) : P.attr(el, "src") || "",
-      page: pageIndex + 1, box: box(el), visible: simplePaint && P.painted(el) === true && (tag === "img"
+      page: pageIndex + 1, box: box(el), ...(nonRendered ? { nonRendered: true } : {}), visible: simplePaint && P.painted(el) === true && (tag === "img"
         ? P.replaced(el).naturalWidth > 0 && P.replaced(el).naturalHeight > 0
         : P.all(el, "rect,circle,ellipse,line,polyline,polygon,path,text,image").some(part => {
           if (P.closest(part, "defs,symbol,clipPath,mask,pattern") || P.closest(P.parent(part), "svg") !== el || P.painted(part) !== true) return false;
@@ -1120,11 +1123,14 @@ export const SNAPSHOT_SOURCE = `(() => {
   pagesEls.forEach((page, pageIndex) => P.all(page, "table").forEach((table) => {
     if (!inFlow(table)) return;
     let flowReason = null;
+    let displayNone = false;
     for (let at = table; at && at !== page; at = P.parent(at)) {
       const style = P.style(at, null);
-      if (style.writingMode && style.writingMode !== "horizontal-tb") { flowReason = "env/vertical-writing"; break; }
-      if (style.columnCount && style.columnCount !== "auto" && style.columnCount !== "1") { flowReason = "env/multicolumn"; break; }
+      if (style.display === "none") displayNone = true;
+      if (flowReason === null && style.writingMode && style.writingMode !== "horizontal-tb") flowReason = "env/vertical-writing";
+      if (flowReason === null && style.columnCount && style.columnCount !== "auto" && style.columnCount !== "1") flowReason = "env/multicolumn";
     }
+    const nonRendered = displayNone && P.rects(table).length === 0;
     const rows = P.all(table, "tr").filter(row => P.closest(row, "table") === table).map(row => ({
       sid: P.attr(row, "data-bl-sid"),
       cells: P.all(row, "td,th").filter(cell => P.closest(cell, "tr") === row && P.closest(cell, "table") === table).map(cell => ({
@@ -1134,7 +1140,7 @@ export const SNAPSHOT_SOURCE = `(() => {
         rowSpan: P.attr(cell, "rowspan") === null ? 1 : Number(P.attr(cell, "rowspan")),
       })),
     }));
-    tables.push({ sid: P.attr(table, "data-bl-sid"), page: pageIndex + 1, box: box(table), visible: P.painted(table) === true, flowReason, rows });
+    tables.push({ sid: P.attr(table, "data-bl-sid"), page: pageIndex + 1, box: box(table), visible: P.painted(table) === true, ...(nonRendered ? { nonRendered: true } : {}), flowReason, rows });
   }));
   return { pages, blocks, textLines, svg, figureBodies, tables,
     requestedUrls: performance.getEntriesByType("resource").map((e) => e.name),
@@ -1584,6 +1590,7 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
           fragments: (input.raw.tables ?? []).filter(table => table.sid === figure.body?.tableSid),
         }, figure.body.identity) : (input.raw.figureBodies ?? []).filter(body => body.sid === figure.sid).map(body => ({
           page: body.page, box: body.box, visible: body.visible,
+          ...(body.nonRendered ? { nonRendered: true } : {}),
           identity: figureBodyIdentity(body.tag, body.authorId, body.value),
         })),
       })),

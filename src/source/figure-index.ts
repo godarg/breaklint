@@ -1,7 +1,7 @@
 /** Authored semantic relations. No browser, guessed numbering, or paginated DOM identity. */
 import { parseFragment, serializeOuter, type DefaultTreeAdapterMap } from "parse5";
 import { sha256 } from "../core/fingerprint.ts";
-import type { FigureIndex } from "../core/types.ts";
+import type { FigureBodyCandidate, FigureIndex } from "../core/types.ts";
 type Node = DefaultTreeAdapterMap["node"];
 type Element = DefaultTreeAdapterMap["element"];
 const element = (node: Node): node is Element => "tagName" in node;
@@ -21,7 +21,7 @@ export function figureBodyIdentity(tag: string, authorId: string | null, value: 
       const a = attrs(node);
       if (a.id && a["data-id"] === undefined) node.attrs.push({ name: "data-id", value: a.id });
       node.attrs = node.attrs.filter(a => a.name !== "data-next-break-before"
-        && a.name !== "data-ref" && !a.name.startsWith("data-bl-"))
+        && a.name !== "data-ref" && a.name !== "data-undisplayed" && !a.name.startsWith("data-bl-"))
         .sort((left, right) => left.name.localeCompare(right.name));
       textContext ||= ["text", "tspan", "textPath", "style", "title", "desc"].includes(node.tagName)
         || a["xml:space"] === "preserve";
@@ -55,6 +55,7 @@ export function figureIndexTreeFingerprint(
     figure.captionSids,
     figure.captionPosition ?? null,
     figure.body ? [figure.body.tag, figure.body.identity] : null,
+    figure.bodyCandidates ? figure.bodyCandidates.map(candidate => [candidate.tag, candidate.identity]) : null,
   ]);
   const referenceBlocks = [...index.referenceBlocks]
     .sort((a, b) => (a.sid < b.sid ? -1 : a.sid > b.sid ? 1 : 0))
@@ -84,7 +85,7 @@ export function buildFigureIndexDetail(document: Node): { index: FigureIndex; st
     if ((node.tagName === "script" && isExecutableScript(a)) || Object.keys(a).some(k => /^on[a-z]/u.test(k))) {
       scriptBearing = true;
     }
-    if (node.tagName === "base" || Object.hasOwn(a, "data-next-break-before") || Object.hasOwn(a, "data-ref")) {
+    if (node.tagName === "base" || Object.hasOwn(a, "data-next-break-before") || Object.hasOwn(a, "data-ref") || Object.hasOwn(a, "data-undisplayed")) {
       structuralIncomplete = true;
     }
     let current = figure; let caption = inCaption;
@@ -98,16 +99,18 @@ export function buildFigureIndexDetail(document: Node): { index: FigureIndex; st
       if (current) {
         if (!a["data-bl-sid"]) structuralIncomplete = true;
         else current.captionSids.push(a["data-bl-sid"]);
-        current.captionPosition = (bodyCounts.get(current) ?? 0) === 0 ? "before" : "after";
+        seenCaption.add(current);
       }
     }
     if (current && !caption && !insideSvg && ["img", "svg", "table"].includes(node.tagName)) {
-      const body = node.tagName === "table"
+      const body: FigureBodyCandidate = node.tagName === "table"
         ? { tag: "table" as const, identity: `table:${a["data-bl-sid"] ?? ""}`, tableSid: a["data-bl-sid"] ?? "" }
         : { tag: node.tagName as "img" | "svg", identity: figureBodyIdentity(node.tagName, a.id ?? null, node.tagName === "svg" ? serializeOuter(node) : a.src ?? "") };
-      // Count separately below: a second body must not overwrite the first and look supported.
-      const count = bodyCounts.get(current) ?? 0; bodyCounts.set(current, count + 1);
-      current.body = count === 0 ? body : null;
+      const list = candidatesByFigure.get(current) ?? [];
+      list.push(body);
+      candidatesByFigure.set(current, list);
+      if (seenCaption.has(current)) bodiesAfterCaption.set(current, (bodiesAfterCaption.get(current) ?? 0) + 1);
+      else bodiesBeforeCaption.set(current, (bodiesBeforeCaption.get(current) ?? 0) + 1);
     }
     if (node.tagName === "a" && a.href?.startsWith("#") && /\b(?:figure|fig\.?|abbildung|abb\.?|table|tbl\.?|tabelle|tab\.?)\s+\d/iu.test(text(node))) {
       if (!sid) structuralIncomplete = true;
@@ -123,9 +126,27 @@ export function buildFigureIndexDetail(document: Node): { index: FigureIndex; st
       walk(child, sid, current, caption, insideSvg || node.tagName === "svg");
     }
   };
-  const bodyCounts = new Map<FigureIndex["figures"][number], number>();
+  const candidatesByFigure = new Map<FigureIndex["figures"][number], FigureBodyCandidate[]>();
+  const seenCaption = new Set<FigureIndex["figures"][number]>();
+  const bodiesBeforeCaption = new Map<FigureIndex["figures"][number], number>();
+  const bodiesAfterCaption = new Map<FigureIndex["figures"][number], number>();
   walk(document, null, null, false);
-  for (const figure of index.figures) if (bodyCounts.get(figure) !== 1) figure.body = null;
+  for (const figure of index.figures) {
+    const candidates = candidatesByFigure.get(figure) ?? [];
+    if (candidates.length === 1) {
+      figure.body = candidates[0]!;
+    } else if (candidates.length >= 2) {
+      figure.body = null;
+      figure.bodyCandidates = candidates;
+    } else {
+      figure.body = null;
+    }
+    if (seenCaption.has(figure)) {
+      const before = bodiesBeforeCaption.get(figure) ?? 0;
+      const after = bodiesAfterCaption.get(figure) ?? 0;
+      figure.captionPosition = before === 0 ? "before" : after === 0 ? "after" : null;
+    }
+  }
   index.referenceBlocks = [...referenceBlocks.values()];
   index.complete = !structuralIncomplete && !scriptBearing;
   return { index, structuralComplete: !structuralIncomplete, scriptBearing };

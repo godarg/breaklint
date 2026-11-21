@@ -1,10 +1,90 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
 import { SNAPSHOT_ROUNDING_PX } from "../../core/enums.ts";
+import type { FigureBodyCandidate, FigureBodyFragment, Snapshot } from "../../core/types.ts";
 import { declined, isNotRendered, layoutOutOfScope, makeFinding, renderedBox, sourceOf, targetEvaluation } from "../shared.ts";
 import { blocksFor, unavailable } from "./shared.ts";
 import { sourceTableMatches, measuredTableBodyFragments } from "../../source/table-index.ts";
 const ID = "figure/caption-separated";
+
+function resolveFigureBody(
+  snapshot: Snapshot,
+  figure: NonNullable<Snapshot["figureIndex"]>["figures"][number],
+): {
+  body: FigureBodyCandidate | null;
+  table: NonNullable<Snapshot["tableIndex"]>["tables"][number] | null;
+  fragments: FigureBodyFragment[];
+} {
+  if (figure.body !== null) {
+    const isTable = figure.body.tag === "table";
+    const table = isTable && snapshot.tableIndex?.complete
+      ? snapshot.tableIndex.tables.find(item => item.sid === figure.body?.tableSid) ?? null
+      : null;
+    const fragments = (isTable && table
+      ? measuredTableBodyFragments(table, figure.body.identity)
+      : [...figure.bodyFragments]).sort((a, b) => a.page - b.page);
+    return { body: figure.body, table, fragments };
+  }
+  const candidates = figure.bodyCandidates;
+  if (!candidates || candidates.length < 2) {
+    return { body: null, table: null, fragments: [] };
+  }
+  const imgSvgCandidates = candidates.filter(candidate => candidate.tag !== "table");
+  const tableCandidates = candidates.filter(candidate => candidate.tag === "table");
+  const authoredImgSvgCount = new Map<string, number>();
+  for (const candidate of imgSvgCandidates) {
+    authoredImgSvgCount.set(candidate.identity, (authoredImgSvgCount.get(candidate.identity) ?? 0) + 1);
+  }
+  const renderedImgSvg: FigureBodyFragment[] = [];
+  const nonRenderedById = new Map<string, number>();
+  for (const fragment of figure.bodyFragments) {
+    if (!authoredImgSvgCount.has(fragment.identity)) return { body: null, table: null, fragments: [] };
+    if (fragment.nonRendered === true) {
+      if (fragment.visible) return { body: null, table: null, fragments: [] };
+      nonRenderedById.set(fragment.identity, (nonRenderedById.get(fragment.identity) ?? 0) + 1);
+      continue;
+    }
+    if (!fragment.visible) return { body: null, table: null, fragments: [] };
+    renderedImgSvg.push(fragment);
+  }
+  const renderedTables: {
+    candidate: FigureBodyCandidate;
+    table: NonNullable<Snapshot["tableIndex"]>["tables"][number];
+  }[] = [];
+  if (tableCandidates.length > 0) {
+    if (!snapshot.tableIndex?.complete) return { body: null, table: null, fragments: [] };
+    for (const candidate of tableCandidates) {
+      const table = snapshot.tableIndex.tables.find(item => item.sid === candidate.tableSid);
+      if (!table || table.fragments.length === 0) return { body: null, table: null, fragments: [] };
+      const allNonRendered = table.fragments.every(fragment => fragment.nonRendered === true && !fragment.visible);
+      if (!allNonRendered) renderedTables.push({ candidate, table });
+    }
+  }
+  if (renderedImgSvg.length + renderedTables.length !== 1) {
+    return { body: null, table: null, fragments: [] };
+  }
+  if (renderedImgSvg.length === 1) {
+    const activeFragment = renderedImgSvg[0]!;
+    for (const [identity, authoredCount] of authoredImgSvgCount) {
+      const neededNonRendered = authoredCount - (identity === activeFragment.identity ? 1 : 0);
+      if ((nonRenderedById.get(identity) ?? 0) < neededNonRendered) {
+        return { body: null, table: null, fragments: [] };
+      }
+    }
+    const activeCandidate = imgSvgCandidates.find(candidate => candidate.identity === activeFragment.identity) ?? null;
+    if (!activeCandidate) return { body: null, table: null, fragments: [] };
+    return { body: activeCandidate, table: null, fragments: [activeFragment] };
+  }
+  for (const [identity, authoredCount] of authoredImgSvgCount) {
+    if ((nonRenderedById.get(identity) ?? 0) < authoredCount) {
+      return { body: null, table: null, fragments: [] };
+    }
+  }
+  const active = renderedTables[0]!;
+  const fragments = measuredTableBodyFragments(active.table, active.candidate.identity).sort((a, b) => a.page - b.page);
+  return { body: active.candidate, table: active.table, fragments };
+}
+
 export const captionSeparated = defineRule({
   id: ID, severity: "warn", proofSource: null, calibrated: false, experimental: false,
   unit: "pages", defaultOptions: { maxPageDistance: 0 },
@@ -21,16 +101,16 @@ export const captionSeparated = defineRule({
     candidates += 1;
     const captions = blocksFor(snapshot, captionSid).filter(block => !isNotRendered(snapshot, block));
     const caption = captions[0];
-    const isTable = figure.body?.tag === "table";
-    const table = isTable && snapshot.tableIndex?.complete
-      ? snapshot.tableIndex.tables.find(table => table.sid === figure.body?.tableSid) : null;
-    const bodies = (isTable && table ? measuredTableBodyFragments(table, figure.body!.identity)
-      : [...figure.bodyFragments]).sort((a, b) => a.page - b.page);
+    const resolved = resolveFigureBody(snapshot, figure);
+    const activeBody = resolved.body;
+    const isTable = activeBody?.tag === "table";
+    const table = resolved.table;
+    const bodies = resolved.fragments;
     const body = isTable && figure.captionPosition === "after" ? bodies.at(-1) : bodies[0];
     const box = caption ? renderedBox(snapshot, caption) : null;
     const inside = bodies.length > 0 && bodies.every(body => {
       const page = snapshot.pages.find(p => p.pageNumber === body.page);
-      return page && body.visible && body.box.width > 0 && body.box.height > 0 && body.identity === figure.body?.identity
+      return page && body.visible && body.box.width > 0 && body.box.height > 0 && body.identity === activeBody?.identity
         && body.box.x >= page.contentBox.x - SNAPSHOT_ROUNDING_PX && body.box.y >= page.contentBox.y - SNAPSHOT_ROUNDING_PX
         && body.box.x + body.box.width <= page.contentBox.x + page.contentBox.width + SNAPSHOT_ROUNDING_PX
         && body.box.y + body.box.height <= page.contentBox.y + page.contentBox.height + SNAPSHOT_ROUNDING_PX;
@@ -39,7 +119,7 @@ export const captionSeparated = defineRule({
       || !["before", "after"].includes(figure.captionPosition ?? "")
       || new Set(bodies.map(body => body.page)).size !== bodies.length
       || table.fragments.some(fragment => fragment.visible && !bodies.some(body => body.page === fragment.page)));
-    const unsupported = figure.captionSids.length !== 1 || !figure.body || (!isTable && bodies.length !== 1)
+    const unsupported = figure.captionSids.length !== 1 || !activeBody || (!isTable && bodies.length !== 1)
       || tableUnsupported || !body || !inside || captions.length !== 1 || !caption || !box;
     const flowReason = [caption, ...blocksFor(snapshot, figure.sid)].filter(block => block !== undefined)
       .map(block => layoutOutOfScope(block.effectiveStyle)).find(reason => reason !== null);

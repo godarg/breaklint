@@ -218,11 +218,14 @@ it("normalizes only proven paginator break metadata while preserving authored SV
   const svg = '<svg width="240" height="120"><text>BODY</text></svg>';
   const original = figureBodyIdentity("svg", null, svg);
   assert.equal(figureBodyIdentity("svg", null, svg.replace("<svg ", '<svg data-next-break-before="page" ')), original);
+  assert.equal(figureBodyIdentity("svg", null, svg.replace("<svg ", '<svg data-undisplayed="undisplayed" ')), original);
   for (const changed of [svg.replace("BODY", "OTHER"), svg.replace("240", "120"), svg.replace("<svg ", '<svg class="other" '), svg.replace("<svg ", '<svg style="display:none" ')]) {
     assert.notEqual(figureBodyIdentity("svg", null, changed), original);
   }
   const html = '<figure><svg data-next-break-before="page"><text>BODY</text></svg><figcaption>Figure 1</figcaption></figure>';
   assert.equal(buildSourceModel(injectSourceIds(html, "authored-metadata.html").html, "authored-metadata.html").figureIndex.complete, false);
+  const undisplayed = '<figure><svg data-undisplayed="undisplayed"><text>BODY</text></svg><figcaption>Figure 1</figcaption></figure>';
+  assert.equal(buildSourceModel(injectSourceIds(undisplayed, "authored-undisplayed.html").html, "authored-undisplayed.html").figureIndex.complete, false);
 });
 it("declines authored ownership of paginator data-ref instead of discarding source semantics", () => {
   const authored = '<figure><svg data-ref="author"><style>svg[data-ref="author"] text { fill: red }</style><text>BODY</text></svg><figcaption>Figure 1</figcaption></figure>';
@@ -258,4 +261,72 @@ it("keeps the source-less presentation fixture scoped to its declared baseline",
   assert.equal(report.exitCode, 1);
   assert.equal(report.rulesRun, 13);
   assert.ok(Object.keys(report.documents[0]!.coverage).every(id => !id.startsWith("figure/")));
+});
+
+it("measures responsive dual-body figures when exactly one authored variant renders and fails closed otherwise", () => {
+  const html = '<figure id="dual"><svg class="wide" width="200" height="80"><rect width="200" height="80"/></svg><svg class="narrow" width="100" height="160"><rect width="100" height="160"/></svg><figcaption>Figure 1</figcaption></figure>';
+  const model = buildSourceModel(injectSourceIds(html, "responsive.html").html, "responsive.html");
+  assert.equal(model.figureIndex.complete, true);
+  assert.equal(model.figureIndex.figures[0]!.body, null);
+  assert.equal(model.figureIndex.figures[0]!.bodyCandidates?.length, 2);
+  assert.equal(model.figureIndex.figures[0]!.captionPosition, "after");
+  const [wide, narrow] = model.figureIndex.figures[0]!.bodyCandidates!;
+
+  // Positive control: wide visible on page 1, narrow display:none (nonRendered), caption on page 2 -> finding
+  const separated = sample("caption-separated-trigger");
+  const fig = separated.figureIndex!.figures[0]!;
+  fig.body = null;
+  fig.bodyCandidates = [wide!, narrow!];
+  fig.bodyFragments = [
+    { page: 1, box: { x: 48, y: 48, width: 100, height: 60 }, visible: true, identity: wide!.identity },
+    { page: 1, box: { x: 0, y: 0, width: 0, height: 0 }, visible: false, nonRendered: true, identity: narrow!.identity },
+  ];
+  const separatedResult = judge(separated, "figure/caption-separated");
+  assert.equal(separatedResult.coverage["figure/caption-separated"]?.measured, 1);
+  assert.equal(separatedResult.findings.length, 1);
+  assert.equal(separatedResult.findings[0]!.measurement.value, 1);
+
+  // Positive clean control: wide visible on page 2 (same page as caption) -> measured, 0 findings
+  const samePage = structuredClone(separated);
+  samePage.figureIndex!.figures[0]!.bodyFragments[0]!.page = 2;
+  const samePageResult = judge(samePage, "figure/caption-separated");
+  assert.equal(samePageResult.coverage["figure/caption-separated"]?.measured, 1);
+  assert.deepEqual(samePageResult.findings, []);
+
+  // Fail-closed controls: 0 visible, 2 visible, hidden-not-display-none, dropped candidate, identity mismatch, contradictory nonRendered+visible
+  for (const mode of ["none-visible", "both-visible", "opacity-hidden", "dropped-candidate", "unknown-identity", "contradictory-nonrendered"] as const) {
+    const snap = structuredClone(separated);
+    const f = snap.figureIndex!.figures[0]!;
+    if (mode === "none-visible") {
+      f.bodyFragments[0]!.visible = false;
+      f.bodyFragments[0]!.nonRendered = true;
+    } else if (mode === "both-visible") {
+      f.bodyFragments[1] = { page: 1, box: { x: 48, y: 120, width: 80, height: 40 }, visible: true, identity: narrow!.identity };
+    } else if (mode === "opacity-hidden") {
+      delete f.bodyFragments[1]!.nonRendered;
+    } else if (mode === "dropped-candidate") {
+      f.bodyFragments = [f.bodyFragments[0]!];
+    } else if (mode === "unknown-identity") {
+      f.bodyFragments[1]!.identity = "svgbody:tampered";
+    } else if (mode === "contradictory-nonrendered") {
+      f.bodyFragments[1]!.visible = true;
+    }
+    const res = judge(snap, "figure/caption-separated");
+    assert.deepEqual(res.findings, [], mode);
+    assert.equal(res.coverage["figure/caption-separated"]?.measured, 0, mode);
+    assert.ok(res.notMeasured.every(n => n.reason === "env/figure-body-unsupported"), mode);
+  }
+
+  // Malformed bodyCandidates / nonRendered rejected by snapshot validator (exit 3 / checker-crashed)
+  for (const mutate of [
+    (s: Snapshot) => { s.figureIndex!.figures[0]!.body = wide!; },
+    (s: Snapshot) => { s.figureIndex!.figures[0]!.bodyCandidates = [wide!]; },
+    (s: Snapshot) => { (s.figureIndex!.figures[0]!.bodyFragments[1] as unknown as Record<string, unknown>).nonRendered = "yes"; },
+  ]) {
+    const bad = structuredClone(separated);
+    mutate(bad);
+    const res = judge(bad, "figure/caption-separated");
+    assert.equal(res.verdict, "infrastructure");
+    assert.ok(res.infrastructure.some(e => e.kind === "checker-crashed"));
+  }
 });

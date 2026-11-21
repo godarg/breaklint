@@ -1,19 +1,24 @@
 # figure/caption-separated
 
 Supports a standard `<figure>` with one authored `<img>`, root inline `<svg>` or `<table>` body and one
-visible `<figcaption>`. Nested SVG belongs to its root body. The concrete body is measured
+visible `<figcaption>`, as well as responsive multi-variant `<figure>` elements (for example a print-visible
+`<svg>` paired with a mobile `display: none` variant) when **exactly one** authored body candidate renders
+visible with a verified source identity and every other authored candidate is witnessed non-rendered
+(`display: none` with zero layout boxes). Nested SVG belongs to its root body. The concrete body is measured
 independently of the wrapper; it warns when page distance exceeds `maxPageDistance` (default 0).
 The warning names both pages, but does not establish the pagination cause, author intent or that
 a keep remedy would fit.
 
-Multiple or mixed bodies, split/repeated image bodies, missing/hidden geometry, clipping/masking/filter effects,
+Multiple simultaneously rendered bodies, zero visible bodies, non-`display: none` hidden/broken/clipped
+variants (such as `opacity: 0`, `visibility: hidden`, or `clip-path`), dropped or mismatched candidates,
+split/repeated image bodies, missing/hidden geometry, clipping/masking/filter effects,
 multiple captions, unsupported flow and source mismatch decline. An inline SVG needs a nonzero
 paint primitive intersecting its viewport: a DOM paint-state witness, not an ink-mask proof.
 A convenient wrapper box cannot replace this evidence. Non-executing data scripts
 (`application/json`, `application/ld+json`) do not mark a document script-bearing; documents with
 executable scripts or inline `on*` handlers unlock the figure inventory only when runtime-verified
 mutation-free with exact DOM element-count parity and static-to-runtime figure/ID/anchor/reference
-tree parity. Any DOM mutation, `<base>` element, authored `data-ref`/`data-next-break-before`,
+tree parity. Any DOM mutation, `<base>` element, authored `data-ref`/`data-next-break-before`/`data-undisplayed`,
 no source-map mode and stored snapshots without an inventory decline inventory unavailable.
 
 A table body can span several pages. Its source row/cell IDs, order, normalized content and
@@ -36,7 +41,7 @@ SVG identity uses a full normalized content hash and preserves meaningful text w
 authored style, drawing attributes and content. Normalization follows measured Paged.js 0.4.3
 parser changes: removed comments/non-text formatting nodes and `data-id` added from an existing
 ID, without overwriting authored `data-id`. Breaklint/paginator addressing metadata is excluded;
-`data-next-break-before` is excluded only after the authored inventory rules out source ownership.
+`data-next-break-before` and `data-undisplayed` are excluded only after the authored inventory rules out source ownership.
 This is a body-equality witness, not the coarser finding fingerprint. Changed body content cannot
 borrow geometry from an unchanged wrapper.
 

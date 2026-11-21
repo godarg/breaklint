@@ -477,14 +477,20 @@ export function missingSnapshotFields(snapshot: Snapshot): string[] {
         || !Object.values(index.namedAnchors).every(count => Number.isSafeInteger(count) && count > 0)))
       || !Array.isArray(index.figures) || !Array.isArray(index.referenceBlocks)) missing.add("FigureIndex.inventory");
     else {
+      const bodyCandidate = (value: unknown): boolean => record(value)
+        && ["img", "svg", "table"].includes(String(value.tag)) && sid(value.identity)
+        && (value.tag !== "table" || sid(value.tableSid));
       for (const figure of index.figures) {
         if (!record(figure) || !sid(figure.sid) || !Array.isArray(figure.captionSids) || !figure.captionSids.every(sid)
           || (figure.captionPosition !== undefined && ![null, "before", "after"].includes(figure.captionPosition))
-          || (figure.body !== null && (!record(figure.body) || !["img", "svg", "table"].includes(String(figure.body.tag)) || !sid(figure.body.identity)
-            || (figure.body.tag === "table" && !sid(figure.body.tableSid))))
+          || (figure.body !== null && !bodyCandidate(figure.body))
+          || (figure.bodyCandidates !== undefined && (figure.body !== null || !Array.isArray(figure.bodyCandidates)
+            || figure.bodyCandidates.length < 2 || !figure.bodyCandidates.every(bodyCandidate)))
           || !Array.isArray(figure.bodyFragments)) { missing.add("FigureIndex.figure"); continue; }
         for (const body of figure.bodyFragments) if (!record(body) || !Number.isSafeInteger(body.page) || Number(body.page) < 1
-          || !snapshot.pages.some(page => page.pageNumber === body.page) || !box(body.box) || typeof body.visible !== "boolean" || !sid(body.identity)) missing.add("FigureIndex.bodyFragment");
+          || !snapshot.pages.some(page => page.pageNumber === body.page) || !box(body.box) || typeof body.visible !== "boolean"
+          || (body.nonRendered !== undefined && typeof body.nonRendered !== "boolean")
+          || !sid(body.identity)) missing.add("FigureIndex.bodyFragment");
       }
       for (const group of index.referenceBlocks) if (!record(group) || !sid(group.sid) || !Array.isArray(group.references)
         || !group.references.every(ref => record(ref) && typeof ref.href === "string" && ref.href.startsWith("#") && (ref.targetId === null || sid(ref.targetId)))) missing.add("FigureIndex.referenceBlock");
@@ -511,7 +517,9 @@ export function missingSnapshotFields(snapshot: Snapshot): string[] {
       for (const fragment of table.fragments) if (!record(fragment) || !Number.isSafeInteger(fragment.page)
         || !snapshot.pages.some(page => page.pageNumber === fragment.page) || !box(fragment.box)
         || ![null, "env/multicolumn", "env/vertical-writing"].includes(fragment.flowReason)
-        || typeof fragment.visible !== "boolean" || !Array.isArray(fragment.rows) || !fragment.rows.every(value => row(value, true)))
+        || typeof fragment.visible !== "boolean"
+        || (fragment.nonRendered !== undefined && typeof fragment.nonRendered !== "boolean")
+        || !Array.isArray(fragment.rows) || !fragment.rows.every(value => row(value, true)))
         missing.add("TableIndex.fragment");
     }
   }
