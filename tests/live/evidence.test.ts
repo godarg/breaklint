@@ -8,7 +8,7 @@
  * of the thing in question.
  *
  * **A missing prerequisite is a failure here, not a skip.** A suite that goes green by running
- * nothing is the most expensive kind of green there is: it makes every claim in `docs/status.md`
+ * nothing is the most expensive kind of green there is: it makes every claim in `maintainers/status.md`
  * look checked. Set `BREAKLINT_LIVE_OPTIONAL=1` to turn the failure back into a skip for a local
  * run on a machine without a browser — never in a release gate.
  *
@@ -269,7 +269,7 @@ const hasPoppler = (() => {
 // Measured: with `BREAKLINT_CHROME=/nonexistent/chrome` this gate announced `cannot run without:
 // a browser` and failed the run — while `before()` two lines later launched the real Chrome
 // through `launchBrowser()` and all sixteen measurements completed. The gate on which
-// `docs/status.md` rests every live claim was answering a different question from the suite it
+// `maintainers/status.md` rests every live claim was answering a different question from the suite it
 // guards. A false FAIL rather than a false green, which is the safe direction, and still wrong.
 const chromeAvailable = resolveBrowser().path !== null;
 const pagedjsRoot = resolvePackageRoot("pagedjs", REPO);
@@ -506,7 +506,7 @@ describe("evidence path, live", () => {
     assert.deepEqual(
       missing,
       [],
-      `this suite carries every live claim in docs/status.md and cannot run without: ${missing.join(", ")}. ` +
+      `this suite carries every live claim in maintainers/status.md and cannot run without: ${missing.join(", ")}. ` +
         "Set BREAKLINT_LIVE_OPTIONAL=1 to downgrade this to a skip for a local run — never in a release gate.",
     );
   });

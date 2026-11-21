@@ -463,7 +463,9 @@ describe("page-fill rules", () => {
     for (const file of [
       "README.md",
       "docs/agent-contract.md",
-      "docs/limitations.md",
+      "docs/known-limits.md",
+      "maintainers/burden-of-proof.md",
+      "maintainers/limitations-history.md",
       "docs/rules/layout-half-empty-page.md",
       "docs/rules/layout-orphaned-continuation-page.md",
     ]) {

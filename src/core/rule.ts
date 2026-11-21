@@ -219,7 +219,7 @@ export function defineRule(meta: RuleMeta, run: Rule["run"]): Rule {
   if (meta.severity === "error" && meta.proofSource === null) {
     throw new Error(
       `${meta.id}: severity "error" requires a named proof source. An uncalibrated threshold ` +
-        `is at most a warning — see docs/limitations.md.`,
+        `is at most a warning — see https://github.com/godarg/breaklint/blob/main/maintainers/burden-of-proof.md.`,
     );
   }
   if (meta.severity !== "error" && meta.proofSource !== null) {

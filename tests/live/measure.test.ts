@@ -188,7 +188,7 @@ describe("the measurement probe, live", () => {
    * primitives are NOT installed — `window.__blPrimitives` came back `undefined` and the collector
    * threw. `setContent` writes into the existing document, so CDP's on-new-document script never
    * fires. Two independent measurements now point at the same loader design: this one, and the
-   * `file://` origin measurement in `docs/status.md` that showed `cssRules` unreadable off a file.
+   * `file://` origin measurement in `maintainers/status.md` that showed `cssRules` unreadable off a file.
    */
   async function loaded(): Promise<PageLike> {
     const page = await browser!.newPage();

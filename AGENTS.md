@@ -7,17 +7,17 @@ documents; do not copy their current values here.
 ## Read before changing behavior
 
 - `README.md` for the public contract and supported workflow.
-- `docs/status.md` and `docs/limitations.md` for the honest capability boundary.
+- `docs/known-limits.md` for the current capability boundary, and `maintainers/` (`status.md`,
+  `burden-of-proof.md`, `limitations-history.md`) for the record behind it.
 - `docs/configuration.md` for Configuration Contract v1.
 - The affected `docs/rules/*.md` page before changing a rule.
 - `CONTRIBUTING.md` before adding a rule or changing a public schema.
 - `SECURITY.md` before changing acquisition, browser, network or dependency boundaries.
 - `.github/workflows/ci.yml` for the executable public gate inventory.
 
-For Dargel-managed work, the accepted decision and narrowly applicable product contract under
-`../Dargel Solutions/02_Products/Digital_Products/07_breaklint/` control scope and sequence. A
-historical audit or proposed decision is evidence, not current authority. Stop and report a
-conflict between an accepted decision, the normative contract, repository status and runtime.
+Maintainer-internal scope documents live outside this repository. A historical audit or proposed
+decision is evidence, not current authority. Stop and report a conflict between an accepted
+decision, the normative contract, repository status and runtime.
 
 ## Invariants
 

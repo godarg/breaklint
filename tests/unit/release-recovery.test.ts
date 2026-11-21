@@ -27,8 +27,11 @@ describe("release recovery", () => {
   });
 
   it("release notes are the tag commit's own CHANGELOG section: non-empty, the right version, nothing else", () => {
-    const notes = changelogSection(CHANGELOG, "0.11.0");
-    assert.ok(notes.trim().length > 200, "the 0.11.0 section is empty");
+    // 0.10.0 is the last release whose own section carries its notes; since 0.11.1 the 0.11.0
+    // section is one line pointing to 0.11.1, which lists that tag's changes against 0.10.0.
+    const notes = changelogSection(CHANGELOG, "0.10.0");
+    assert.ok(notes.trim().length > 200, "the 0.10.0 section is empty");
+    assert.match(changelogSection(CHANGELOG, "0.11.0"), /listed under 0\.11\.1/u, "the 0.11.0 section no longer points to 0.11.1");
     assert.doesNotMatch(notes, /^## /mu, "the notes run into another version's section");
     assert.ok(CHANGELOG.includes(notes.trim()), "the notes are not the CHANGELOG's own text");
     assert.throws(() => changelogSection(CHANGELOG, "0.0.99"), /has no "## 0\.0\.99 — YYYY-MM-DD" section/u);

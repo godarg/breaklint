@@ -12,7 +12,7 @@
  *      `measured` — which is the whole of what was wrong with it.
  *
  * Then it asserts the current build names both. The recorded outcome is kept beside this script in
- * `docs/validation/pagination-residue-red-control.json` for a reader who cannot build the old tree.
+ * `maintainers/validation/pagination-residue-red-control.json` for a reader who cannot build the old tree.
  *
  * TWO CASES, ONE PUBLIC. The public fixture reproduces the class and runs for everyone; the corpus
  * document is a chapter of a paid product and is only reachable when
@@ -30,7 +30,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
-const RECORD = JSON.parse(readFileSync(join(ROOT, "docs/validation/pagination-residue-red-control.json"), "utf8"));
+const RECORD = JSON.parse(readFileSync(join(ROOT, "maintainers/validation/pagination-residue-red-control.json"), "utf8"));
 assert.equal(RECORD.contractVersion, "pagination-residue-red-control-v2");
 assert.equal(RECORD.cases.length, 2);
 assert.equal(RECORD.cases.filter((item) => item.artifactRoot === "repository").length, 1,

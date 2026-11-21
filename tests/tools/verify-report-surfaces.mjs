@@ -1057,7 +1057,7 @@ function runScreenPixelMutationControl(artifact, currentInput) {
     { dimensions: artifact.dimensions, semantics: artifact.semantics, pixels: roundTripped.contract },
   );
   assert.equal(originalFingerprint, artifact.reviewArtifactFingerprint, `${artifact.cell}: mutation control baseline drift`);
-  assert.notEqual(mutatedFingerprint, originalFingerprint, `${artifact.cell}: visible pixel mutation left human fingerprint green`);
+  assert.notEqual(mutatedFingerprint, originalFingerprint, `${artifact.cell}: visible pixel mutation left the review fingerprint green`);
   return { cell: artifact.cell, changedOffset, before: original.contract.normalizedRgbaSha256, after: roundTripped.contract.normalizedRgbaSha256 };
 }
 
@@ -1219,7 +1219,7 @@ assert.throws(() => assertSurfaceInventory(manifest, "unsupported-control"), /un
 
 const latestRound = describeLatestRound(ledger, manifest, currentReviewInput.fingerprint);
 // The review ledger's state belongs where a release reader looks, not only in a log line. The line
-// names every reviewer by kind; delegatedAI is explicit and never reported as a human pass.
+// names every reviewer by kind; delegatedAI is explicit and never reported as a rostered pass.
 if (process.env.GITHUB_STEP_SUMMARY) {
   appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Report-surface review ledger\n\n${latestRound}.\n\n${REVIEWER_AUTHENTICATION_NOTE}\n\n`);
 }
@@ -1228,7 +1228,7 @@ const sightReview = mode === "local" ? assessSightGate(ledger, manifest, current
 if (mode === "technical") {
   process.stdout.write(
     `report surfaces: technical gate passed 32/32 current cells and ${Object.values(manifest.physicalArtifacts).reduce((sum, count) => sum + count, 0)} physical artifacts; ` +
-      `no human-review claim is made; ${latestRound} ` +
+      `no sight-review claim is made; ${latestRound} ` +
       `(current inputs ${manifest.reviewInputFingerprint}; verifier self-controls rejected: pixel, font, tile re-cut, gallery, stranded heading, text depth, fill application, bare continuation, row rule, header rule, row pitch, break runs)\n`,
   );
 } else {

@@ -10,7 +10,7 @@
  * successful self-application.
  */
 
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 
@@ -20,6 +20,7 @@ import { runDocument } from "../../src/core/engine.ts";
 import { ALL_RULES } from "../../src/rules/index.ts";
 import { resolveConfig, toReportConfig } from "../../src/config/resolve.ts";
 import type { Snapshot } from "../../src/core/types.ts";
+import { shippedDocuments } from "./docs-truth.mjs";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const problems: string[] = [];
@@ -68,9 +69,11 @@ for (const [pattern, why] of [
 
 // 2. The project's own prose must pass the typography rules it applies to others. The straight
 //    apostrophe is the one a typography tool cannot afford in its own README.
-// docs/agent-contract.md is in this list because it was not: it shipped with three false
-// contract claims, was linked from no file in the repo, and no gate read it.
-const prose = [join(ROOT, "README.md"), join(ROOT, "docs/agent-contract.md"), ...readdirSync(join(ROOT, "docs/rules")).map((f) => join(ROOT, "docs/rules", f))];
+// docs/agent-contract.md once shipped with three false contract claims, linked from no file and
+// read by no gate. The list is therefore not written by hand: it is every page npm ships (README,
+// SECURITY.md, docs/**), from the same function docs-truth uses, so a new page is read on arrival.
+const prose = shippedDocuments(ROOT);
+if (prose.length < 20) problems.push(`only ${prose.length} shipped documents found; the prose guard has lost its subject`);
 for (const file of prose) {
   const text = readFileSync(file, "utf8");
   // Only outside code spans and fenced blocks: a straight quote in a code sample is correct.
@@ -91,8 +94,9 @@ for (const file of prose) {
   if (claims) problems.push(`${file}: uniqueness claim — ${claims.join(", ")}`);
 }
 
-// 3. No absolute build-machine path anywhere in the published tree.
-for (const file of [join(ROOT, "README.md"), join(ROOT, "docs/status.md")]) {
+// 3. No absolute build-machine path anywhere in the published tree: the shipped pages and the
+//    changelog, which npm ships too.
+for (const file of [...shippedDocuments(ROOT), join(ROOT, "CHANGELOG.md")]) {
   const text = readFileSync(file, "utf8");
   if (/\/(Users|home)\/[a-z][a-z0-9_-]+\//u.test(text)) problems.push(`${file}: absolute build-machine path`);
 }

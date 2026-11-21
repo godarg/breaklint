@@ -17,7 +17,7 @@
  *   B. Release preparation — package.json names a version that has no tag yet. It must be greater
  *      than the last release tag; the first section must be `## <version> — YYYY-MM-DD` or exactly
  *      `## <version> — TBD-at-tag` (the owner sets the date immediately before tagging); no
- *      `## Unreleased` section may be left; `docs/status.md` must not call the version unreleased.
+ *      `## Unreleased` section may be left; `maintainers/status.md` must not call the version unreleased.
  *   C. The release build — HEAD is the commit `v<version>` points at, which is what the release
  *      workflow checks out and what npm will serve. The rules of B apply, except that ONLY a date
  *      is accepted: a `TBD-at-tag` left in place stops the release workflow here, before any
@@ -113,10 +113,13 @@ function releasePrepIssues(version, sections, statusText, { atTag }) {
   }
   const statusClaim = new RegExp(`${version.replace(/\./gu, "\\.")}\\s*(\\(unreleased\\)|— unreleased)`, "iu");
   if (statusText !== null && statusClaim.test(statusText)) {
-    issues.push(`docs/status.md still calls ${version} unreleased`);
+    issues.push(`${STATUS_PATH} still calls ${version} unreleased`);
   }
   return issues;
 }
+
+/** The maintainers' release record; it moved here from docs/status.md in 0.11.1. */
+export const STATUS_PATH = "maintainers/status.md";
 
 export function checkChangelog(root) {
   const issues = [];
@@ -125,8 +128,10 @@ export function checkChangelog(root) {
   const version = manifest.version;
   if (typeof version !== "string" || !RELEASE_TAG.test(`v${version}`)) return fail(`package.json version ${JSON.stringify(version)} is not X.Y.Z`);
   const changelog = readFileSync(join(root, "CHANGELOG.md"), "utf8");
-  const statusPath = join(root, "docs/status.md");
-  const statusText = existsSync(statusPath) ? readFileSync(statusPath, "utf8") : null;
+  const statusPath = join(root, STATUS_PATH);
+  // Fail closed: a status page that moved or vanished is not a status page that says nothing.
+  if (!existsSync(statusPath)) return fail(`${STATUS_PATH} is missing, so whether it still calls ${version} unreleased cannot be read; restore it or point STATUS_PATH at its new place`);
+  const statusText = readFileSync(statusPath, "utf8");
   const sections = sectionsOf(changelog);
 
   const head = git(root, ["rev-parse", "HEAD^{commit}"]);
@@ -261,7 +266,7 @@ function releasedRepo(scratch, name) {
     "src/rules/layout/shared.ts": "export const helper = 1;\n",
     "src/rules/layout/orphan.ts": 'export const rule = { id: "layout/orphan" };\n',
     "src/rules/layout/orphaned-continuation-page.ts": 'export const rule = { id: "layout/orphaned-continuation-page" };\n',
-    "docs/status.md": "# Status\n",
+    "maintainers/status.md": "# Status\n",
   });
   commitAll(root, "release 1.0.0");
   sh(root, ["tag", "-a", "v1.0.0", "-m", "canary 1.0.0"]);
@@ -304,8 +309,12 @@ function runSelfTest() {
       after: { "package.json": JSON.stringify({ name: "canary", version: "1.1.0" }), "CHANGELOG.md": prep("## 1.1.0 — unreleased") } },
     { name: "a version bump that leaves an Unreleased section behind", expect: 1, match: /still carries "## Unreleased"/u,
       after: { "package.json": JSON.stringify({ name: "canary", version: "1.1.0" }), "CHANGELOG.md": prep("## 1.1.0 — 2026-02-03", "## Unreleased\n\n- left over\n\n") } },
-    { name: "a version bump while status.md still says unreleased", expect: 1, match: /docs\/status\.md still calls 1\.1\.0 unreleased/u,
-      after: { "package.json": JSON.stringify({ name: "canary", version: "1.1.0" }), "CHANGELOG.md": prep("## 1.1.0 — 2026-02-03"), "docs/status.md": "## Current work — 1.1.0 (unreleased)\n" } },
+    { name: "a version bump while status.md still says unreleased", expect: 1, match: /maintainers\/status\.md still calls 1\.1\.0 unreleased/u,
+      after: { "package.json": JSON.stringify({ name: "canary", version: "1.1.0" }), "CHANGELOG.md": prep("## 1.1.0 — 2026-02-03"), "maintainers/status.md": "## Current work — 1.1.0 (unreleased)\n" } },
+    { name: "a status page that is missing (moved without the check)", expect: 1, match: /maintainers\/status\.md is missing/u,
+      remove: ["maintainers/status.md"], after: { "README.md": "docs only\n" } },
+    { name: "a version bump whose status page is missing", expect: 1, match: /maintainers\/status\.md is missing/u,
+      remove: ["maintainers/status.md"], after: { "package.json": JSON.stringify({ name: "canary", version: "1.1.0" }), "CHANGELOG.md": prep("## 1.1.0 — 2026-02-03") } },
     { name: "a version older than the last tag", expect: 1, match: /not newer than the last release tag v1\.0\.0/u,
       after: { "package.json": JSON.stringify({ name: "canary", version: "0.9.0" }), "CHANGELOG.md": prep("## 0.9.0 — 2026-02-03") } },
     { name: "the release build of a dated tag", expect: 0, tagAfter: "v1.1.0",

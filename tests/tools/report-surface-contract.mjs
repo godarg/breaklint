@@ -230,13 +230,16 @@ export function assertObservedEnvironment(observed, label) {
 }
 
 /**
- * The closed roster of human review roles. A cell counts toward the human gate only when it passed
- * under one of these handles AND its round lists that handle as `kind: "human"`. The roster is a
- * code constant on purpose: a role is added or removed by a reviewed change to this file, never by
- * a ledger edit, so a reviewer (human or agent) cannot admit itself by writing the very ledger its
- * review is recorded in. `docs/reporting.md` names the roster and this procedure.
+ * The closed roster of rostered reviewer roles. A cell counts toward the roster gate only when it
+ * passed under one of these handles AND its round lists that handle as `kind: "human"` — the
+ * ledger's field value for a rostered handle, kept so rounds 1–9 stay byte-identical. The value
+ * records which handle was written, not that a person reviewed: a handle is a role in this
+ * maintainer's workflow and may be operated by an agent. The roster is a code constant on purpose:
+ * a role is added or removed by a reviewed change to this file, never by a ledger edit, so a
+ * reviewer cannot admit itself by writing the very ledger its review is recorded in.
+ * `maintainers/report-review.md` names the roster and this procedure.
  */
-export const HUMAN_REVIEW_ROLES = Object.freeze(["@Brand", "@Neo", "@Founder"]);
+export const ROSTERED_REVIEW_ROLES = Object.freeze(["@Brand", "@Neo", "@Founder"]);
 
 /**
  * What the roster check does NOT do, stated wherever a review result is shown. The ledger is a
@@ -245,8 +248,8 @@ export const HUMAN_REVIEW_ROLES = Object.freeze(["@Brand", "@Neo", "@Founder"]);
  */
 export const REVIEWER_AUTHENTICATION_NOTE =
   "The roster check proves only that a rostered handle (@Brand, @Neo or @Founder) was written into the ledger; " +
-  "it does not authenticate a person. That a rostered human actually reviewed rests on repository access control " +
-  "and on review of the ledger diff, not on this gate. Delegated AI receipt/model/image fields are " +
+  "it does not authenticate a person, and a rostered handle does not establish that a person reviewed. Who " +
+  "stands behind a handle rests on repository access control and on review of the ledger diff, not on this gate. Delegated AI receipt/model/image fields are " +
   "record bindings, not authentication of a provider or proof that the reviewer perceived the images.";
 
 const AGENT_HANDLE = /^@[A-Za-z0-9][A-Za-z0-9_.-]{0,38}$/u;
@@ -257,9 +260,9 @@ const REVIEWER_FIELDS = Object.freeze({
   "not-recorded": Object.freeze(["handle", "kind"]),
 });
 
-/** True only for a reviewer entry that is a rostered human role. */
-export function isRosteredHuman(reviewer) {
-  return reviewer?.kind === "human" && HUMAN_REVIEW_ROLES.includes(reviewer.handle);
+/** True only for a reviewer entry that carries a rostered role handle (ledger kind "human"). */
+export function isRosteredReviewer(reviewer) {
+  return reviewer?.kind === "human" && ROSTERED_REVIEW_ROLES.includes(reviewer.handle);
 }
 
 function assertClosedFields(value, fields, label) {
@@ -307,7 +310,7 @@ function assertDelegation(round, label) {
 
 function assertDelegatedReviewer(reviewer, label, roundNumber) {
   assert.match(reviewer.handle ?? "", AGENT_HANDLE, `${label}: delegated AI handle is malformed`);
-  assert.ok(!HUMAN_REVIEW_ROLES.includes(reviewer.handle), `${label}: a delegated AI cannot carry the human review role ${reviewer.handle}`);
+  assert.ok(!ROSTERED_REVIEW_ROLES.includes(reviewer.handle), `${label}: a delegated AI cannot carry the rostered reviewer role ${reviewer.handle}`);
   assert.ok(typeof reviewer.actual_model === "string" && reviewer.actual_model.trim().length > 0 && !/^(?:(?:UNKNOWN|UNBEKANNT)\b|n\/a$)/iu.test(reviewer.actual_model.trim()),
     `${label}: delegated AI actual_model must be recorded, not UNKNOWN, UNBEKANNT or n/a`);
   for (const field of ["promptSha256", "outputSha256"]) {
@@ -334,31 +337,32 @@ function assertDelegatedReviewer(reviewer, label, roundNumber) {
 }
 
 /**
- * A reviewer is named for what it is. `human` is one of the rostered role handles and nothing else;
- * `agent` carries the label of the model or tool that reviewed (and, optionally, a handle that is
- * not a human role) and is never counted as a human; `not-recorded` states that the record of the
- * time did not name the reviewer, instead of inventing a name afterwards. No other field is
- * accepted, so an agent cannot pass as a human by moving its model label into a field of its own.
+ * A reviewer is named for what it is. Ledger kind `human` is one of the rostered role handles and
+ * nothing else; `agent` carries the label of the model or tool that reviewed (and, optionally, a
+ * handle that is not a rostered role) and is never counted as rostered; `not-recorded` states that
+ * the record of the time did not name the reviewer, instead of inventing a name afterwards. No
+ * other field is accepted, so an agent cannot pass as rostered by moving its model label into a
+ * field of its own.
  */
 function assertReviewer(reviewer, label, roundNumber) {
   assert.ok(reviewer && typeof reviewer === "object", `${label}: reviewer entry missing`);
-  assert.ok(Object.hasOwn(REVIEWER_FIELDS, reviewer.kind ?? ""), `${label}: reviewer kind must be human, agent or not-recorded; delegated-ai requires an explicit Founder delegation`);
+  assert.ok(Object.hasOwn(REVIEWER_FIELDS, reviewer.kind ?? ""), `${label}: reviewer kind must be human (a rostered role handle), agent or not-recorded; delegated-ai requires an explicit Founder delegation`);
   const allowed = REVIEWER_FIELDS[reviewer.kind];
   const unknown = Object.keys(reviewer).filter((field) => !allowed.includes(field));
-  assert.deepEqual(unknown, [], `${label}: a ${reviewer.kind} reviewer carries only ${allowed.join(" and ")}; unknown field ${unknown.join(", ")}` +
-    (reviewer.kind === "human" && unknown.includes("model") ? " (a human reviewer does not carry a model label)" : ""));
+  assert.deepEqual(unknown, [], `${label}: a ${reviewer.kind === "human" ? 'rostered (kind "human")' : reviewer.kind} reviewer carries only ${allowed.join(" and ")}; unknown field ${unknown.join(", ")}` +
+    (reviewer.kind === "human" && unknown.includes("model") ? " (a rostered reviewer does not carry a model label)" : ""));
   if (reviewer.kind === "delegated-ai") {
     assertDelegatedReviewer(reviewer, label, roundNumber);
     assertClosedFields(reviewer, allowed, label);
   } else if (reviewer.kind === "human") {
-    assert.ok(HUMAN_REVIEW_ROLES.includes(reviewer.handle),
-      `${label}: ${JSON.stringify(reviewer.handle)} is not a rostered human review role (${HUMAN_REVIEW_ROLES.join(", ")}); ` +
+    assert.ok(ROSTERED_REVIEW_ROLES.includes(reviewer.handle),
+      `${label}: ${JSON.stringify(reviewer.handle)} is not a rostered reviewer role (${ROSTERED_REVIEW_ROLES.join(", ")}); ` +
         "the roster changes only by a reviewed code change to tests/tools/report-surface-contract.mjs");
   } else if (reviewer.kind === "agent") {
     assert.ok(typeof reviewer.model === "string" && reviewer.model.trim().length > 0, `${label}: an agent reviewer must name its model or tool`);
     if (reviewer.handle !== undefined && reviewer.handle !== null) {
       assert.match(reviewer.handle, AGENT_HANDLE, `${label}: agent handle is malformed`);
-      assert.ok(!HUMAN_REVIEW_ROLES.includes(reviewer.handle), `${label}: an agent cannot carry the human review role ${reviewer.handle}`);
+      assert.ok(!ROSTERED_REVIEW_ROLES.includes(reviewer.handle), `${label}: an agent cannot carry the rostered reviewer role ${reviewer.handle}`);
     }
   } else {
     assert.equal(reviewer.handle, null, `${label}: a not-recorded reviewer has no handle`);
@@ -387,9 +391,9 @@ function assertReviewCell(cellId, cell, round, label) {
   const reviewer = round.reviewers.find((entry) => entry.handle && entry.handle === cell.reviewer);
   assert.ok(reviewer, `${label}: ${cellId} reviewer ${cell.reviewer} is not a reviewer of this round`);
   if (cell.status === "pass") {
-    assert.ok(isRosteredHuman(reviewer) || reviewer.kind === "delegated-ai",
-      `${label}: ${cellId} passed under ${cell.reviewer}, ${reviewer.kind === "human" ? "a human" : reviewer.kind === "agent" ? "an agent" : "a not-recorded"} reviewer; a pass is recorded only by a rostered human ` +
-        `(${HUMAN_REVIEW_ROLES.join(", ")}), and an agent may record a failed cell or a round note but never a pass`);
+    assert.ok(isRosteredReviewer(reviewer) || reviewer.kind === "delegated-ai",
+      `${label}: ${cellId} passed under ${cell.reviewer}, ${reviewer.kind === "human" ? "an unrostered" : reviewer.kind === "agent" ? "an agent" : "a not-recorded"} reviewer; a pass is recorded only by a rostered reviewer ` +
+        `(${ROSTERED_REVIEW_ROLES.join(", ")}), and an agent may record a failed cell or a round note but never a pass`);
   }
   assert.match(cell.reviewArtifactFingerprint ?? "", SHA256, `${label}: ${cellId} stable review fingerprint missing`);
   assertUtc(cell.reviewedAt, `${label}: ${cellId} reviewedAt is not an exact UTC timestamp`);
@@ -418,15 +422,15 @@ function assertReviewCell(cellId, cell, round, label) {
  * evidence and is kept, so the next round can be compared with it.
  *
  * Structural rules, all fail-closed:
- * - rounds are numbered 1..n in order; the last one is the current state of the human gate;
+ * - rounds are numbered 1..n in order; the last one is the current state of the review gate;
  * - within a round one handle names one reviewer of one kind;
- * - a cell that passed names a rostered human or an explicitly delegated AI reviewer;
+ * - a cell that passed names a rostered or an explicitly delegated AI reviewer;
  *   an agent may be recorded as a reviewer and may record a failed cell, never a passed one;
  * - rounds are reviewed in numbered order (non-decreasing reviewedAt), no historical or
  *   reconstructed record follows a current one, and a current round and each of its reviewed cells
  *   were reviewed at or after the render timestamp it binds;
  * - a passing LATEST round is a current record;
- * - a `pass` round names a rostered human or delegated AI reviewer, binds an input fingerprint, a render
+ * - a `pass` round names a rostered or delegated AI reviewer, binds an input fingerprint, a render
  *   timestamp and an environment, records no blocker or high finding and carries a complete cell
  *   set in which every cell passed;
  * - a `fail` round records at least one finding or one failed cell;
@@ -441,12 +445,12 @@ export function validateReviewLedger(ledger, { cellCount = 32, now = Date.now() 
   const latestAcceptable = now + REVIEW_TIME_SKEW_MS;
   const notInFuture = (value, what) => assert.ok(Date.parse(value) <= latestAcceptable,
     `${what} ${value} lies in the future (verifier clock ${new Date(now).toISOString()}); a review is recorded after it happened`);
-  assert.equal(ledger?.schemaVersion, REVIEW_LEDGER_SCHEMA_VERSION, "human ledger schema drift");
-  assert.ok(Array.isArray(ledger.rounds) && ledger.rounds.length > 0, "human ledger holds no review round");
+  assert.equal(ledger?.schemaVersion, REVIEW_LEDGER_SCHEMA_VERSION, "review ledger schema drift");
+  assert.ok(Array.isArray(ledger.rounds) && ledger.rounds.length > 0, "review ledger holds no review round");
   let previousReviewedAt = null;
   let currentSeen = false;
   for (const [index, round] of ledger.rounds.entries()) {
-    const label = `human ledger round ${index + 1}`;
+    const label = `review ledger round ${index + 1}`;
     assert.equal(round.round, index + 1, `${label}: rounds must be numbered in order`);
     assert.ok(["pass", "fail", "pending"].includes(round.outcome), `${label}: outcome must be pass, fail or pending`);
     assert.ok(["current", "historical", "historical-reconstruction"].includes(round.record), `${label}: record kind is invalid`);
@@ -502,7 +506,7 @@ export function validateReviewLedger(ledger, { cellCount = 32, now = Date.now() 
       }
     }
     if (round.outcome === "pass") {
-      assert.ok(round.reviewers.some((reviewer) => isRosteredHuman(reviewer) || reviewer.kind === "delegated-ai"), `${label}: a passing round must name a rostered human or delegated AI reviewer`);
+      assert.ok(round.reviewers.some((reviewer) => isRosteredReviewer(reviewer) || reviewer.kind === "delegated-ai"), `${label}: a passing round must name a rostered or delegated AI reviewer`);
       assert.ok(round.binding, `${label}: a passing round must bind inputs and environment`);
       assert.equal(round.findings.blocker + round.findings.high, 0, `${label}: a passing round cannot carry a blocker or high finding`);
       assert.ok(cells && cells.length === cellCount, `${label}: a passing round must cover all ${cellCount} cells`);
@@ -522,7 +526,7 @@ export function validateReviewLedger(ledger, { cellCount = 32, now = Date.now() 
   // A pass is claimed only by a round recorded as it happened: a historical or reconstructed pass
   // moved to the end, or re-bound to today's render, is not a review of today's render.
   if (latest.outcome === "pass") {
-    assert.equal(latest.record, "current", `human ledger round ${latest.round}: a passing latest round must be a current record, not ${latest.record}`);
+    assert.equal(latest.record, "current", `review ledger round ${latest.round}: a passing latest round must be a current record, not ${latest.record}`);
   }
   return { rounds: ledger.rounds.length, latest };
 }
@@ -531,29 +535,30 @@ function describeReviewer(reviewer) {
   if (reviewer.kind === "not-recorded") return "not recorded";
   if (reviewer.kind === "agent") return `${reviewer.handle ?? "unnamed"} (agent: ${reviewer.model})`;
   if (reviewer.kind === "delegated-ai") return `${reviewer.handle} (delegatedAI: ${reviewer.actual_model})`;
-  return `${reviewer.handle} (${isRosteredHuman(reviewer) ? "human" : "unrostered, not a human role"})`;
+  return `${reviewer.handle} (${isRosteredReviewer(reviewer) ? "rostered" : "unrostered, not a rostered role"})`;
 }
 
 /**
- * Who reviewed the latest round, by kind, and how many of its passing cells a rostered human
- * passed. `humanPass` is true only when the round passed and every cell passed under a rostered
- * human; nothing else may be reported as a human PASS.
+ * Who reviewed the latest round, by kind, and how many of its passing cells a rostered reviewer
+ * passed. `rosteredPass` is true only when the round passed and every cell passed under a rostered
+ * reviewer; nothing else may be reported as a rostered PASS, and none of it is a claim that a
+ * person reviewed.
  */
 export function summarizeLatestRound(ledger) {
   const latest = ledger.rounds.at(-1);
   const byHandle = new Map(latest.reviewers.filter((reviewer) => reviewer.handle).map((reviewer) => [reviewer.handle, reviewer]));
   const cells = Object.values(latest.cells ?? {});
   const passing = cells.filter((cell) => cell.status === "pass");
-  const humanPassing = passing.filter((cell) => isRosteredHuman(byHandle.get(cell.reviewer)));
-  const humanPass = latest.outcome === "pass" && cells.length > 0 && humanPassing.length === cells.length;
+  const rosteredPassing = passing.filter((cell) => isRosteredReviewer(byHandle.get(cell.reviewer)));
+  const rosteredPass = latest.outcome === "pass" && cells.length > 0 && rosteredPassing.length === cells.length;
   const delegatedPassing = passing.filter((cell) => byHandle.get(cell.reviewer)?.kind === "delegated-ai");
-  const delegatedPass = latest.outcome === "pass" && delegatedPassing.length > 0 && humanPassing.length + delegatedPassing.length === cells.length;
+  const delegatedPass = latest.outcome === "pass" && delegatedPassing.length > 0 && rosteredPassing.length + delegatedPassing.length === cells.length;
   return {
     latest,
     reviewers: latest.reviewers.map(describeReviewer),
     passingCells: passing.length,
-    humanPassingCells: humanPassing.length,
-    humanPass,
+    rosteredPassingCells: rosteredPassing.length,
+    rosteredPass,
     delegatedPassingCells: delegatedPassing.length,
     delegatedPass,
   };
@@ -566,17 +571,17 @@ export function summarizeLatestRound(ledger) {
  */
 function assertEnvironmentAndArtifactBinding(latest, manifest) {
   assert.ok(latest.binding, `latest review round ${latest.round} binds nothing`);
-  assertReviewEnvironment(latest.binding.reviewEnvironment, "latest human review environment");
+  assertReviewEnvironment(latest.binding.reviewEnvironment, "latest review environment");
   assert.deepEqual(latest.binding.reviewEnvironment, manifest.reviewEnvironment,
-    "strict local human review cannot transfer to a different declared browser/platform/render environment");
+    "strict local sight review cannot transfer to a different declared browser/platform/render environment");
   assert.ok(latest.cells, `latest review round ${latest.round} records no cells`);
   assert.deepEqual([...Object.keys(latest.cells)].sort(), manifest.artifacts.map((artifact) => artifact.cell).sort(),
-    "the human review ledger and current render matrix disagree");
+    "the review ledger and current render matrix disagree");
   for (const artifact of manifest.artifacts) {
     const review = latest.cells[artifact.cell];
-    assert.equal(review.reviewArtifactFingerprint, artifact.reviewArtifactFingerprint, `${artifact.cell}: strict local human review is bound to a different rendered artifact`);
+    assert.equal(review.reviewArtifactFingerprint, artifact.reviewArtifactFingerprint, `${artifact.cell}: strict local sight review is bound to a different rendered artifact`);
     if (artifact.kind === "screen") {
-      assert.equal(review.reviewedNormalizedRgbaSha256, artifact.pixels.normalizedRgbaSha256, `${artifact.cell}: strict local human review is bound to different visible screen pixels`);
+      assert.equal(review.reviewedNormalizedRgbaSha256, artifact.pixels.normalizedRgbaSha256, `${artifact.cell}: strict local sight review is bound to different visible screen pixels`);
       assert.deepEqual(review.reviewedArtifacts, [artifact.path, ...(artifact.tiles ?? []).map((tile) => tile.path)], `${artifact.cell}: reviewed screen artifacts are not named exactly`);
     } else if (artifact.kind === "pdf") {
       assert.deepEqual(review.reviewedPages, Array.from({ length: artifact.pages }, (_, index) => index + 1), `${artifact.cell}: PDF page review is incomplete`);
@@ -586,7 +591,7 @@ function assertEnvironmentAndArtifactBinding(latest, manifest) {
       assert.deepEqual(review.reviewedArtifacts, artifact.pages.map((page) => page.path), `${artifact.cell}: raster artifacts do not match the matrix contract`);
     }
   }
-  assert.deepEqual(latest.physicalArtifactsReviewed, manifest.physicalArtifacts, "human ledger does not attest the complete physical artifact inventory");
+  assert.deepEqual(latest.physicalArtifactsReviewed, manifest.physicalArtifacts, "review ledger does not attest the complete physical artifact inventory");
 }
 
 /**
@@ -613,30 +618,30 @@ export function latestBindingStatus(ledger, manifest, currentFingerprint) {
  * it is bound to what is rendered now, in both halves of the strict gate's binding.
  */
 export function describeLatestRound(ledger, manifest, currentFingerprint) {
-  const { latest, reviewers, passingCells, humanPassingCells, humanPass, delegatedPass } = summarizeLatestRound(ledger);
+  const { latest, reviewers, passingCells, rosteredPassingCells, rosteredPass, delegatedPass } = summarizeLatestRound(ledger);
   const counts = `${latest.findings.blocker} blocker, ${latest.findings.high} high, ${latest.findings.medium} medium, ${latest.findings.low} low`;
   const binding = latestBindingStatus(ledger, manifest, currentFingerprint);
   const who = reviewers.length > 0 ? reviewers.join(", ") : "none named";
-  return `latest ${humanPass ? "human " : delegatedPass ? "delegatedAI " : ""}review round ${latest.round} is ${latest.outcome.toUpperCase()}` +
-    `${latest.outcome === "pass" && !humanPass ? " but NOT a human pass" : ""} ` +
+  return `latest ${rosteredPass ? "rostered " : delegatedPass ? "delegatedAI " : ""}review round ${latest.round} is ${latest.outcome.toUpperCase()}` +
+    `${latest.outcome === "pass" && !rosteredPass ? " but NOT a rostered pass" : ""} ` +
     `(${latest.reviewedAt ?? "not yet reviewed"}; ${counts}; ${latest.record} record; reviewers: ${who}; ` +
-    `cells passed by a rostered human: ${humanPassingCells} of ${passingCells} passing); ` +
+    `cells passed by a rostered reviewer: ${rosteredPassingCells} of ${passingCells} passing); ` +
     `bound to the current render: inputs ${binding.inputs ? "yes" : "no"}; environment/artifacts ${binding.environmentAndArtifacts ? "yes" : "no"}`;
 }
 
 /**
- * The strict local human gate. It passes only when the LATEST round passed, every one of its cells
- * passed under a rostered human reviewer, it is a current record, and it is bound to exactly the
+ * The strict local roster gate. It passes only when the LATEST round passed, every one of its cells
+ * passed under a rostered reviewer, it is a current record, and it is bound to exactly the
  * current inputs, the current declared environment, the current physical inventory and every
  * current cell fingerprint. An earlier passing round never carries forward over a later failed or
  * pending one.
  */
-export function assessHumanGate(ledger, manifest, currentFingerprint) {
+export function assessRosterGate(ledger, manifest, currentFingerprint) {
   validateReviewLedger(ledger, { cellCount: manifest.artifacts.length });
   const latest = ledger.rounds.at(-1);
   assert.equal(latest.outcome, "pass", describeLatestRound(ledger, manifest, currentFingerprint));
-  assert.equal(summarizeLatestRound(ledger).humanPass, true, "the human-only gate requires every cell to pass under a rostered human");
-  assert.equal(latest.binding.reviewInputFingerprint, currentFingerprint, "human review ledger is bound to a different source/input revision");
+  assert.equal(summarizeLatestRound(ledger).rosteredPass, true, "the roster-only gate requires every cell to pass under a rostered reviewer");
+  assert.equal(latest.binding.reviewInputFingerprint, currentFingerprint, "review ledger is bound to a different source/input revision");
   assertEnvironmentAndArtifactBinding(latest, manifest);
   return latest;
 }
@@ -681,7 +686,7 @@ export function assertCurrentDelegationRelease(latest, reviewInputRoot = DEFAULT
     `delegation release ${latest.delegation?.release ?? "missing"} does not match bound package version ${candidate.version}`);
 }
 
-/** Strict sight gate; delegatedAI is distinct from a human pass and never authenticates identity. */
+/** Strict sight gate; delegatedAI is distinct from a rostered pass, and neither authenticates identity. */
 export function assessSightGate(ledger, manifest, currentFingerprint, reviewInputRoot = DEFAULT_REVIEW_INPUT_ROOT) {
   validateReviewLedger(ledger, { cellCount: manifest.artifacts.length });
   const latest = ledger.rounds.at(-1);
@@ -690,7 +695,7 @@ export function assessSightGate(ledger, manifest, currentFingerprint, reviewInpu
   assertEnvironmentAndArtifactBinding(latest, manifest);
   assertCurrentDelegationRelease(latest, reviewInputRoot);
   assertDelegatedImageBinding(latest, manifest);
-  return { latest, reviewKind: summarizeLatestRound(ledger).humanPass ? "human" : "delegatedAI" };
+  return { latest, reviewKind: summarizeLatestRound(ledger).rosteredPass ? "rostered" : "delegatedAI" };
 }
 
 // The printed page inventory is pinned rather than derived, so that a report which silently doubles in

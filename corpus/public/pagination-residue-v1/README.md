@@ -25,7 +25,7 @@ this repository is public and MIT-licensed. The product's own licence architectu
 keeps delivered bytes out of its public companion repository; copying 39.8 % of its running text
 into an MIT repository would cut straight across that, and a public Git history is not revocable.
 
-`docs/validation/corpus-contract-v1.md` already defines the shape for this: a redacted public
+`maintainers/validation/corpus-contract-v1.md` already defines the shape for this: a redacted public
 record keeps the artifact path null and is therefore ineligible on its own, while an authorised
 private run supplies an opaque path below an external artifact root, and the validator reads those
 bytes and verifies the recorded SHA-256. *"A hash-only public record documents existence without

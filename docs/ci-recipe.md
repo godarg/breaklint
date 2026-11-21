@@ -1,41 +1,30 @@
 # breaklint as a CI gate in GitHub Actions
 
-This page is for projects that build a printed product from HTML — a guide, a book, a print
-edition — and want every pull request checked before the PDF is made. It describes the composite
-Action at the root of this repository (`action.yml`) and gives a workflow you can copy.
+For projects that build a printed product from HTML and want every pull request checked before
+the PDF is made: the composite Action in `action.yml`, and a workflow to copy.
 
 What the Action does, in one run:
 
 1. installs breaklint at the version its own ref pins, with the renderer peers
    `puppeteer-core@25.16.0`, `pagedjs@0.4.3` and `pdfjs-dist@6.2.108`, into the runner's temporary
    directory — or uses your project's own install;
-2. hands breaklint the runner's Chrome without a sandbox-disabling switch; breaklint refuses two known Puppeteer overrides and strips `CHROME_EXTRA_FLAGS`, while other wrapper variables are not proven safe;
-3. runs breaklint once over the HTML paths you give it, and writes the canonical JSON report;
-4. renders SARIF, JUnit and Markdown from that one report with breaklint's own reporters, appends
-   the Markdown to the job's step summary, and prints the console report to the log;
-5. ends the step with breaklint's own exit code, or passes it.
+2. runs breaklint once over the HTML paths you give it with the runner's Chrome, and writes the
+   canonical JSON report;
+3. renders SARIF, JUnit and Markdown from that report, appends the Markdown to the job summary and
+   prints the console report to the log;
+4. ends the step with breaklint's own exit code, or passes it.
 
-**What the findings are worth.** Two rules can fail a build by default:
-`layout/unbreakable-block-too-tall` and `svg/text-overflows-viewport`. They compare two directly
-measured quantities against a structural boundary (proof source A). Every other rule is a
-heuristic whose threshold nobody has calibrated against real documents. Its findings are advice,
-reported as warnings, and they gate only with `fail-on: warn`. The argument, and what no test here
-establishes, is in [`limitations.md`](limitations.md).
+Two rules fail a build by default; every other rule is an uncalibrated warning that gates only
+with `fail-on: warn` ([known limits](known-limits.md)).
 
 ## The workflow
 
-Copy this to `.github/workflows/print-qa.yml` and replace the build step and the `paths`. Every
-third-party action is pinned to a full commit SHA. Pin the breaklint Action the same way: to a
-release tag, or better, to that tag's commit SHA. The Action exists from the first release whose
-[changelog](../CHANGELOG.md) lists it.
+Copy this to `.github/workflows/print-qa.yml`, replace the build step and the `paths`, and pin the
+breaklint Action to a release tag or its commit SHA.
 
-**Which breaklint a ref runs.** The Action does not run the breaklint code of the ref you name.
-It installs `breaklint@<version>` from npm, where `<version>` is the `version` in that ref's
-`package.json`. Use a release tag only after that release's npm publish has succeeded; before
-that, the install fails and the step ends with exit 3. A branch ref such as `@main` runs the last
-published version between releases — not the code on the branch — and fails with exit 3 from the
-moment the branch's `package.json` names a version npm does not have yet. To gate on unreleased
-code, pack it yourself and pass the tarball as `breaklint-tarball`.
+**Which breaklint a ref runs.** The Action installs the npm version named in that ref's
+`package.json`, not the ref's code; before a release is on npm its tag fails with exit 3. To gate
+on unpublished code, pass an `npm pack` tarball as `breaklint-tarball`.
 
 ```yaml
 name: print QA
@@ -101,69 +90,50 @@ jobs:
           category: breaklint
 ```
 
-The `layout` job needs only `contents: read`. `security-events: write` appears in the upload job
-and nowhere else. Code scanning must be available for the repository (it is for public
-repositories; a private one needs GitHub Advanced Security), otherwise the upload step fails and
-the `layout` job's result is unaffected.
+
+Only the upload job holds `security-events: write`. Private repositories need GitHub Advanced
+Security for code scanning.
 
 ## What each exit code does to the job
 
-The step ends with breaklint's own exit code, so the log says `exit code 1` for findings and
-`exit code 4` for a run that judged too little. The `exit-code` output is set on every run,
-including a failed one; the table under [Outputs](#outputs) says exactly what it holds.
+| exit | meaning | step |
+|---|---|---|
+| 0 | checked, coverage met, nothing reached the threshold | passes |
+| 1 | a non-experimental finding reached the threshold | fails, unless `fail-on-exit: 2,3,4` |
+| 2 | invalid invocation: a missing path, a bad config or input | always fails |
+| 3 | infrastructure: no browser, a font that did not load, a crash | always fails |
+| 4 | too little was judged: coverage below its floor | always fails |
 
-| exit | meaning | step, by default | can it be left ungated? |
-|---|---|---|---|
-| 0 | checked, coverage met, nothing reached the threshold | passes | — |
-| 1 | at least one non-experimental finding reached the threshold | fails | yes: `fail-on-exit: 2,3,4` |
-| 2 | invalid invocation: a path that is not there, a bad config or input | fails | no |
-| 3 | infrastructure: no browser, a font that did not load, a crash | fails | no |
-| 4 | nothing or too little was judged: coverage below its floor | fails | no |
+`fail-on-exit: 2,3,4` reports findings without failing the build while you adopt the tool (the
+step passes on exit 1 with a warning). `fail-on: never` instead changes breaklint's own gate, so
+the exit code no longer shows findings.
 
-2, 3 and 4 always fail the step. Each of them says that the requested check did not run or judged
-too little, and a gate that passes on them is a green over nothing. `fail-on-exit: 1,2,3` is
-refused with exit 2 before anything runs.
-
-To report findings without failing the build while you adopt the tool, use
-`fail-on-exit: 2,3,4`. The step then passes on exit 1, the log carries a warning annotation, and
-the summary says the findings were not gated. That is different from `fail-on: never`, which
-changes breaklint's own gate: breaklint then ends with 0 on findings, so the recorded exit code no
-longer shows them either.
-
-The Action's path expansion requires Bash 4 or newer with globstar. GitHub's Ubuntu runner has
-that shell; macOS `/bin/bash` 3.2 does not, so install Bash 4+ and put it first on `PATH` when
-running the Action on macOS. A runner without globstar exits 3 before checking a document.
-
-The Action adds two refusals of its own, both with breaklint's table. A step input that fails
-validation is exit 2. An install that fails, a runner that cannot run the check (Windows, a Node
-older than breaklint's `engines`, a `BREAKLINT_CHROME` that points nowhere), or a breaklint exit
-0 or 1 without the report that says so is exit 3. Node's own exit code for an uncaught crash is
-1, and it must not read as "findings".
+The Action's path expansion requires Bash 4 or newer with globstar (GitHub's Ubuntu runner has
+it; macOS `/bin/bash` 3.2 does not). Without it, a failed install, an unsupported runner or a
+missing report, the Action ends with exit 3; an invalid input is exit 2.
 
 ## Inputs
 
 | input | default | what it does |
 |---|---|---|
-| `paths` | required | HTML files, one path or bash glob per line, relative to the workspace. `**` matches across directories; hidden files and brace expansion are not matched; matches are sorted in byte order, and a file two patterns match is checked once. A pattern that matches nothing is passed on literally and ends with exit 2, exactly as in bash. |
+| `paths` | required | HTML files, one path or bash glob per line, relative to the workspace; `**` crosses directories. A pattern that matches nothing ends with exit 2. |
 | `fail-on-exit` | `1,2,3,4` | which exit codes fail the step; 2, 3 and 4 are mandatory |
 | `fail-on` | breaklint's | `--fail-on`: `error`, `warn` or `never` |
 | `profile` | breaklint's | `--profile`: `default` or `strict` |
 | `config` | `./breaklint.config.json` if present | `--config`: path to a JSON config ([configuration](configuration.md)) |
 | `allow-network` | none (offline) | `--allow-network`: one origin per line, e.g. a font host |
 | `output-dir` | `$RUNNER_TEMP/breaklint-report` | where the reports and `evidence/` go |
-| `chrome-path` | `$BREAKLINT_CHROME`, then `google-chrome` on `PATH` | absolute path to Chrome |
+| `chrome-path` | `$BREAKLINT_CHROME`, else `google-chrome` | absolute path to Chrome |
 | `use-project-install` | `false` | `true` uses `node_modules/breaklint` from your own lockfile |
 | `breaklint-tarball` | none | an `npm pack` tarball to install instead, e.g. a release candidate |
 
-Unknown input names are refused with exit 2 if the runner passes them through; GitHub itself only
-warns about them, so check the spelling of `with:` keys against this table.
 
 ## Outputs
 
 | output | content |
 |---|---|
-| `exit-code` | breaklint's own exit code; or the Action's own 2 or 3 when it refused an input, could not run breaklint, or rejected what breaklint left (an exit 0 or 1 without its report, a report that disagrees with the process, a signal). The step's own exit status equals it, except that an ungated exit 1 (`fail-on-exit: 2,3,4`) ends the step with 0 while `exit-code` stays 1. |
-| `verdict` | the report's `runVerdict`, or `usage`, `infrastructure` or `not-run` when there is no report |
+| `exit-code` | breaklint's exit code, or the Action's own 2 or 3; set on every run. An ungated exit 1 ends the step with 0 while `exit-code` stays 1. |
+| `verdict` | the report's `runVerdict`, or `usage`, `infrastructure` or `not-run` without a report |
 | `report-json` | `breaklint.json`, the canonical report |
 | `sarif-file` | `breaklint.sarif`, SARIF 2.1.0 for `upload-sarif` |
 | `junit-file` | `breaklint.junit.xml` |
@@ -172,72 +142,26 @@ warns about them, so check the spelling of `with:` keys against this table.
 | `output-dir` | the directory all of the above are in |
 | `breaklint-version`, `chrome-path` | what ran, and with which browser |
 
-Before breaklint runs, the Action deletes the four report files and `evidence/` from
-`output-dir`, so a failed run never leaves an earlier run's SARIF to be uploaded as if it were
-this one. A report
-output is empty when breaklint wrote no report, which is why the workflow above tests
-`report-json != ''` instead of hard-coding a path.
-
-JSON is the canonical report; SARIF, JUnit and Markdown are lossy projections of it ([reporting](reporting.md)).
-Keep the JSON when you keep anything.
+Earlier report files in `output-dir` are deleted before each run, and a report output is empty
+when no report was written. JSON is canonical ([reporting](reporting.md)).
 
 ## Several documents
 
-One call with several patterns checks all of them in one run and one report. The run takes the
-strongest verdict of any document; the JSON report, the SARIF results and the JUnit suites keep
-each document apart:
+One call with several patterns checks all of them in one run and one report; the JSON, SARIF and
+JUnit keep each document apart. For one report per document, run the Action in a matrix with a
+code-scanning `category` and an artifact name per entry. A job that calls the Action more than
+once needs a separate `output-dir` per call.
 
-```yaml
-        with:
-          paths: |
-            dist/guide/*.html
-            dist/handbook/**/*.html
-```
+## Summaries, comments and JUnit
 
-For one report per document, and one code-scanning category per document, use a matrix and give
-each upload its own `category`:
+The Markdown report goes into the step summary on every run, cut below GitHub's 1 MiB limit. A
+pull-request comment needs `pull-requests: write`; post `breaklint.md` from a separate job. JUnit
+marks a rule that could not measure as `skipped`.
 
-```yaml
-    strategy:
-      fail-fast: false
-      matrix:
-        document: [guide, handbook]
-    steps:
-      # …checkout, setup-node, build…
-      - id: breaklint
-        uses: godarg/breaklint@<release-tag-or-its-commit-sha>
-        with:
-          paths: dist/${{ matrix.document }}/**/*.html
-```
+## Caching and your own install
 
-and `category: breaklint-${{ matrix.document }}` on the upload, with an artifact name per matrix
-entry. When one job calls the Action more than once, give each call its own `output-dir`; the
-calls would otherwise replace each other's reports.
-
-## Pull-request summaries and comments
-
-The Markdown report is appended to the step summary on every run, with one closing line that
-says how the exit code was applied. The summary is cut, with a note, below GitHub's 1 MiB limit;
-the uncut file is the `markdown-file` output. This needs no permission.
-
-A pull-request comment needs `pull-requests: write`, which a fork's pull request does not get.
-If you want one for your own branches, post the file from a separate job that has that permission
-and downloads the artifact, for example with `gh pr comment "$NUMBER" --body-file breaklint.md`.
-Pass the number through `env:`, never by pasting `${{ … }}` into the script.
-
-GitHub does not render JUnit itself. `breaklint.junit.xml` is for CI front-ends and test-report
-tools that read it; its failure count includes infrastructure failures, and a rule that could not
-measure is marked `skipped`, not passed.
-
-## Caching
-
-Chrome comes with the runner, so there is nothing to download for it. The install the Action
-makes lives in `$RUNNER_TEMP` and is reused by later calls in the same job when the same bytes
-are installed the same way. Across runs, what can be cached is npm's download cache, `~/.npm`:
-
-- If your repository has a `package-lock.json`, `actions/setup-node` with `cache: npm` caches it.
-- If it does not, cache the directory yourself, keyed on the workflow file that pins the Action,
-  so a new pin starts a new cache:
+Chrome comes with the runner. Across runs, cache npm's download cache: with a
+`package-lock.json`, `actions/setup-node` with `cache: npm` does it; otherwise:
 
 ```yaml
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
@@ -246,51 +170,23 @@ are installed the same way. Across runs, what can be cached is npm's download ca
           key: breaklint-npm-${{ runner.os }}-${{ hashFiles('.github/workflows/print-qa.yml') }}
 ```
 
-## Your own install instead
-
-The Action installs breaklint and three peers at exact versions. Their own dependencies are
-resolved when they are installed, because no lockfile is involved. For a fully pinned tree, add
-breaklint and the peers to your `devDependencies`, commit the lockfile, run `npm ci` before the
-Action, and set `use-project-install: true`:
+For a fully pinned tree, add breaklint and the peers to your `devDependencies`, commit the
+lockfile, run `npm ci` before the Action and set `use-project-install: true`:
 
 ```bash
 npm i -D breaklint puppeteer-core@25.16.0 pagedjs@0.4.3 pdfjs-dist@6.2.108
 ```
 
-breaklint looks for its peers from the working directory first. When the Action installs its own
-copy but your workspace already has one of the peers (for example `pagedjs` from your PDF build),
-that copy is used, and the Action says so in a warning. A `pagedjs` other than 0.4.3 then ends
-the run with exit 3, as breaklint's version gate requires. Pin the peers in your project and use
-`use-project-install: true`.
+A `pagedjs` other than 0.4.3 already in your workspace is used first and ends the run with exit 3.
 
 ## Permissions and safety
 
-- Give the checking job `contents: read` and nothing else. Only the upload job needs
-  `security-events: write`.
-- Do not run this on `pull_request_target` with the pull request's own code checked out. That
-  combination runs untrusted HTML, including its scripts, in a job that holds a write token.
-- breaklint executes the documents it checks, scripts included, in a fresh browser profile.
-  It requests Chrome without a sandbox-disabling switch and intercepts page requests, allowing
-  only its own loopback origin and data/blob/about URLs by default. That interception is not a
-  network block: WebSocket, WebRTC, WebTransport and browser-managed traffic are outside it.
-  The known driver overrides are refused, but other wrapper variables are not proven safe; see
-  [Running foreign HTML](../README.md#running-foreign-html).
-- The Action passes all inputs to its runner as one JSON environment variable and never pastes
-  an input into a script. Paths are expanded by bash without evaluation, so `$(…)`, backticks and
-  `;` in a pattern stay literal, and a path that starts with `-` is passed as `./-…` so it cannot
-  become an option. breaklint's output is printed with workflow commands switched off, so text
-  from a document cannot write annotations or outputs.
+- Give the checking job `contents: read` and nothing else.
+- Never run it on `pull_request_target` with the pull request's code checked out.
+- breaklint executes the documents it checks. Its request interception is not a network block;
+  see [SECURITY.md](../SECURITY.md).
 
 ## What is not covered
 
-- **Runners.** Tested on `ubuntu-latest`, in the `action` job of this repository's
-  `.github/workflows/ci.yml`. macOS runners are untested. Windows is refused with exit 3, because
-  breaklint does not support it.
-- **Container jobs** (`container:`) are not measured. Chrome's sandbox and the cleanup of its
-  processes depend on the container's init process; run the check on the runner itself.
-- **Code-scanning display.** A finding without a source location is written to SARIF with a
-  logical location only, and a finding in a generated file points at that file. Whether GitHub
-  shows either as an alert has not been measured here; the SARIF file, the Markdown summary and
-  the JSON report carry every finding either way.
-- **Calibration.** No threshold is calibrated. See [`limitations.md`](limitations.md) and
-  [`status.md`](status.md).
+Tested on `ubuntu-latest`. macOS runners and container jobs are untested; Windows is refused with
+exit 3.

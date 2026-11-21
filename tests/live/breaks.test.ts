@@ -753,7 +753,7 @@ describe("the collector, live", () => {
    * the real-paginator observation of what `tests/unit/margin-boxes.test.ts` checks on a
    * hand-built tree. (The production chain does not get this far with a footnote: Paged.js gives
    * the footnote call a per-run random `href`, which the paired control reads as a changed
-   * resource and refuses — see docs/limitations.md.)
+   * resource and refuses — see docs/known-limits.md.)
    */
   it("keeps a block footnote in the flow and accepts its out-of-source-order position", async (t) => {
     if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);

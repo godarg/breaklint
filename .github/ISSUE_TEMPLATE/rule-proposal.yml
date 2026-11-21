@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Read [`docs/limitations.md`](https://github.com/godarg/breaklint/blob/main/docs/limitations.md) first if you intend to
+        Read [`maintainers/burden-of-proof.md`](https://github.com/godarg/breaklint/blob/main/maintainers/burden-of-proof.md) first if you intend to
         argue that the rule should be able to fail a build. Two rules do that today, and the number
         is guarded by the registry on purpose.
 
@@ -44,4 +44,4 @@ body:
       label: Warning or error, and why
       description: >
         If you think it can gate a build, name the proof class (A, B or C) from
-        `docs/limitations.md` and say why a freely chosen number is not involved.
+        `maintainers/burden-of-proof.md` and say why a freely chosen number is not involved.

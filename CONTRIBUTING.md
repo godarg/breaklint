@@ -29,12 +29,12 @@ and rule identity. Any other option-free rule without a registered control fails
 A rule may carry `error` only with a named proof source. There are three classes — a geometric
 invariant between two directly measured quantities, a cited norm together with the cases it does
 not cover, and a resolution invariant — and they are defined in
-[`docs/limitations.md`](docs/limitations.md). Both document-profile error rules are class A; no rule claims
+[`maintainers/burden-of-proof.md`](maintainers/burden-of-proof.md). Both document-profile error rules are class A; no rule claims
 B or C.
 
 `defineRule` rejects `error` without a proof source, and rejects a proof source on anything that is
 not an error. The registry refuses to load if the number of error rules is anything other than two,
-and its message points at `docs/limitations.md`, where the argument for the number belongs. The
+and its message points at `maintainers/burden-of-proof.md`, where the argument for the number belongs. The
 check does not read that file — it only makes the change deliberate, so write the argument before
 you change the literal.
 
@@ -97,7 +97,8 @@ CI then checks the packed package, which no command above sees: it runs `npm pac
 tarball into an empty directory, and there requires `npx breaklint --version` to print the
 `package.json` version, `npx breaklint --demo` to end with exit 1,
 `tests/tools/readme-demo-contract.mjs --consumer .`,
-`tests/tools/docs-truth.mjs --package node_modules/breaklint --pending tests/tools/docs-truth-pending.jsonl`
+`tests/tools/docs-truth.mjs --package node_modules/breaklint --pending tests/tools/docs-truth-pending.jsonl --maintainers maintainers`
+(schema stamps in the shipped docs and in `maintainers/`, release-status sentences, peer install commands)
 and `tests/tools/installed-config-contract.mjs` to pass, and — after installing the three renderer peers — `tests/tools/real-document-gate.mjs`
 against the installed `dist/cli/index.js`. A second empty directory without the peers must end a
 real run with exit 3 and an install command. The `node-floor` job repeats the packed checks on Node

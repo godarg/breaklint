@@ -61,7 +61,7 @@ import {
  * with or without decoration. At one or two fragments the rule measures and records the first
  * fragment's box and reports only if that alone exceeds the page — exactly what 0.5.0 did. The
  * two-fragment case is therefore a KNOWN gap, not a silent one: a block that really is too tall
- * and happens to split into exactly two pieces is not reported. `docs/limitations.md` says so.
+ * and happens to split into exactly two pieces is not reported. `docs/known-limits.md` says so.
  *
  * Fragments are correlated by `sid`, the authoring-source identity. A split block whose fragments
  * carry no `sid` — a `--no-source-map` run, or an element a script created — cannot be correlated,

@@ -15,5 +15,5 @@
       and target, not on the threshold alone
 - [ ] A new rule brings its trigger fixture, at least one clean fixture, and `docs/rules/<id>.md`
 - [ ] A new or changed threshold still says `uncalibrated`, unless a proof class from
-      `docs/limitations.md` is named and argued
+      `maintainers/burden-of-proof.md` is named and argued
 - [ ] Documentation that states a number was checked against the code, not against another document

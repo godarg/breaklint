@@ -114,7 +114,7 @@ function isSubsequence(sub: readonly string[], list: readonly string[]): boolean
 describe("workflow gates", () => {
   /*
    * AGENTS.md says the complete repository gate is documented in CONTRIBUTING.md. It was not:
-   * CONTRIBUTING.md listed no gate, and the list in docs/releasing.md ran `test:real-document`
+   * CONTRIBUTING.md listed no gate, and the list in maintainers/releasing.md ran `test:real-document`
    * before the build it needs and left out three of CI's steps. Both lists are now read here and
    * held against the workflow itself.
    */
@@ -124,19 +124,19 @@ describe("workflow gates", () => {
     assert.deepEqual(gateSteps(firstBashBlockAfter("CONTRIBUTING.md", "## The complete local gate")), ci);
   });
 
-  it("docs/releasing.md runs every ci.yml gate step in CI's order, and names why it runs any other", () => {
+  it("maintainers/releasing.md runs every ci.yml gate step in CI's order, and names why it runs any other", () => {
     const ci = gateSteps(runLinesOf(".github/workflows/ci.yml"));
     const release = new Set(gateSteps(runLinesOf(".github/workflows/release.yml")));
     // A step the release checklist runs beyond both workflows, and why it is there. Empty: a
     // gate worth running before a tag is worth running in CI.
     const EXTRA: Record<string, string> = {};
-    const listed = gateSteps(firstBashBlockAfter("docs/releasing.md", "## Before creating the tag"));
-    assert.ok(isSubsequence(ci, listed), `docs/releasing.md leaves out or reorders a ci.yml step.\n  ci.yml:    ${ci.join(" | ")}\n  releasing: ${listed.join(" | ")}`);
+    const listed = gateSteps(firstBashBlockAfter("maintainers/releasing.md", "## Before creating the tag"));
+    assert.ok(isSubsequence(ci, listed), `maintainers/releasing.md leaves out or reorders a ci.yml step.\n  ci.yml:    ${ci.join(" | ")}\n  releasing: ${listed.join(" | ")}`);
     const unexplained = listed.filter((step) => !ci.includes(step) && !release.has(step) && !(step in EXTRA));
-    assert.deepEqual(unexplained, [], "docs/releasing.md runs a gate step that no workflow runs and that names no reason here");
+    assert.deepEqual(unexplained, [], "maintainers/releasing.md runs a gate step that no workflow runs and that names no reason here");
   });
 
-  // docs/releasing.md says the release workflow "repeats the complete gate". It is a claim a
+  // maintainers/releasing.md says the release workflow "repeats the complete gate". It is a claim a
   // workflow edit can silently falsify, so it is read off both files.
   it("release.yml runs every gate step ci.yml runs", () => {
     const ci = gateSteps(runLinesOf(".github/workflows/ci.yml"));
@@ -149,22 +149,22 @@ describe("workflow gates", () => {
    * the docs' schema stamps against the installed code — exist only as workflow lines. Deleting one
    * leaves every test of the tools themselves green, so the lines are pinned here, job by job. At a
    * tag the docs check must run with --release, which refuses the pending exceptions a pull request
-   * may still carry.
+   * may still carry, and every docs check also reads maintainers/**, the pages npm does not ship.
    */
   it("every packed-consumer job runs the README-demo and docs-truth checks against the installed package", () => {
     const expect: [string, string, RegExp[]][] = [
       [".github/workflows/ci.yml", "check", [
         /readme-demo-contract\.mjs" --consumer "\$PWD"$/u,
-        /docs-truth\.mjs" --package node_modules\/breaklint --pending "\$GITHUB_WORKSPACE\/tests\/tools\/docs-truth-pending\.jsonl"$/u,
+        /docs-truth\.mjs" --package node_modules\/breaklint --pending "\$GITHUB_WORKSPACE\/tests\/tools\/docs-truth-pending\.jsonl" --maintainers "\$GITHUB_WORKSPACE\/maintainers"$/u,
       ]],
       [".github/workflows/ci.yml", "node-floor", [/readme-demo-contract\.mjs" --consumer "\$PWD"$/u]],
       [".github/workflows/release.yml", "clean-consumer", [
         /readme-demo-contract\.mjs" --consumer "\$consumer"$/u,
-        /docs-truth\.mjs" --package "\$consumer\/node_modules\/breaklint" --pending "[^"]+docs-truth-pending\.jsonl" --release$/u,
+        /docs-truth\.mjs" --package "\$consumer\/node_modules\/breaklint" --pending "[^"]+docs-truth-pending\.jsonl" --release --maintainers "\$GITHUB_WORKSPACE\/maintainers"$/u,
       ]],
       [".github/workflows/release.yml", "publish", [
         /readme-demo-contract\.mjs" --consumer "\$registry_consumer"$/u,
-        /docs-truth\.mjs" --package "\$registry_consumer\/node_modules\/breaklint" --pending "[^"]+docs-truth-pending\.jsonl" --release$/u,
+        /docs-truth\.mjs" --package "\$registry_consumer\/node_modules\/breaklint" --pending "[^"]+docs-truth-pending\.jsonl" --release --maintainers "\$GITHUB_WORKSPACE\/maintainers"$/u,
       ]],
     ];
     for (const [path, jobName, patterns] of expect) {
