@@ -50,7 +50,12 @@ events. Screen profile v2 checks unexpected horizontal overflow, content visibly
 (`web/svg-text-overflows-viewport`), and the opt-in warnings `web/sibling-overlap` (visible HTML
 sibling overlap, `rules.siblingOverlap: true`), `web/small-text` and `web/small-touch-target`. Without
 its opt-in, the sibling pass does not run and its fields do not take part in the capture stability
-check. Absolutely positioned siblings are not excluded wholesale; name an intended overlay such as a
+check. `web/small-text` compares the computed `font-size` of elements with their own text (a
+`display: contents` wrapper is placed by the line boxes of its text); scaling by an SVG `viewBox` or
+a CSS `transform` is not applied, so scaled text can be reported too small or missed.
+`web/small-touch-target` is a size heuristic, not a WCAG 2.5.8 check: an inline link surrounded by
+running text is exempt, while a link that is the only text of its block, such as a navigation list
+item, is measured. Absolutely positioned siblings are not excluded wholesale; name an intended overlay such as a
 badge in `intentionalOverlays`. An intentional overlay exempts its subtree. An allowed scroll
 container exempts only its own horizontal overflow and the clipping it causes (content it cuts or
 scrolls out of view); its descendants are still measured. An exception that matches `html` or `body`

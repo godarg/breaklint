@@ -229,13 +229,33 @@ export async function samplePage(page: StructuralPage, input: SampleInput): Prom
       const role = (node.getAttribute("role") ?? "").trim().toLowerCase();
       if (INTERACTIVE_ROLES.has(role)) return true;
       if (tag === "a" && node.hasAttribute("href")) {
-        // Inline links inside running prose paragraphs are exempt from minimum touch-target size.
-        const st = getComputedStyle(node);
-        const insideProse = !!node.closest("p, li, dd, blockquote, td, th");
-        if (insideProse && st.display === "inline") return false;
-        return true;
+        // An inline link surrounded by running text is exempt from the minimum touch-target size,
+        // whatever its container's tag; a link that is the only text of its block (a navigation
+        // list item) is measured.
+        return !(getComputedStyle(node).display === "inline" && inRunningText(node));
       }
       return false;
+    };
+    const inRunningText = (node: Element): boolean => {
+      let block = node.parentElement;
+      while (block && ["inline", "contents"].includes(getComputedStyle(block).display)) block = block.parentElement;
+      if (!block) return false;
+      const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+      for (let text = walker.nextNode(); text; text = walker.nextNode()) {
+        if (!node.contains(text) && (text.textContent ?? "").trim().length > 0) return true;
+      }
+      return false;
+    };
+    // An element with display: contents has no box of its own, but its direct text renders: its
+    // geometry is the union of that text's line boxes (null without visible direct text).
+    const contentsTextRect = (node: Element, style: CSSStyleDeclaration): DOMRect | null => {
+      if (style.display !== "contents") return null;
+      const rects = [...node.childNodes].filter((child) => child.nodeType === Node.TEXT_NODE && (child.textContent ?? "").trim().length > 0).flatMap((text) => {
+        const range = document.createRange(); range.selectNodeContents(text); return [...range.getClientRects()];
+      }).filter((rect) => rect.width > 0 && rect.height > 0);
+      if (rects.length === 0) return null;
+      const left = Math.min(...rects.map((r) => r.left)), top = Math.min(...rects.map((r) => r.top));
+      return new DOMRect(left, top, Math.max(...rects.map((r) => r.right)) - left, Math.max(...rects.map((r) => r.bottom)) - top);
     };
 
     // Content the browser does not render: the body of a closed <details> (its first direct
@@ -304,8 +324,9 @@ export async function samplePage(page: StructuralPage, input: SampleInput): Prom
     const statesByNode = new Map<Element, "candidate" | "excluded" | "not-measured">();
     const overlayByNode = new Map<Element, boolean>();
     for (const node of selected) {
-      rectsByNode.set(node, node.getBoundingClientRect());
-      stylesByNode.set(node, getComputedStyle(node));
+      const style = getComputedStyle(node);
+      rectsByNode.set(node, contentsTextRect(node, style) ?? node.getBoundingClientRect());
+      stylesByNode.set(node, style);
       overlayByNode.set(node, isMatch(node, options.overlays));
     }
 

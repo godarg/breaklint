@@ -189,6 +189,24 @@ describe("screen checkPage host-page adapter, live", () => {
     } finally { await page.close(); }
   });
 
+  it("measures small text in a display:contents wrapper by its text and exempts only links inside running text from small-touch-target", async (t) => {
+    if (missingBrowser && optional) return t.skip("missing browser");
+    const res = await inspect(
+      '<p>Normal text <span id="contents" style="display:contents;font-size:8px">tiny text without a box of its own</span> continues.</p>' +
+      '<nav><ul style="margin:0"><li><a id="nav-link" href="#home" style="font-size:12px">Home</a></li><li><a id="nav-link-2" href="#about" style="font-size:12px">About</a></li></ul></nav>' +
+      '<div>Running text in a div with <a id="div-link" href="#more" style="font-size:14px">an inline link</a> inside it.</div>' +
+      '<p>Running prose with <a id="prose-link" href="#a" style="font-size:14px">inline link</a> inside paragraph.</p>',
+      "small-rules-context",
+      { rules: { smallText: { minFontSizePx: 12 }, smallTouchTarget: { minSizePx: 24 } } },
+    );
+    const marked = JSON.stringify(res.report.evaluations.filter((e) => e.target.selector.startsWith("#") && (e.ruleId === "web/small-text" || e.ruleId === "web/small-touch-target")).map((e) => [e.target.selector, e.ruleId, e.status, e.reason, e.measurements[0]?.value]));
+    assert.ok(res.report.findings.some((f) => f.ruleId === "web/small-text" && f.target.selector === "#contents" && f.measurement.value === 8), marked);
+    // A link that is the only text of its list item is navigation, not running text: measured.
+    assert.ok(res.report.findings.some((f) => f.ruleId === "web/small-touch-target" && f.target.selector === "#nav-link"), marked);
+    // Inline links surrounded by running text are exempt whatever the container tag.
+    for (const id of ["#div-link", "#prose-link"]) assert.equal(res.report.findings.some((f) => f.ruleId === "web/small-touch-target" && f.target.selector === id), false, `${id} ${marked}`);
+  });
+
   it("finds visible content cut by an overflow:hidden rectangle", async (t) => {
     if (missingBrowser && optional) return t.skip("missing browser");
     const result = await inspect('<div id="clip" style="width:200px;overflow:hidden"><div id="cut" style="width:500px">clipped text</div></div>', "clipping");
