@@ -197,12 +197,18 @@ describe("screen checkPage host-page adapter, live", () => {
     if (missingBrowser && optional) return t.skip("missing browser");
     const overlap = await inspect(
       '<div style="position:relative"><p id="first" style="margin:0;height:30px">First line</p><p id="second" style="margin:-18px 0 0;height:30px">Overlapping sibling</p></div>' +
+      '<div style="width:240px;line-height:22px"><code id="wrap-a">Wrapped inline code spanning across the first line into line two</code> <bdi id="wrap-b">followed immediately by wrapped inline bdi text continuing onto line three</bdi></div>' +
+      '<div style="width:300px;line-height:22px"><span id="inline-hit-a">Alpha inline</span><span id="inline-hit-b" style="margin-left:-36px">Overlap inline</span></div>' +
       '<svg width="100" height="40"><rect x="0" y="0" width="100" height="40" fill="#eee"/><rect x="10" y="5" width="80" height="30" fill="#ddd"/><text id="svg-over" x="70" y="24" font-size="20">WayTooWideLabel</text></svg>',
       "sibling-and-svg-overflow",
     );
     assert.equal(overlap.ok, true);
     assert.equal(overlap.report.runVerdict, "findings");
     assert.ok(overlap.report.findings.some((f) => f.ruleId === "web/sibling-overlap" && f.target.selector === "#second" && f.severity === "warn"));
+    assert.ok(overlap.report.findings.some((f) => f.ruleId === "web/sibling-overlap" && f.target.selector === "#inline-hit-b" && f.severity === "warn"));
+    // Multi-line wrapped inline siblings share a line vertically in getBoundingClientRect()
+    // without overlapping in getClientRects() and must never produce a false positive.
+    assert.equal(overlap.report.findings.some((f) => f.ruleId === "web/sibling-overlap" && (f.target.selector === "#wrap-a" || f.target.selector === "#wrap-b")), false);
     assert.ok(overlap.report.findings.some((f) => f.ruleId === "web/svg-text-overflows-viewport" && f.target.selector === "#svg-over" && f.severity === "error"));
     // Overlapping SVG <rect> shapes must never trigger web/sibling-overlap.
     assert.equal(overlap.report.findings.some((f) => f.ruleId === "web/sibling-overlap" && f.target.tag === "rect"), false);

@@ -502,27 +502,49 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
       const hasContent = (node.textContent?.trim().length ?? 0) > 0 || REPLACED_TAGS.has(rec.tag);
       return hasContent;
     };
-    const byParent = new Map<Element, { node: Element; rec: BrowserRawTarget; rect: DOMRect }[]>();
+    const fragmentRects = (node: Element, st: CSSStyleDeclaration, fallback: DOMRect): readonly DOMRect[] => {
+      if (st.display === "inline" && typeof node.getClientRects === "function") {
+        const rects = [...node.getClientRects()].filter((r) => r.width > 0 && r.height > 0);
+        if (rects.length > 0) return rects;
+      }
+      return [fallback];
+    };
+    const byParent = new Map<Element, { node: Element; rec: BrowserRawTarget; rect: DOMRect; rects: readonly DOMRect[] }[]>();
     for (const item of rawRecords) {
       if (!siblingEligible(item.node, item.record)) continue;
       const parent = item.node.parentElement;
       if (!parent) continue;
+      const st = stylesByNode.get(item.node)!;
+      const rect = rectsByNode.get(item.node)!;
       const list = byParent.get(parent) ?? [];
-      list.push({ node: item.node, rec: item.record, rect: rectsByNode.get(item.node)! });
+      list.push({ node: item.node, rec: item.record, rect, rects: fragmentRects(item.node, st, rect) });
       byParent.set(parent, list);
     }
     for (const siblings of byParent.values()) {
       if (siblings.length < 2) continue;
       for (let a = 0; a < siblings.length; a++) {
         for (let b = a + 1; b < siblings.length; b++) {
-          const ra = siblings[a]!.rect;
-          const rb = siblings[b]!.rect;
-          const iw = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left);
-          const ih = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
-          if (iw > 0 && ih > 0) {
-            const depth = Math.round(Math.min(iw, ih) * 100) / 100;
-            if (depth > siblings[a]!.rec.siblingOverlapPx) siblings[a]!.rec.siblingOverlapPx = depth;
-            if (depth > siblings[b]!.rec.siblingOverlapPx) siblings[b]!.rec.siblingOverlapPx = depth;
+          const sa = siblings[a]!;
+          const sb = siblings[b]!;
+          const ra = sa.rect;
+          const rb = sb.rect;
+          if (Math.min(ra.right, rb.right) <= Math.max(ra.left, rb.left) || Math.min(ra.bottom, rb.bottom) <= Math.max(ra.top, rb.top)) {
+            continue;
+          }
+          let depth = 0;
+          for (const fa of sa.rects) {
+            for (const fb of sb.rects) {
+              const iw = Math.min(fa.right, fb.right) - Math.max(fa.left, fb.left);
+              const ih = Math.min(fa.bottom, fb.bottom) - Math.max(fa.top, fb.top);
+              if (iw > 0 && ih > 0) {
+                const d = Math.round(Math.min(iw, ih) * 100) / 100;
+                if (d > depth) depth = d;
+              }
+            }
+          }
+          if (depth > 0) {
+            if (depth > sa.rec.siblingOverlapPx) sa.rec.siblingOverlapPx = depth;
+            if (depth > sb.rec.siblingOverlapPx) sb.rec.siblingOverlapPx = depth;
           }
         }
       }
