@@ -75,10 +75,14 @@ export function tableGridColumns(table: Pick<Table, "rows">): number | null {
   }
   return width && width > 0 ? width : null;
 }
-/** Membership/order are checked against source, not inferred from similar-looking wrapper boxes. */
+/**
+ * Membership/order are checked against source, not inferred from similar-looking wrapper boxes.
+ * Grid regularity is deliberately not part of this match: ragged rows (all colspan 1, differing
+ * cell counts) are valid HTML and figure/caption-separated measured them in 0.10.0. Rules that need
+ * column tracks (table-continuation) check tableGridColumns() themselves.
+ */
 export function sourceTableMatches(table: Table): boolean {
   if (!table.rows.length || table.rows.some(row => !row.sid || !row.cells.length || row.cells.some(cell => !cell.sid))) return false;
-  if (tableGridColumns(table) === null) return false;
   const rows = new Map(table.rows.map(row => [row.sid, row]));
   if (rows.size !== table.rows.length) return false;
   const heads = new Set(table.headerRowSids);

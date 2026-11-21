@@ -188,8 +188,11 @@ describe("Paket 1: tables with simple regular colspan rows", () => {
   });
 
   it("declines irregular colspan sums and rowspan > 1 explicitly", () => {
-    for (const snap of [makeColspanSnapshot({ irregular: true }), makeColspanSnapshot({ rowSpan: 2 })]) {
-      assert.equal(sourceTableMatches(snap.tableIndex!.tables[0]!), false);
+    for (const [name, snap] of [["irregular", makeColspanSnapshot({ irregular: true })], ["rowspan", makeColspanSnapshot({ rowSpan: 2 })]] as const) {
+      // 0.11.1 (P1): grid regularity is no longer part of the source match (ragged figure tables
+      // stay measurable); the continuation rules decline an irregular grid via tableGridColumns().
+      if (name === "irregular") assert.equal(tableGridColumns(snap.tableIndex!.tables[0]!), null);
+      else assert.equal(sourceTableMatches(snap.tableIndex!.tables[0]!), false);
       const report = runDocument({ path: "t.html", snapshot: snap, infrastructure: [] }, { activeRules: [headerRule, driftRule], optionsByRule: {}, coverageFloors: {}, failOn: "warn" }).report;
       assert.equal(report.verdict, "insufficient-coverage");
       assert.equal(report.findings.length, 0);
