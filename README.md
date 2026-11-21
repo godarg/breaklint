@@ -71,7 +71,10 @@ Four frozen real-product readbacks retained all 215 original page PNGs; one stil
 for insufficient measurement and three exited 1 with findings. See the dated
 [publication and limitations checkpoint](docs/status.md#release-v0100-published-2026-10-08)
 for package identity, review scope and the separately measured Action, website and local
-consumer integration outcomes. Publication of 0.11.0 is pending candidate review and tagging.
+consumer integration outcomes.
+
+**Note:** 0.11.0 was tagged but never published to npm. `npm i -D breaklint` installs 0.10.0,
+and the Action works with `uses: godarg/breaklint@v0.10.0`. 0.11.1 will be the first published 0.11 release.
 
 ```bash
 npm i -D breaklint
