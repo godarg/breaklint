@@ -130,6 +130,26 @@ it("reports missing reference edges as coverage when the grouped header stands a
   assert.equal(report.verdict, "insufficient-coverage");
   assert.ok(report.notMeasured.some(n => n.reason === "env/table-structure-unsupported"));
 });
+it("keeps measuring the observed header edges when inner reference edges are missing (P2)", () => {
+  // Header [2,2] alone on page 1, rows [1,1,1,1] on page 2: the coarse edges 0|, 1|2 and |3 are
+  // observed on the first fragment; the inner edges 0|1 and 2|3 are not. A real displacement of
+  // an observed edge is a finding; the edges without a reference are declined, one each.
+  const report = judge(alignment, grouped({ headerOnlyLead: true, outerShift: 12 }));
+  assert.equal(report.findings.length, 1, "a displaced observed header edge must be measured");
+  assert.equal(report.findings[0]!.page, 2);
+  assert.equal(report.findings[0]!.measurement.value, 12);
+  const coverage = report.coverage[alignment]!;
+  assert.equal(coverage.measured, 2, "both fragments are measured against the observed edges");
+  const declined = coverage.notMeasured.filter(n => n.reason === "env/table-structure-unsupported");
+  assert.equal(declined.reduce((sum, n) => sum + n.count, 0), 4, "each continued edge without a reference is declined");
+  assert.ok(declined.every(n => /reference edge/u.test(n.detail ?? "")), "the decline names the missing reference edge");
+  assert.equal(coverage.candidates, 6);
+  // Without displacement nothing is invented: no finding, and the gap stays visible.
+  const aligned = judge(alignment, grouped({ headerOnlyLead: true }));
+  assert.deepEqual(aligned.findings, []);
+  assert.equal(aligned.coverage[alignment]!.measured, 2);
+  assert.equal(aligned.coverage[alignment]!.notMeasuredCount, 4);
+});
 it("keeps declining irregular grids for column drift while caption-separated measures them (P2/P1)", () => {
   const snapshot = grouped();
   const table = snapshot.tableIndex!.tables[0]!;

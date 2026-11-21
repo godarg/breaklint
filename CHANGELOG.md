@@ -45,7 +45,8 @@ published to npm, so the Action pinned to `@v0.11.0` fails with its default inst
   rendered and the others are `display: none`.
 - The table continuation checks measure tables with simple `colspan` rows (group and separator
   rows, grouped headers); `layout/table-column-drift` compares continuations against the edges it
-  observed on the first page. Irregular spans, `rowspan` and edges never seen stay declined.
+  observed on the first page. An edge never seen there is declined on its own while the observed
+  edges are still compared; irregular spans and `rowspan` stay declined.
 - A declined check names what it observed (`notMeasured[].detail`; console: `(observed: …)`), for
   example `rowSpan > 1 in thead` or the number of script mutations before pagination.
 - The browser's default `/favicon.ico` request is answered with 204 when the document declares no
