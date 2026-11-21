@@ -20,7 +20,7 @@ import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { checkDocsTruth, currentStamps, internalNameIssues, peerCommandIssues, pinIssues, scanText, statusIssues } from "../tools/docs-truth.mjs";
+import { checkDocsTruth, commentLines, currentStamps, internalNameIssues, peerCommandIssues, pinIssues, scanText, shippedCodeFiles, sourceCommentIssues, statusIssues } from "../tools/docs-truth.mjs";
 import type { PendingCorrection, Stamps } from "../tools/docs-truth.mjs";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
@@ -323,6 +323,40 @@ describe("release-status sentences and peer install commands in the shipped docu
     for (const file of ["README.md", "SECURITY.md", "CHANGELOG.md", "docs/source-bound-findings.md", "docs/agent-contract.md"]) {
       assert.deepEqual(internalNameIssues(file, readFileSync(join(ROOT, file), "utf8")), [], `${file} names an internal role or system`);
     }
+  });
+
+  it("no code comment in src/** or the built dist/** names a model, a register id or an internal role", () => {
+    // 0.10.0 shipped exactly these in dist/ comments; each must be caught where tsc copies it.
+    const shippedComments = [
+      " * design review (Gemini, Z1) left open and explicitly refused to grant:",
+      " * is the half of Gemini's A4 that is actually available.",
+      "        // G-78: a confirmed parity-blank page carries zero flow blocks and zero marks.",
+      "  /** 1-based page numbers confirmed blank (e.g. Paged.js parity blanks, G-78). */",
+      "          // either allowance to the footnote area (G-100).",
+      "// reviewed by @Neo and the Founder",
+      "/* a second opinion from Codex */ const x = 1;",
+      " * element on one page must shift by the same amount (CDX-20, CODE-PRINT-4/5).",
+      "    // the decline code itself is unchanged (VALUE-DIAG-1).",
+    ];
+    // A " * " line is inside the block comment it came from; the control keeps that context.
+    const inContext = (line: string) => line.startsWith(" * ") ? `/**\n${line}\n */\n` : `${line}\n`;
+    for (const line of shippedComments) assert.ok(sourceCommentIssues("src/x.ts", inContext(line)).length >= 1, `negative control passed: ${line}`);
+    // The same words outside any comment are not read by this guard.
+    assert.deepEqual(sourceCommentIssues("src/x.ts", " * design review (Gemini, Z1)\n"), [], "a line outside any comment was read as one");
+    // Positive controls: code that is not a comment, a URL and a lowercase domain are not comments or names.
+    for (const line of [
+      'const url = "https://dargel-solutions.de/schemas/breaklint/config-v1.json";',
+      "const g = grid.G - 78; // a grid offset",
+      "/** Measured against the fallback font. */",
+      "// The digest is SHA-256 over UTF-8 bytes (FNV-1a for the short key).",
+    ]) assert.deepEqual(sourceCommentIssues("src/x.ts", `${line}\n`), [], `positive control failed: ${line}`);
+    assert.deepEqual(commentLines("a // b\n/* c\n d */ e"), ["  // b", "/* c", " d */  "], "comment extraction keeps line numbers");
+    const files = shippedCodeFiles(ROOT).filter((file) => file.includes("/src/"));
+    assert.ok(files.length >= 60, `only ${files.length} source files found; the comment guard has lost its subject`);
+    const built = shippedCodeFiles(stage).filter((file) => file.includes("/dist/"));
+    assert.ok(built.length >= 120, `only ${built.length} built files found in the staged package`);
+    const issues = [...files, ...built].flatMap((file) => sourceCommentIssues(file, readFileSync(file, "utf8")));
+    assert.deepEqual(issues, [], "a shipped code comment names a model, a register id or an internal role");
   });
 
   it("the shipped documents fail the whole check when one carries a stale status sentence or peer", () => {

@@ -413,6 +413,52 @@ export function internalNameIssues(file, text) {
   return issues;
 }
 
+/**
+ * The code ships too: `dist/**` carries the comments of `src/**` (tsc keeps them, in `.js` and in
+ * `.d.ts`). There a comment may additionally not name the model that took part in a review or a
+ * maintainer register id: neither tells a user anything, and both were in 0.10.0's `dist/`.
+ */
+const COMMENT_ONLY_NAMES = [
+  { re: /\b(?:Gemini|Codex|Grok|Opus|Sonnet|Claude|Anthropic|OpenAI|ChatGPT|GPT-?\d)\b/iu, label: "an AI model or vendor" },
+  { re: /\b(?:G|CDX|ADR)-\d{2,4}\b|\b(?:CODE|VALUE|DOC|COMP)-[A-Z]+-\d+\b/u, label: "a maintainer register id" },
+];
+
+/**
+ * The comment text of a TypeScript or JavaScript file, line by line, with every other character
+ * blanked so line numbers stay true. Deliberately conservative: it does not parse strings or regex
+ * literals, so a `/*` or `//` inside one opens a "comment" too. That can only make it read MORE
+ * text than the comments, never less; `://` (a URL) is not taken for a line comment.
+ */
+export function commentLines(text) {
+  const source = text.replace(/\r\n/gu, "\n");
+  const kept = source.replace(/[^\n]/gu, " ").split("");
+  for (const match of source.matchAll(/\/\*[\s\S]*?(?:\*\/|$)|(?<![:\\])\/\/[^\n]*/gu)) {
+    for (let i = 0; i < match[0].length; i += 1) kept[match.index + i] = match[0][i];
+  }
+  return kept.join("").split("\n");
+}
+
+export function sourceCommentIssues(file, text) {
+  const issues = [];
+  for (const [index, line] of commentLines(text).entries()) {
+    for (const { re, label } of [...INTERNAL_NAMES, ...COMMENT_ONLY_NAMES]) {
+      if (re.test(line)) issues.push(`${file}:${index + 1}: a code comment names ${label} in a shipped file: ${line.trim()}`);
+    }
+  }
+  return issues;
+}
+
+/** Every `.ts` under src/ and every `.js`/`.d.ts` under dist/ that exists in `packageDir`. */
+export function shippedCodeFiles(packageDir) {
+  const root = resolve(packageDir);
+  const walk = (dir, accept) => !existsSync(dir) ? [] : readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) return walk(path, accept);
+    return entry.isFile() && accept(entry.name) ? [path] : [];
+  });
+  return [...walk(join(root, "src"), (name) => name.endsWith(".ts")), ...walk(join(root, "dist"), (name) => name.endsWith(".js") || name.endsWith(".d.ts"))].sort();
+}
+
 const PEERS = ["puppeteer-core", "pagedjs", "pdfjs-dist"];
 const INSTALL = /\b(?:npm\s+(?:i|install|add)|pnpm\s+(?:add|i|install)|yarn\s+add)\b/u;
 
@@ -516,6 +562,10 @@ export function checkDocsTruth({ packageDir, docsRoot = packageDir, extra = [], 
   // but not from the names a user has no use for.
   for (const path of [...shipped, join(root, "CHANGELOG.md")].filter((file) => existsSync(file))) {
     issues.push(...internalNameIssues(relative(root, path), readFileSync(path, "utf8")));
+  }
+  // The installed package carries dist/; a source checkout carries src/. Whichever is there is read.
+  for (const path of shippedCodeFiles(packageDir)) {
+    issues.push(...sourceCommentIssues(relative(resolve(packageDir), path), readFileSync(path, "utf8")));
   }
   // One entry absorbs exactly one issue: same file, kind, number and exact sentence.
   const pendingLeft = new Set(pending.map((_, i) => i));

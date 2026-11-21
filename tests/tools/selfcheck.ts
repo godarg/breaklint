@@ -20,7 +20,7 @@ import { runDocument } from "../../src/core/engine.ts";
 import { ALL_RULES } from "../../src/rules/index.ts";
 import { resolveConfig, toReportConfig } from "../../src/config/resolve.ts";
 import type { Snapshot } from "../../src/core/types.ts";
-import { shippedDocuments } from "./docs-truth.mjs";
+import { shippedCodeFiles, shippedDocuments, sourceCommentIssues } from "./docs-truth.mjs";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const problems: string[] = [];
@@ -100,6 +100,12 @@ for (const file of [...shippedDocuments(ROOT), join(ROOT, "CHANGELOG.md")]) {
   const text = readFileSync(file, "utf8");
   if (/\/(Users|home)\/[a-z][a-z0-9_-]+\//u.test(text)) problems.push(`${file}: absolute build-machine path`);
 }
+
+// 4. Code comments ship in dist/ (tsc keeps them). They name no AI model, register id or internal
+//    role; docs-truth applies the same check to the installed package's dist/.
+const code = shippedCodeFiles(ROOT).filter((file) => file.startsWith(join(ROOT, "src")));
+if (code.length < 60) problems.push(`only ${code.length} source files found; the comment guard has lost its subject`);
+for (const file of code) problems.push(...sourceCommentIssues(file.slice(ROOT.length), readFileSync(file, "utf8")));
 
 for (const p of problems) console.log(p);
 console.log(problems.length === 0 ? "static self-application guards: clean" : `${problems.length} problem(s)`);

@@ -47,6 +47,12 @@ export function pinIssues(file: string, text: string, packageVersion: string): s
 
 export function internalNameIssues(file: string, text: string): string[];
 
+export function commentLines(text: string): string[];
+
+export function sourceCommentIssues(file: string, text: string): string[];
+
+export function shippedCodeFiles(packageDir: string): string[];
+
 export function checkDocsTruth(input: {
   packageDir: string;
   docsRoot?: string;

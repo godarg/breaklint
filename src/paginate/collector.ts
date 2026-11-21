@@ -14,7 +14,7 @@
  *
  * TOKENS ARE TAKEN AT DECISION TIME. `afterPageLayout` is handed the break token for the page it
  * just finished; that is the only moment it exists as an object rather than as an inference. This
- * is the half of Gemini's A4 that is actually available.
+ * is the half of an external design-review finding (A4) that is actually available.
  *
  * THE OTHER HALF OF A4, AND WHY IT BECAME A CHECK INSTEAD OF A MOVE. A4 proposed reading the break
  * ATTRIBUTES at decision time too, closing the window in which an author script could alter them

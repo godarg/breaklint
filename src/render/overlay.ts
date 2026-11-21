@@ -232,7 +232,7 @@ const OVERLAY_TEMPLATE = `(() => {
           // that continues; data-split-from/-to on a zero-height split wrapper) may end within
           // 0.5 px sub-pixel rounding BELOW areaBox.bottom. That rounding allowance needs the
           // split evidence: an ordinary end edge past the area is an overflow. Never extend
-          // either allowance to the footnote area (G-100).
+          // either allowance to the footnote area.
           const notInFootnote = P.closest(el, ".pagedjs_footnote_area") === null;
           const withinRounding = y > areaBox.bottom && y - areaBox.bottom <= 0.5;
           const splitTo = P.hasAttr(el, "data-split-to");
