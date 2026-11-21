@@ -138,3 +138,29 @@ it("keeps declining irregular grids for column drift while caption-separated mea
   assert.deepEqual(report.findings, []);
   assert.equal(report.verdict, "insufficient-coverage");
 });
+it("declines rowspan in thead with its machine code and an observed sub-cause (P5/P11)", () => {
+  // <tr><th rowspan=2>Name</th><th colspan=2>Q1</th></tr><tr><th>a</th><th>b</th></tr>: the usual
+  // grouped header with a rowspan. It stays declined; the decline now says why.
+  const snapshot = sample();
+  const table = snapshot.tableIndex!.tables[0]!;
+  const spanned = (rows: typeof table.rows) => { rows[0]!.cells[0]!.rowSpan = 2; };
+  spanned(table.rows);
+  for (const fragment of table.fragments) for (const row of fragment.rows) if (row.sid === "head") row.cells[0]!.rowSpan = 2;
+  for (const id of [header, alignment]) {
+    const report = judge(id, snapshot);
+    assert.equal(report.verdict, "insufficient-coverage");
+    const declines = report.notMeasured.filter(n => n.ruleId === id);
+    assert.ok(declines.length > 0);
+    for (const decline of declines) {
+      assert.equal(decline.reason, "env/table-structure-unsupported");
+      assert.equal(decline.detail, "rowSpan > 1 in thead");
+    }
+  }
+  // A data-row rowspan names a different observed condition; an irregular grid another one.
+  const dataSpan = sample(); dataSpan.tableIndex!.tables[0]!.rows[1]!.cells[0]!.rowSpan = 2;
+  for (const f of dataSpan.tableIndex!.tables[0]!.fragments) for (const row of f.rows) if (row.sid === "row-a") row.cells[0]!.rowSpan = 2;
+  assert.equal(judge(header, dataSpan).notMeasured[0]!.detail, "rowSpan > 1 in a data row");
+  const ragged = sample(); const rt = ragged.tableIndex!.tables[0]!;
+  rt.rows[2]!.cells.pop(); rt.fragments[1]!.rows[0]!.cells.pop();
+  assert.equal(judge(alignment, ragged).notMeasured[0]!.detail, "rows have unequal column counts (no regular column grid)");
+});

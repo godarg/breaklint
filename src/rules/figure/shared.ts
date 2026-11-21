@@ -1,9 +1,9 @@
 import type { Snapshot, BlockRecord } from "../../core/types.ts";
 import { declined, targetEvaluation } from "../shared.ts";
-export function unavailable(ruleId: string) {
+export function unavailable(ruleId: string, detail?: string | null) {
   const reason = "env/figure-index-unavailable" as const;
   return { findings: [], candidates: 1, measured: 0,
-    notMeasured: [declined({ scope: "document", ruleId, reason })],
+    notMeasured: [declined({ scope: "document", ruleId, reason, detail })],
     evaluations: [targetEvaluation({ ruleId, keyType: "generated", nodeKey: "figure-inventory", sid: null,
       status: "not-measured", reason, occurrenceKey: "unaddressable-rest:figure-inventory" })] };
 }

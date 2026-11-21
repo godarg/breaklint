@@ -317,3 +317,21 @@ describe("Paket 1: G-78 parity-blank page evidence verification", () => {
     }
   });
 });
+
+describe("P5: figure index declines carry the observed sub-cause", () => {
+  it("names script mutations and keeps the env/figure-index-unavailable code", () => {
+    const withScript = '<!doctype html><html><body><p><a href="#f1">Figure 1</a></p><figure id="f1"><svg width="40" height="20"><text>A</text></svg><figcaption>Figure 1</figcaption></figure><script>void 0</script></body></html>';
+    const input = baseAssembleInput(withScript, false);
+    input.runtimeFigureVerification = { verified: false, detail: "script mutated DOM: 3 records before pagination" };
+    const snapshot = assembleSnapshot(input);
+    assert.equal(snapshot.figureIndex, undefined);
+    const rule = RULES_BY_ID.get("figure/dangling-reference")!;
+    const report = runDocument({ path: "s.html", snapshot, infrastructure: [] }, { activeRules: [rule], optionsByRule: {}, coverageFloors: {}, failOn: "warn" }).report;
+    assert.equal(report.notMeasured[0]!.reason, "env/figure-index-unavailable");
+    assert.equal(report.notMeasured[0]!.detail, "script mutated DOM: 3 records before pagination");
+    // Without source-id injection the decline names that, not a script.
+    const off = assembleSnapshot({ ...baseAssembleInput(withScript, true), sourceMapInjection: false });
+    const offReport = runDocument({ path: "s.html", snapshot: off, infrastructure: [] }, { activeRules: [rule], optionsByRule: {}, coverageFloors: {}, failOn: "warn" }).report;
+    assert.equal(offReport.notMeasured[0]!.detail, "source-id injection is off");
+  });
+});

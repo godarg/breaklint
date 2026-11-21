@@ -53,7 +53,7 @@ function check(snapshot: Snapshot, ctx: Parameters<typeof makeFinding>[0]["ctx"]
       const target = { ruleId: id, keyType: "generated" as const, nodeKey: `table-inventory:${table.sid}`, sid: table.sid };
       evaluations.push(targetEvaluation({ ...target, status: hidden ? "excluded" : "not-measured",
         countsTowardCoverage: !hidden, reason: hidden ? "rule/target-not-visible" : reason }));
-      if (!hidden) { candidates += 1; notMeasured.push(declined({ scope: "block", ruleId: id, reason })); }
+      if (!hidden) { candidates += 1; notMeasured.push(declined({ scope: "block", ruleId: id, reason, detail: "no visible rendered table fragment" })); }
       continue;
     }
     const gridColumns = tableGridColumns(table);
@@ -68,10 +68,22 @@ function check(snapshot: Snapshot, ctx: Parameters<typeof makeFinding>[0]["ctx"]
       .filter(row => !table.headerRowSids.includes(row.sid!)).some(row => spans(row).some(([start, end]) =>
         refEdges.left[start] === undefined || refEdges.right[end] === undefined)));
     const columnTracksUnavailable = id === COLUMNS && (refEdges === null || missingReferenceEdge);
+    const hiddenDataCell = fragments.some(f => f.rows.filter(row => !table.headerRowSids.includes(row.sid!))
+      .some(row => row.cells.some(cell => !cell.visible || cell.box.width <= 0 || cell.box.height <= 0)));
     const unsupported = !sourceTableMatches(table) || gridColumns === null || !lead || !table.headerRowSids.length
-      || !visibleHeader(table, lead) || columnTracksUnavailable
-      || fragments.some(f => f.rows.filter(row => !table.headerRowSids.includes(row.sid!))
-        .some(row => row.cells.some(cell => !cell.visible || cell.box.width <= 0 || cell.box.height <= 0)));
+      || !visibleHeader(table, lead) || columnTracksUnavailable || hiddenDataCell;
+    // The first observed condition behind the decline, for the report (the code stays the same).
+    const rowSpanned = (header: boolean) => table.rows.some(row => table.headerRowSids.includes(row.sid ?? "") === header
+      && row.cells.some(cell => cell.rowSpan !== 1));
+    const unsupportedDetail = !unsupported ? null
+      : rowSpanned(true) ? "rowSpan > 1 in thead"
+      : rowSpanned(false) ? "rowSpan > 1 in a data row"
+      : !sourceTableMatches(table) ? "rendered rows or cells differ from the source (membership, order, text or span)"
+      : gridColumns === null ? "rows have unequal column counts (no regular column grid)"
+      : !table.headerRowSids.length ? "no header row"
+      : !lead || !visibleHeader(table, lead) ? "header row not visible on the first fragment"
+      : columnTracksUnavailable ? "no observed reference edge for a continued column on the first fragment"
+      : "a data cell is invisible or has an empty box";
     for (const [at, fragment] of fragments.entries()) {
       const block = blocks.get(`${table.sid}:${fragment.page}`);
       const target = { ruleId: id, keyType: "block" as const, nodeKey: block?.nodeKey ?? `table:${table.sid}:${fragment.page}`,
@@ -80,7 +92,9 @@ function check(snapshot: Snapshot, ctx: Parameters<typeof makeFinding>[0]["ctx"]
       const reason = fragment.flowReason || (block ? layoutOutOfScope(block.effectiveStyle) : null)
         || (!block || unsupported ? "env/table-structure-unsupported" as const : null);
       if (reason) {
-        notMeasured.push(declined({ scope: "block", ruleId: id, reason, target: { keyType: "block", nodeKey: target.nodeKey, sid: table.sid } }));
+        const detail = reason !== "env/table-structure-unsupported" ? null
+          : unsupportedDetail ?? "no rendered table block on this page";
+        notMeasured.push(declined({ scope: "block", ruleId: id, reason, detail, target: { keyType: "block", nodeKey: target.nodeKey, sid: table.sid } }));
         evaluations.push(targetEvaluation({ ...target, status: "not-measured", reason })); continue;
       }
       measured += 1;

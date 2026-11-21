@@ -140,6 +140,9 @@ it("observes script mutations up to the guarded preview call and keeps a clean s
   const timer = runCase("guarded-timer-attribute",
     'document.addEventListener("DOMContentLoaded", () => setTimeout(() => document.getElementById("tail").setAttribute("data-state", "late"), 0));', 4);
   assert.ok(timer.documents[0]!.notMeasured.some(n => n.reason === "env/figure-index-unavailable"));
+  // P5: the decline keeps its code and names the observed sub-cause.
+  assert.ok(timer.documents[0]!.notMeasured.some(n => n.reason === "env/figure-index-unavailable"
+    && /^script mutated DOM: [1-9]\d* records? before pagination$/u.test((n as { detail?: string }).detail ?? "")), JSON.stringify(timer.documents[0]!.notMeasured));
   // The window between apparatus install and preview() (CDX-11) cannot be hit deterministically by
   // a page script through the CLI (print media change events only fire on a rendering update, and
   // then again during page.pdf()); the next test drives that window directly.

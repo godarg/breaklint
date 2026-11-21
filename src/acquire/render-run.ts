@@ -2594,6 +2594,18 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
       integrityAtSnapshot.mutationRecordsAfterRendered === opened.postPaginationMutations &&
       integrityAtSnapshot.sidMutations === 0 &&
       runtimeFigureTreeMatches(sourceModel.figureIndex, opened.prePaginationFigureTree, sourceModel.elementCount);
+    // The first failed condition, as observed; the decline code itself is unchanged (VALUE-DIAG-1).
+    const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+    const runtimeFigureDetail = !needRuntimeFigureCheck || runtimeFigureVerified ? null
+      : opened.prePaginationScriptMutations > 0
+        ? `script mutated DOM: ${plural(opened.prePaginationScriptMutations, "record")} before pagination`
+      : integrityAtSnapshot.sidMutations > 0
+        ? `script changed source-id attributes: ${plural(integrityAtSnapshot.sidMutations, "record")}`
+      : integrityAtSnapshot.mutationRecordsAfterRendered !== opened.postPaginationMutations
+        ? `script mutated DOM after pagination: ${plural(integrityAtSnapshot.mutationRecordsAfterRendered - opened.postPaginationMutations, "record")}`
+      : opened.prePaginationFigureTree === null
+        ? "figure, id or reference tree changed between load and pagination"
+        : "runtime figure, id or reference tree differs from the authored source";
     const snapshot = assembleSnapshot({
       raw,
       collector,
@@ -2601,7 +2613,7 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
       sourceMap: injected.map,
       originalSourceMap: originalMap,
       sourceMapInjection: context.options.sourceMapInjection,
-      runtimeFigureVerification: { verified: runtimeFigureVerified },
+      runtimeFigureVerification: { verified: runtimeFigureVerified, detail: runtimeFigureDetail },
       renderer: context.rendererPath,
       browserVersion: context.browserVersion,
       pagedjsVersion: context.pagedjsVersion,
