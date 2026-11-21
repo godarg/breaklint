@@ -235,9 +235,11 @@ machine-readable record is required.
 
 ## Public bounded review bundle
 
-The installed package also exposes three report-only helpers. They accept a canonical document
+The installed package also exposes three report-only helpers and matching CLI subcommands
+(`breaklint context`, `breaklint bundle`, and `breaklint compare`). They accept a canonical document
 report — readers accept Report 4 and 5 — and the renderer also accepts the distinct screen-report
-profile; they do not acquire documents, run a browser, or turn report strings into commands.
+profile (Screen 2; readers accept Screen 1 and 2); they do not acquire documents, run a browser, or
+turn report strings into commands.
 
 ```ts
 import { createContextPack, renderReport, writeReportBundle } from "breaklint";
@@ -269,7 +271,8 @@ the report's integrity record. A failed check produces an explicit unavailable-e
 it does not retain a stale image or link. Page-relative target crops use that same verified full
 page image and retain the declared `css-page-top-left` coordinate system. Legacy Report 3 input is
 shown as legacy: it receives neither a new original-source assertion nor a repair claim.
-Screen reports retain their separate route, viewport, target and CSS-viewport coordinate semantics;
+Screen reports retain their separate route, viewport, target and CSS coordinate semantics
+(`css-viewport-pixels` for viewport captures or `css-document-pixels` for full-page captures);
 they never acquire document page or PDF claims in this view.
 
 Each document card names the original-source status and role, exact verified range when available

@@ -25,6 +25,20 @@ published repair from this change set and binds the child CLI to the actual cons
 run `33320332110` completed the Node 22.13/24 consumer matrix, npm provenance verification and
 GitHub Release creation on 2026-08-30.
 
+Version 0.11.0 is a minor pre-1.0 release: `PublicScreenReport` moves from Screen 1 → 2 (readers
+accept Screen 1 and 2) to add CSS Color 4 alpha visibility, geometry-correct evaluation under
+semi-transparent opacity / `filter` / `backdrop-filter`, stabilization drift details,
+framework-agnostic build output receipts (output-receipt version 2 alongside legacy Next.js
+version 1), full-page target coverage (`css-document-pixels`), `web/sibling-overlap`, `web/svg-text-overflows-viewport`,
+opt-in `web/small-text` and `web/small-touch-target`, and `scope: "scenario" | "suite"` on named
+screen exceptions. Print checks gain runtime-verified figure indexing for mutation-free scripted
+documents, simple regular `colspan` table support, implicit `/favicon.ico` `204` handling,
+verified post-PDF out-of-flow freeze tolerance, and `G-78` parity-blank page evidence binding.
+Document Report 5 (readers accept Report 4 and 5), Snapshot 7 (readers accept Snapshot 5, 6 and 7),
+context pack 2, comparison 1 and Configuration Contract 1 remain unchanged. The `puppeteer-core`
+peer floor moves to `>=25.16.0 <26`. Report-surface sight review for 0.11.0 is required before
+tagging.
+
 Version 0.10.0 is a minor pre-1.0 change: it adds two optional table checks
 and changes judgments on unchanged documents. Snapshot 7 adds table row/cell and printed-fragment
 inventory. Readers accept Snapshot 5, 6 and 7; missing legacy inventory declines enabled checks.

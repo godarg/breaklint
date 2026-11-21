@@ -60,6 +60,12 @@ describe("schema stamps in the shipped documents", () => {
     const moved = { ...stamps, snapshot: stamps.snapshot + 1 };
     assert.equal(scanText("x.md", `| Measured snapshot | ${stamps.snapshot} | geometry |\n`, moved).length, 1);
     assert.equal(scanText("x.md", `| Measured snapshot | ${stamps.snapshot} | geometry |\n`, stamps).length, 0);
+    // Same check for the screen report contract stamp and reader set.
+    const movedScreen = { ...stamps, screen: stamps.screen + 1 };
+    assert.equal(scanText("x.md", `| Screen report | ${stamps.screen} | geometry |\n`, movedScreen).length, 1);
+    assert.equal(scanText("x.md", `| Screen report | ${stamps.screen} | geometry |\n`, stamps).length, 0);
+    assert.equal(scanText("x.md", `Readers accept Screen ${stamps.readableScreens.join(" and ")}.\n`, stamps).length, 0);
+    assert.equal(scanText("x.md", `Readers accept Screen 1 and ${stamps.screen + 5}.\n`, stamps).length, 1);
   });
 
   it("rejects the stale current-state forms that shipped, and each one names its line", () => {

@@ -89,6 +89,8 @@ export function currentStamps(packageDir) {
       readable: [...enums.READABLE_REPORT_SCHEMA_VERSIONS].sort((a, b) => a - b),
       snapshot: enums.SNAPSHOT_SCHEMA_VERSION,
       readableSnapshots: [...enums.READABLE_SNAPSHOT_SCHEMA_VERSIONS].sort((a, b) => a - b),
+      screen: index.SCREEN_REPORT_SCHEMA_VERSION,
+      readableScreens: [...index.READABLE_SCREEN_REPORT_SCHEMA_VERSIONS].sort((a, b) => a - b),
       context: index.createContextPack(report).schemaVersion,
       comparison: (await index.compareReports(report, report)).schemaVersion,
       config: report.config.contractVersion,
@@ -99,11 +101,13 @@ export function currentStamps(packageDir) {
   if (stamps.report !== stamps.reportConstant) {
     throw new Error(`the CLI writes report schema ${stamps.report} but REPORT_SCHEMA_VERSION is ${stamps.reportConstant}`);
   }
-  for (const key of ["report", "snapshot", "context", "comparison", "config"]) {
+  for (const key of ["report", "snapshot", "screen", "context", "comparison", "config"]) {
     if (!Number.isInteger(stamps[key])) throw new Error(`the built package yielded no ${key} stamp`);
   }
   if (!Array.isArray(stamps.readableSnapshots) || !stamps.readableSnapshots.every(Number.isSafeInteger)
     || !stamps.readableSnapshots.includes(stamps.snapshot)) throw new Error("the built package yielded no valid snapshot reader set");
+  if (!Array.isArray(stamps.readableScreens) || !stamps.readableScreens.every(Number.isSafeInteger)
+    || !stamps.readableScreens.includes(stamps.screen)) throw new Error("the built package yielded no valid screen reader set");
   return { ...stamps, packageVersion: manifest.version };
 }
 
@@ -144,6 +148,7 @@ const KIND_WORDS = [
   { kind: "context", pattern: /\bcontext(?:\.json)?\b/giu },
   { kind: "comparison", pattern: /\bcomparison\b/giu },
   { kind: "snapshot", pattern: /\bsnapshots?\b/giu },
+  { kind: "screen", pattern: /\bscreen\s+reports?\b|\bPublicScreenReport\b/giu },
   { kind: "config", pattern: /\bconfiguration\b/giu },
   { kind: "report", pattern: /\breports?\b/giu },
 ];
@@ -172,6 +177,8 @@ function mentionsIn(unit, paragraph, unitOffset) {
     { kind: "report", re: /\bschema-(\d+) report/giu },
     { kind: "snapshot", re: /\bSnapshot[- ]?(\d+)\b/gu },
     { kind: "snapshot", re: /\bsnapshot schema(?: is| at| to| moves to| stays| remains)?[- ](\d+)\b/giu },
+    { kind: "screen", re: /\bScreen[- ]?(\d+)\b/gu },
+    { kind: "screen", re: /\bscreen(?:\s+report)?\s+schema(?: is| at| to| moves to| stays| remains)?[- ](\d+)\b/giu },
     { kind: "context", re: /\bcontext pack(?:\s+(?:schema|is|to|becomes|moves to|at|stays|version|v))*\s+(\d+)\b/giu },
     { kind: "config", re: /\bConfiguration Contract\s*v?(\d+)\b/giu },
   ];
@@ -192,7 +199,8 @@ function mentionsIn(unit, paragraph, unitOffset) {
   if (row) {
     const label = row[1].toLowerCase();
     const kind = /context/u.test(label) ? "context" : /comparison/u.test(label) ? "comparison"
-      : /snapshot/u.test(label) ? "snapshot" : /^configuration$/u.test(label) ? "config"
+      : /snapshot/u.test(label) ? "snapshot" : /^screen report$/u.test(label) ? "screen"
+      : /^configuration$/u.test(label) ? "config"
       : /^document report$/u.test(label) ? "report" : null;
     add(kind, Number(row[2]), row.index + row[0].indexOf(row[2]));
   }
@@ -233,23 +241,42 @@ function unitsOf(text) {
   return units;
 }
 
-function readableSetOk(unit, stamps) {
-  // Read the entire list, including repeated conjunctions and Oxford commas. A two-member
-  // prefix of a longer claim is not the declared reader set. Keep duplicate members so a
+function readableSetsIn(unit, stamps) {
+  // Read every readable-set claim in the sentence (e.g. Report 4 and 5 alongside Snapshot 5, 6 and 7
+  // or Screen 1 and 2), including repeated conjunctions and Oxford commas. Keep duplicate members so a
   // repeated stamp fails exact-set equality rather than silently disappearing.
   const list = String.raw`\d+(?:(?:,\s*(?:(?:and|or)\s+)?|\s+(?:and|or)\s+)\d+)+`;
   const prefix = String.raw`\b(?:readers?|reads?|accepts?|accepted|readable)\b[^.;]{0,40}?`;
   const suffix = String.raw`\s+(?:are|remain|stay)\s+readable\b`;
-  // Explicit snapshot wording must not be read as the report set by the generic grammar.
-  const snapshot = new RegExp(`${prefix}Snapshots?[- ]?(${list})`, "iu").exec(unit)
-    ?? new RegExp(String.raw`\bSnapshots?[- ]?(${list})${suffix}`, "iu").exec(unit);
-  const match = snapshot ?? new RegExp(`${prefix}(?:Report[- ]?)?(${list})`, "iu").exec(unit)
-    ?? new RegExp(String.raw`\bReports?[- ]?(${list})${suffix}`, "iu").exec(unit);
-  if (!match) return null;
-  const kind = snapshot ? "snapshot" : "report";
-  const expected = snapshot ? stamps.readableSnapshots : stamps.readable;
-  const numbers = [...match[1].matchAll(/\d+/gu)].map(member => Number(member[0])).sort((a, b) => a - b);
-  return { kind, expected, numbers, ok: JSON.stringify(numbers) === JSON.stringify(expected), start: match.index, end: match.index + match[0].length };
+  const results = [];
+  const claimed = [];
+  const overlaps = (start, end) => claimed.some((span) => start < span.end && end > span.start);
+  const addAll = (kind, expected, patterns) => {
+    for (const pattern of patterns) {
+      for (const match of unit.matchAll(pattern)) {
+        const start = match.index;
+        const end = start + match[0].length;
+        if (overlaps(start, end)) continue;
+        claimed.push({ start, end });
+        const numbers = [...match[1].matchAll(/\d+/gu)].map((member) => Number(member[0])).sort((a, b) => a - b);
+        results.push({ kind, expected, numbers, ok: JSON.stringify(numbers) === JSON.stringify(expected), start, end });
+      }
+    }
+  };
+  addAll("snapshot", stamps.readableSnapshots, [
+    new RegExp(`${prefix}Snapshots?[- ]?(${list})`, "giu"),
+    new RegExp(String.raw`\bSnapshots?[- ]?(${list})${suffix}`, "giu"),
+  ]);
+  addAll("screen", stamps.readableScreens, [
+    new RegExp(`${prefix}Screen(?:\\s+reports?|\\s+schema)?[- ]?(${list})`, "giu"),
+    new RegExp(String.raw`\bScreen(?:\s+reports?|\s+schema)?[- ]?(${list})${suffix}`, "giu"),
+    new RegExp(String.raw`\bscreen\s+readers?\b[^.;]{0,40}?\bversions?\s+(${list})`, "giu"),
+  ]);
+  addAll("report", stamps.readable, [
+    new RegExp(`${prefix}(?:Report[- ]?)?(${list})`, "giu"),
+    new RegExp(String.raw`\bReports?[- ]?(${list})${suffix}`, "giu"),
+  ]);
+  return results;
 }
 
 /** Structured issues: `{ file, line, kind, number, unit, message }`, one per stale mention. */
@@ -257,16 +284,18 @@ export function scanIssues(file, text, stamps) {
   const issues = [];
   for (const { unit, paragraph, offset, line } of unitsOf(text)) {
     const sentence = unit.trim();
-    const readable = readableSetOk(unit, stamps);
-    if (readable && !readable.ok) {
-      issues.push({
-        file, line, kind: "readable", number: readable.numbers.join(","), unit: sentence,
-        message: `${file}:${line}: names the readable ${readable.kind} set ${readable.numbers.join(" and ")}, but the package reads ${readable.expected.join(" and ")}: ${sentence}`,
-      });
+    const readables = readableSetsIn(unit, stamps);
+    for (const readable of readables) {
+      if (!readable.ok) {
+        issues.push({
+          file, line, kind: "readable", number: readable.numbers.join(","), unit: sentence,
+          message: `${file}:${line}: names the readable ${readable.kind} set ${readable.numbers.join(" and ")}, but the package reads ${readable.expected.join(" and ")}: ${sentence}`,
+        });
+      }
     }
     for (const mention of mentionsIn(unit, paragraph, offset)) {
       if (mention.number === stamps[mention.kind]) continue;
-      if (readable && mention.kind === readable.kind && mention.at >= readable.start && mention.at <= readable.end) continue;
+      if (readables.some((readable) => mention.kind === readable.kind && mention.at >= readable.start && mention.at <= readable.end)) continue;
       // A stated legacy reader claim is an actual capability, not merely a historical mention.
       if (mention.kind === "snapshot" && /\blegacy\s+(?:[\w-]+\s+)?$/iu.test(unit.slice(0, mention.start))
         && /^\s+(?:is|remains?|stays?)\s+readable\b/iu.test(unit.slice(mention.at + String(mention.number).length))) {
@@ -401,7 +430,7 @@ function main(args) {
   }
   const result = checkDocsTruth({ packageDir, docsRoot: options.docsRoot ?? packageDir, extra: options.extra, pending: release ? [] : pending });
   const { stamps } = result;
-  const summary = `report ${stamps.report} (reads ${stamps.readable.join(", ")}), snapshot ${stamps.snapshot}, context pack ${stamps.context}, comparison ${stamps.comparison}, configuration contract ${stamps.config}`;
+  const summary = `report ${stamps.report} (reads ${stamps.readable.join(", ")}), snapshot ${stamps.snapshot}, screen ${stamps.screen} (reads ${stamps.readableScreens.join(", ")}), context pack ${stamps.context}, comparison ${stamps.comparison}, configuration contract ${stamps.config}`;
   if (!result.valid) {
     process.stderr.write(`docs truth: FAILED against the built package (${summary})\n${result.issues.map((issue) => `  - ${issue}`).join("\n")}\n`);
     return 1;

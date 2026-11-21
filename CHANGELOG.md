@@ -1,24 +1,74 @@
 # Changelog
 
-## Unreleased
+## 0.11.0 — TBD-at-tag
 
-Development and CI only; nothing in the published package changed.
+Print measurement improvements, Screen Profile v2 (`PublicScreenReport` schema 2), CLI subcommands
+for existing public APIs, Round-8 report-surface follow-ups (`G-148`–`G-151`), and the
+`puppeteer-core@25.16.0` consumer-pin update.
 
-- Correction to the 0.2.0 entry, which said the runtime and full development graphs "audit to zero
-  known advisories": that was true when written and stopped holding for the development graph on
-  2026-10-23, when GHSA-mrhx-c7xc-m3w5 (zod below 4.6.6, reached through puppeteer-core 25.8.0 →
-  chromium-bidi 17) and four fast-uri advisories below 3.1.9 were published. The runtime graph was
-  not affected. The lockfile now resolves puppeteer-core 25.16.0 (zod 4.6.7) and fast-uri 3.1.9;
-  package.json is unchanged. The consumer pin `puppeteer-core@25.8.0` moves with the next release;
-  `SECURITY.md` records the interim disposition and why breaklint's CDP launch never loads zod.
-- `npm run test:advisories` separates an advisory (exit 1, now naming each package, its GHSA ids,
-  the chain that pulls it in and whether a fix exists) from an audit that did not run (exit 75:
-  unreachable registry, unparseable answer or its time limit), which it previously reported as an
-  advisory. Each npm audit call is time-limited. A self-test classifies recorded npm outputs and
-  runs real npm audit against a closed loopback port.
-- `.github/dependabot.yml` configures Dependabot security updates as lockfile-only pull requests;
-  version updates stay off. The advisory check fails if the configuration or its strategy is
-  removed.
+### Print profile
+- **Runtime-verified figure index**: non-executing data scripts (`<script type="application/ld+json">`,
+  `<script type="application/json">`) no longer mark a document `scriptBearing`. Documents with
+  executable scripts or inline `on*` handlers unlock `figure/caption-separated` and
+  `figure/dangling-reference` only when the pre-pagination `MutationObserver` observes zero script
+  mutations, post-pagination mutations remain at baseline, `data-bl-*` attributes are untouched,
+  and both the DOM element count and the pre-pagination figure/ID/anchor/reference-link tree
+  fingerprint match the static `parse5` source tree exactly. Any DOM mutation or structural
+  disqualifier (`<base>`, authored `data-ref` / `data-next-break-before`) remains strictly fail-closed.
+- **Tables with simple regular `colspan` rows**: `layout/table-header-not-repeated` and
+  `layout/table-column-drift` now measure tables whose rows have `rowSpan === 1` and uniform total
+  column width (supporting full-width group/separator rows and grouped headers). Irregular spans
+  and `rowSpan > 1` remain explicitly declined (`env/table-structure-unsupported`).
+- **Implicit `/favicon.ico` & post-PDF OOF freeze**: unreferenced browser-default `/favicon.ico`
+  requests (`resourceType === "other"` without an authored `<link rel="icon">` or asset) receive
+  `204 No Content` instead of blocking the document; explicitly referenced `/favicon.ico` and
+  stylesheet/script/image requests remain strictly fail-closed (`403`). Chrome's post-`page.pdf()`
+  out-of-flow (`position: absolute`) coordinate-cache artifact is tolerated only when `offsetParent`,
+  computed `left`/`top`, element dimensions, fragmentainer residue (`0`), and DOM mutations (`0`)
+  are all verified unchanged.
+- **Evidence binding (`G-78` & bottom-edge zero-height wrappers)**: confirmed parity-blank pages
+  with zero flow blocks, zero unplaced marks, zero stray `BLSID*` tokens in the PDF text stream,
+  and verified document-level mark conformance now bind cleanly (`pdfConformance: "verified"`).
+  Zero-height opening wrapper fragments flush with `areaBox.bottom` inside the physical page box
+  (outside `.pagedjs_footnote_area`) are placed instead of emitting false
+  `env/evidence-fragment-outside-page`.
+
+### Screen profile (`checkPage`, `PublicScreenReport` schema 2)
+- **Screen schema 2** (`SCREEN_REPORT_SCHEMA_VERSION = 2`): `createContextPack()`, `renderReport()`,
+  and `writeReportBundle()` accept both screen schema 1 and schema 2.
+- **CSS Color 4 & geometry-correct paint evaluation**: `parseCssColorAlpha()` parses CSS Color 3
+  and CSS Color 4 solid colors (`oklch()`, `oklab()`, `lab()`, `lch()`, `hwb()`, `color(srgb|display-p3|...)`,
+  modern space+`/` alpha, `%` alpha, `none`, `transparent`). Semi-transparent opacity (`0 < opacity < 1`),
+  `filter`, and `backdrop-filter` are measured normally for geometry rules; `opacity: 0` stays
+  `evidence/target-not-visible`, and `mask-image`, `clip-path`, `clip`, unsupported transforms, and
+  running animations stay `not-measured`.
+- **Stabilization loop & structured drift diff**: `checkPage()` waits for two consecutive identical
+  layout samples within `stabilizationTimeoutMs` and reports concrete drifted fields/selectors in
+  `capture.driftDetails` and the `screen-capture-drift` diagnostic detail.
+- **Framework-agnostic output receipts**: `verifyOutputReceipt()` accepts both legacy Next.js
+  schema 1 (`.next/BUILD_ID`) and generic output-directory manifests in schema 2 (`buildId`,
+  optional `buildMarkerPath`, `files`, `filesSha256`).
+- **New screen rules, full-page coverage & exception scopes**: adds `web/sibling-overlap` (`warn`,
+  uncalibrated, HTML siblings only), `web/svg-text-overflows-viewport` (`error`, uncalibrated),
+  full-page target coverage in `css-document-pixels` when `output.screenshot === "full-page"`,
+  opt-in `web/small-text` and `web/small-touch-target` (`geometry.rules`, `warn`, uncalibrated),
+  and `scope: "scenario" | "suite"` on `NamedScreenException` (suppressing per-scenario
+  `screen-exception-unused` noise for suite-scoped exceptions while preserving counts).
+
+### CLI, Report surfaces & Security
+- **CLI subcommands**: adds `breaklint compare`, `breaklint context`, and `breaklint bundle`
+  exposing `compareReports()`, `createContextPack()`, and `writeReportBundle()` directly from the
+  command line.
+- **Round-8 report follow-ups (`G-148`–`G-151`)**: adds explicit `decline`/`declines` units in
+  run facts, singular `1 applicable evaluation` accounting grammar, `"No candidates"` result labels
+  for zero-candidate coverage rows, inside/outside coverage-base tags on declined candidates,
+  state-qualified finding-gate wording and partial-run table captions, mono slash-only wrapping for
+  rule/reason IDs in Next checks and Declined candidates, page-consistent fixture evidence, partner
+  cross-references on ambiguous findings, and print hiding of `.finding-navigation`.
+- **Consumer pin update (`SECURITY.md`)**: raises `peerDependencies["puppeteer-core"]` from
+  `>=25.8.0 <26` to `>=25.16.0 <26` and moves the Action, CI, release workflow, and documented
+  install commands to `puppeteer-core@25.16.0`, closing the `GHSA-mrhx-c7xc-m3w5` consumer-pin
+  exception. Also retains the `npm run test:advisories` and lockfile-only Dependabot checks.
 
 ## 0.10.0 — 2026-10-08
 

@@ -13,7 +13,7 @@ are deliberately not exported. Document renderer peers remain optional for scree
 | Configuration | 1 | Existing generated `breaklint/config.schema.json` |
 | Producer record | `studio-producer-record-v1` | Host-launched producer, FD 3, captured bytes |
 | Declared source manifest | 1 | Matching-byte declaration; never producer authority |
-| Screen report | 1 | `profileKind: "screen"`, route/viewport/scenario geometry |
+| Screen report | 2 | `profileKind: "screen"`, route/viewport/scenario geometry; readers accept Screen 1 and 2 |
 | Screen options | 1 | Closed runtime validation and exported `SCREEN_OPTIONS_SCHEMA` |
 | AI context pack | 2 | Bounded projection of one canonical report |
 | Report comparison | 1 | Explicit continuity decisions between two reports |
@@ -120,11 +120,20 @@ the scenario; the adapter records current route, viewport, browser and screensho
 `trust: "host-controlled-page"` and `networkPolicy: "host-owned"` explicitly retain the caller's
 authority. Document text cannot authorize new network access.
 
-The `web-geometry-v1` semantics cover unexpected horizontal overflow and content cut by rectangular
-clipping ancestors. Named allowed scroll containers and intentional overlays retain reasons and match
-counts. Hidden/off-viewport nodes are exclusions, not positive repairs; inert/ARIA alone do not hide
-geometry. Non-axis-aligned transforms, unsupported paint, opacity other than 1, active animations,
-capture drift, font timeout and truncated inventory prevent a clean claim.
+The `web-geometry-v2` semantics (`PublicScreenReport` schema 2; readers accept Screen 1 and 2) cover
+unexpected horizontal overflow, content cut by rectangular clipping ancestors, visible HTML sibling
+overlap (`web/sibling-overlap`), SVG text extending past its viewport (`web/svg-text-overflows-viewport`),
+and opt-in typography/touch-target advisories (`web/small-text`, `web/small-touch-target`). When
+`output.screenshot` is `"full-page"`, targets across the full document height are measured in
+`css-document-pixels`; viewport screenshots measure the visible viewport in `css-viewport-pixels`.
+Named allowed scroll containers and intentional overlays retain reasons, match counts, and optional
+`scope: "scenario" | "suite"` metadata. Hidden/off-viewport nodes are exclusions, not positive repairs;
+inert/ARIA alone do not hide geometry. CSS Color 4 solid colors (`oklch()`, `oklab()`, `lab()`, `lch()`,
+`hwb()`, `color(...)`) are parsed for alpha visibility; semi-transparent opacity (`0 < opacity < 1`),
+`filter`, and `backdrop-filter` do not disqualify geometry rules, while `opacity: 0` stays
+`evidence/target-not-visible`. Non-axis-aligned transforms, masks, clip-paths, active animations,
+capture drift (reported via `capture.driftDetails` after the bounded stabilization loop), font timeout,
+and truncated inventory prevent a clean claim.
 
 DS_OS reuses its existing authenticated E2E navigation, scenario fixtures and five viewports. The
 shared overflow harness adds canonical breaklint diagnostics while retaining its independent width
@@ -133,8 +142,11 @@ retain missing/skipped/aborted attempts and retry inconsistencies. This is herme
 not a backend correctness, live operational-state or human usability claim.
 
 Its production build records sorted source/config/lock file hashes. A generated build ID is compiled
-into `<meta name="breaklint-build">`; sources are checked again after `next build`. Completed builds
-record the compiled output inventory as a separate receipt. The fixed `host-build-container` adapter
+into `<meta name="breaklint-build">`; sources are checked again after the build. Completed builds
+record the compiled output inventory as a separate receipt: output-receipt version 1
+(`.next/BUILD_ID` for Next.js) or framework-agnostic output-receipt version 2 (`buildId`, optional
+`buildMarkerPath`, `files`, `filesSha256` for static, Vite, Astro, or custom builds). The fixed
+`host-build-container` adapter
 requires both `receiptPath` and `buildOutputReceiptPath`, and verifies current source bytes,
 compiled output bytes and the page ID before/after capture. Preparing a build invalidates previous
 receipts; only a successful, unchanged build creates completed receipts. Symlinked sources, receipt

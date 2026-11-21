@@ -4,6 +4,36 @@ This page exists because the alternative is worse. A layout checker whose green 
 nothing is more dangerous than no checker at all, so what has been measured and what has not is
 stated here rather than left to be inferred from a passing test suite.
 
+## Version 0.11.0: candidate scope (release preparation)
+
+Version 0.11.0 keeps the 17 registered print rules (12 enabled by default), Report 5 (readers accept
+Report 4 and 5), context pack 2, comparison 1 and Configuration Contract 1 unchanged. Snapshot 7
+remains the live measurement stamp (readers accept Snapshot 5, 6 and 7). `PublicScreenReport` moves
+to `schemaVersion: 2` (`SCREEN_REPORT_SCHEMA_VERSION = 2`); screen readers accept versions 1 and 2.
+
+Print improvements: runtime-verified figure-index unlock for non-executing data scripts and
+mutation-free executable scripts / `on*` handlers (verified against `MutationObserver`, exact
+DOM element-count parity, and static-to-runtime figure/ID/anchor/reference-link tree parity; any
+mutation or structural disqualifier stays fail-closed), simple regular `colspan` table rows in
+`layout/table-header-not-repeated` and `layout/table-column-drift`, unreferenced `/favicon.ico`
+`204 No Content` handling (explicitly linked `/favicon.ico` stays fail-closed), strict verification
+of Chrome's post-`page.pdf()` out-of-flow coordinate-cache artifact, `G-78` parity-blank page
+evidence verification, and bottom-edge zero-height wrapper placement.
+
+Screen profile v2 (`checkPage`, `schemaVersion: 2`): CSS Color 4 alpha parsing (`oklch()`,
+`oklab()`, `lab()`, `lch()`, `hwb()`, `color(...)`), geometry-correct paint evaluation under
+semi-transparent opacity (`0 < opacity < 1`), `filter`, and `backdrop-filter` (`opacity: 0`, masks,
+clip-paths, unsupported transforms and running animations remain `not-measured`), stabilization loop
+with structured `capture.driftDetails`, framework-agnostic build output receipts (`schemaVersion: 2`
+alongside legacy Next.js `schemaVersion: 1`), full-page target coverage (`css-document-pixels`),
+`web/sibling-overlap`, `web/svg-text-overflows-viewport`, opt-in `web/small-text` and
+`web/small-touch-target`, and `scope: "scenario" | "suite"` on named screen exceptions.
+
+CLI & surfaces: adds `breaklint compare`, `breaklint context`, and `breaklint bundle`; addresses
+Round-8 report follow-ups (`G-148`–`G-151`); raises the `puppeteer-core` peer floor to
+`>=25.16.0 <26` and consumer pin to `puppeteer-core@25.16.0`. No rule or profile is human-calibrated
+(`calibrated: false` everywhere). Report-surface sight review for 0.11.0 is pending before tagging.
+
 ## Version 0.10.0: behavior and bounded evaluation
 
 Version 0.10.0 registers 17 rules, with 12 enabled by default. Two new default-off table
@@ -667,7 +697,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=768 aggregateTests=934 liveTests=116 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=781 aggregateTests=947 liveTests=122 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against

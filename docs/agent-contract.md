@@ -24,13 +24,13 @@ Always check the process exit code before inspecting findings. Never interpret m
 When breaklint exits with code 4, the report may show zero findings (`findings: []`). **This is not a clean pass.**
 Exit 4 does not require a decline: `--only layout/widow --disable layout/widow` leaves no rule to run and ends exit 4 with "no rule measured a single candidate". Where candidates were declined, `documents[].coverage` shows the rule below its floor and `documents[].notMeasured[].reason` names why, as an `env/` id. The two `error` rules require full coverage in the default profile, so one decline by either of them is enough: `layout/unbreakable-block-too-tall` declines on `env/multicolumn`, `env/vertical-writing` or `env/invalid-measurement` (a split block whose fragments cannot be joined by source id, or a printed block with no box of its own), and `svg/text-overflows-viewport` on `env/svg-not-inline`, `env/svg-no-text`, `env/svg-too-many-text-targets`, `env/svg-ctm-unavailable`, `env/svg-viewport-geometry-unsupported` or `env/svg-painted-bounds-unsupported`. Each list is complete for its rule; `tests/unit/agent-contract.test.ts` fails when a rule declares a coverage-relevant reason this page does not list. A target that is out of scope altogether — `env/svg-overflow-visible` — does not count against coverage.
 
-**The CLI does not write a `context.json`.** `--format` offers `json | sarif | console | html | junit | markdown` and nothing else; the context pack exists only through the library call `writeReportBundle(report, {outDir})`, which writes `report.json`, `context.json`, `report.html`, `bundle.json` and the verified `assets/` together (see `docs/reporting.md`). If you are driving the CLI, `report.json` is your only machine-readable surface, and everything below that names a `context.json` field names a projection you must produce yourself.
+**Document runs do not write `context.json` directly.** `--format` on a document check offers `json | sarif | console | html | junit | markdown` and nothing else; produce the bounded context pack from a saved report JSON with `breaklint context <report.json>` (or `breaklint bundle <report.json> --out-dir <dir>` / the library call `writeReportBundle(report, {outDir})`, which writes `report.json`, `context.json`, `report.html`, `bundle.json` and the verified `assets/` together — see `docs/reporting.md`). On a direct document check, `report.json` is the canonical machine-readable surface.
 
 ---
 
 ## 2. Stable vs. Ephemeral Contract Fields
 
-Breaklint's canonical output is `report.json`. `context.json` is a bounded projection of it, written only by `writeReportBundle` — never by the CLI. Key on stable fields; never rely on ephemeral ones:
+Breaklint's canonical output is `report.json`. `context.json` is a bounded projection of it, produced from `report.json` via `breaklint context`, `breaklint bundle`, `createContextPack`, or `writeReportBundle`. Key on stable fields; never rely on ephemeral ones:
 
 | Field | Stability | Purpose & Safe Usage |
 |:---|:---:|:---|

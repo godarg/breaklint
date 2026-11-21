@@ -20,10 +20,12 @@ const result = await checkPage(page, {
   trust: "host-controlled-page",
   networkPolicy: "host-owned",
   scenario: "signed-in-dashboard",
+  stabilizationTimeoutMs: 500,
   output: { dir: "artifacts/breaklint", screenshot: "viewport" },
   geometry: {
-    allowedScrollContainers: [{ selector: "[data-grid]", reason: "wide data grid" }],
+    allowedScrollContainers: [{ selector: "[data-grid]", reason: "wide data grid", scope: "suite" }],
     intentionalOverlays: [{ selector: "[role=dialog]", reason: "open modal" }],
+    rules: { smallText: true, smallTouchTarget: true },
   },
 });
 ```
@@ -32,15 +34,23 @@ The option object is closed: unknown fields, unbounded target counts, malformed 
 and any trust/network value other than the two literals above are rejected before the adapter calls
 the page. `SCREEN_OPTIONS_SCHEMA` is the matching exported input schema for tooling.
 
-Screen reports are discriminated by `profileKind: "screen"`; they do not contain Paged.js pages or
-PDF coordinates. They record the sanitized route, current viewport and scroll coordinate system,
-browser version, before/stable/after capture signatures, actual PNG hash and dimensions, target
+Screen reports are discriminated by `profileKind: "screen"` and emit `schemaVersion: 2` (readers
+accept Screen 1 and 2); they do not contain Paged.js pages or PDF coordinates. They record the
+sanitized route, current viewport and coordinate system (`css-viewport-pixels` for viewport captures
+or `css-document-pixels` for `"full-page"` captures), browser version, before/stable/after capture
+signatures with structured `capture.driftDetails` on drift, actual PNG hash and dimensions, target
 evaluations (including healthy, excluded, and not-measured targets), coverage counts, and typed
-events. The first screen profile measures only unexpected horizontal overflow and content visibly
-cut by rectangular `overflow: hidden` or `clip` ancestors. Ordinary vertical scrolling and general
-visual occlusion are outside this measurement contract.
+events. Screen profile v2 checks unexpected horizontal overflow, content visibly cut by rectangular
+`overflow: hidden` or `clip` ancestors, visible HTML sibling overlap (`web/sibling-overlap`), SVG text
+overflowing its viewport (`web/svg-text-overflows-viewport`), and opt-in `web/small-text` /
+`web/small-touch-target` warnings. CSS Color 4 solid colors (`oklch()`, `oklab()`, `lab()`, `lch()`,
+`hwb()`, `color(...)`), semi-transparent opacity (`0 < opacity < 1`), `filter`, and `backdrop-filter`
+are measured normally for geometry; `opacity: 0`, masks, clip-paths, unsupported transforms, and
+running animations stay excluded or `not-measured`. Ordinary vertical scrolling and general visual
+occlusion are outside this measurement contract.
 
-Visible source containers can optionally be verified against a host build receipt. This does not
+Visible source containers can optionally be verified against a host build receipt (Next.js output
+receipt version 1 or framework-agnostic output receipt version 2). This does not
 accept a caller claim of being bound: breaklint captures the receipt and its declared root-relative
 source/config/lock files before and after the screenshot, checks every digest and inventory digest,
 then checks the rendered build ID meta element. A verified result is only
