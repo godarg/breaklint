@@ -230,6 +230,26 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
       return node.checkVisibility() && !node.checkVisibility({ contentVisibilityAuto: true });
     };
 
+    // Effective opacity of a target: opacity and every filter opacity() multiplied along the
+    // ancestor chain. null when a value is not a finite number in [0, 1] (fail closed).
+    const filterOpacityRe = /opacity\(\s*([^)]*?)\s*\)/giu;
+    const effectiveOpacity = (node: Element): number | null => {
+      let product = 1;
+      for (let part: Element | null = node; part; part = part.parentElement) {
+        const ps = getComputedStyle(part);
+        const op = Number(ps.opacity);
+        if (!Number.isFinite(op) || op < 0 || op > 1) return null;
+        product *= op;
+        for (const match of ps.filter.matchAll(filterOpacityRe)) {
+          const raw = match[1]!;
+          const value = raw.endsWith("%") ? Number(raw.slice(0, -1)) / 100 : Number(raw);
+          if (raw === "" || !Number.isFinite(value) || value < 0) return null;
+          product *= Math.min(1, value);
+        }
+      }
+      return product;
+    };
+
     const rectsByNode = new Map<Element, DOMRect>();
     const stylesByNode = new Map<Element, CSSStyleDeclaration>();
     const statesByNode = new Map<Element, "candidate" | "excluded" | "not-measured">();
@@ -254,6 +274,7 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
 
       let state: "candidate" | "excluded" | "not-measured" = "candidate"; let reason: string | null = null; let paint: string | null = null;
       if (style.display === "none" || style.visibility === "hidden" || !!node.closest("dialog:not([open])") || notRendered(node)) { state = "excluded"; reason = "target/not-rendered"; }
+      else if (effectiveOpacity(node) === 0) { state = "excluded"; reason = "target/not-visible"; }
       else if (style.position === "absolute" && box && box.width <= 1 && box.height <= 1 && (style.clip !== "auto" || style.clipPath !== "none")) { state = "excluded"; reason = "target/visually-hidden"; }
       else if (!box || box.width === 0 || box.height === 0 || contained(visibleArea, checkRect) === "outside") { state = "excluded"; reason = "target/off-viewport"; }
       else if (skippedByContentVisibilityAuto(node)) { state = "excluded"; reason = "target/not-rendered"; }
@@ -272,18 +293,13 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
       const targetAncestorSignatureComplete = chain.length <= 65;
       if (!targetAncestorSignatureComplete) ancestorSignatureComplete = false;
 
+      if (state === "candidate" && effectiveOpacity(node) === null) {
+        state = "not-measured"; reason = "evidence/paint-unsupported"; paint = reason;
+      }
       if (state === "candidate") {
-        let effectiveOpacity = 1;
         for (const part of chain) {
           const ps = getComputedStyle(part);
-          const op = Number(ps.opacity);
-          if (!Number.isFinite(op) || op < 0 || op > 1) {
-            state = "not-measured"; reason = "evidence/paint-unsupported"; paint = reason; break;
-          }
-          effectiveOpacity *= op;
-          if (effectiveOpacity === 0 || /\bopacity\(\s*0+(?:\.0+)?%?\s*\)/iu.test(ps.filter)) {
-            state = "not-measured"; reason = "evidence/target-not-visible"; paint = reason; break;
-          }
+          // Effective opacity 0 was excluded above as target/not-visible.
           // Geometry rules remain valid under semi-transparent opacity (0 < opacity < 1), filter,
           // and backdrop-filter; only geometry-altering masks, clip-paths, unsupported transforms,
           // and running animations stay not-measured.

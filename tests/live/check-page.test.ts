@@ -111,7 +111,7 @@ describe("screen checkPage host-page adapter, live", () => {
     assert.ok(allowed.report.evaluations.some((entry) => entry.target.selector === "#target" && entry.ruleId === "web/content-clipped" && entry.reason === "target/allowed-scroll-container"));
   });
 
-  it("measures semi-transparent opacity, filter, backdrop-filter, and CSS Color 4 while keeping opacity:0 and clip-path fail-closed", async (t) => {
+  it("measures semi-transparent opacity, filter, backdrop-filter, and CSS Color 4, excludes effectively invisible targets, and keeps clip-path fail-closed", async (t) => {
     if (missingBrowser && optional) return t.skip("missing browser");
     const okResult = await inspect(
       '<div id="faded" style="opacity:.5;filter:drop-shadow(0 2px 4px rgba(0,0,0,.2));backdrop-filter:blur(4px);color:oklch(0.45 0.12 240 / 0.85);background:color(display-p3 0.9 0.95 1 / 80%)">modern paint geometry</div>',
@@ -121,10 +121,22 @@ describe("screen checkPage host-page adapter, live", () => {
     assert.equal(okResult.report.schemaVersion, 2);
     assert.equal(okResult.report.runVerdict, "clean");
 
+    // opacity: 0 (or filter: opacity(0), multiplied along the ancestor chain) is not visible: the
+    // target is excluded, never a coverage gap, and never binds a finding.
     const zeroOpacity = await inspect('<div id="invisible" style="opacity:0">invisible text</div>', "opacity-zero");
-    assert.equal(zeroOpacity.ok, false);
-    assert.equal(zeroOpacity.report.runVerdict, "insufficient-coverage");
-    assert.ok(zeroOpacity.report.evaluations.some((entry) => entry.target.selector === "#invisible" && entry.status === "not-measured" && entry.reason === "evidence/target-not-visible" && entry.evidenceBound === false));
+    assert.equal(zeroOpacity.ok, true);
+    assert.equal(zeroOpacity.report.runVerdict, "clean");
+    assert.ok(zeroOpacity.report.evaluations.filter((entry) => entry.target.selector === "#invisible").every((entry) => entry.status === "excluded" && entry.reason === "target/not-visible" && entry.evidenceBound === false));
+
+    const filteredChain = await inspect(
+      '<div style="opacity:.5"><div style="filter:blur(1px) opacity(0%)"><div id="deep-invisible" style="width:100px;overflow:hidden;white-space:nowrap">invisible clipped text far wider than its box</div></div></div>' +
+      '<div id="half-filter" style="filter:opacity(.5);width:100px;overflow:hidden;white-space:nowrap">half visible clipped text far wider than its box</div>',
+      "filter-opacity-chain",
+    );
+    assert.ok(filteredChain.report.evaluations.filter((entry) => entry.target.selector === "#deep-invisible").every((entry) => entry.status === "excluded" && entry.reason === "target/not-visible"));
+    assert.equal(filteredChain.report.findings.some((f) => f.target.selector === "#deep-invisible"), false);
+    // Positive control: half opacity through filter stays measured, its defect is found.
+    assert.ok(filteredChain.report.findings.some((f) => f.target.selector === "#half-filter" && f.ruleId === "web/content-clipped"));
 
     const clipPath = await inspect('<div id="clipped-shape" style="clip-path:inset(10px)">clipped shape</div>', "clip-path-control");
     assert.equal(clipPath.ok, false);
@@ -380,15 +392,15 @@ describe("screen checkPage host-page adapter, live", () => {
     assert.equal(broadRes.report.runVerdict, "insufficient-coverage");
     assert.equal(broadRes.report.coverage.measured, 0);
 
-    // filter: opacity(0) must be classified evidence/target-not-visible (not-measured), never bindsFinding=true (Codex #6).
+    // filter: opacity(0) is excluded as target/not-visible and never binds a finding (Codex #6).
     const hiddenFilter = await inspect(
       '<button id="ghost" style="width:16px;height:16px;filter:opacity(0)">x</button>',
       "filter-opacity-zero-not-visible",
       { rules: { smallTouchTarget: { minSizePx: 24 } } },
     );
-    assert.equal(hiddenFilter.ok, false);
-    assert.equal(hiddenFilter.report.runVerdict, "insufficient-coverage");
-    assert.ok(hiddenFilter.report.evaluations.some((e) => e.target.selector === "#ghost" && e.status === "not-measured" && e.reason === "evidence/target-not-visible"));
+    assert.equal(hiddenFilter.ok, true);
+    assert.equal(hiddenFilter.report.runVerdict, "clean");
+    assert.ok(hiddenFilter.report.evaluations.some((e) => e.target.selector === "#ghost" && e.status === "excluded" && e.reason === "target/not-visible"));
     assert.equal(hiddenFilter.report.findings.some((f) => f.target.selector === "#ghost"), false);
   });
 });
