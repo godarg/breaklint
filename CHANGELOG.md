@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.11.1 — TBD-at-tag
+## 0.11.1 — 2026-11-21
 
 The first 0.11 release on npm; changes are listed against 0.10.0. 0.11.0 was tagged but never
 published to npm, so the Action pinned to `@v0.11.0` fails with its default installation
