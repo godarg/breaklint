@@ -47,13 +47,28 @@ export function assessHumanGate(ledger: ReviewLedger, manifest: unknown, current
 export function assertCurrentDelegationRelease(latest: ReviewRound, reviewInputRoot?: string): void;
 export function assessSightGate(ledger: ReviewLedger, manifest: unknown, currentFingerprint: string, reviewInputRoot?: string): { latest: ReviewRound; reviewKind: "human" | "delegatedAI" };
 
-export interface FounderSightDelegation {
+export const LEGACY_LEDGER_ROUNDS: number;
+export const DELEGATION_STATEMENT: string;
+export const EXTERNAL_RECEIPT_PREFIX: string;
+
+/** Rounds 1–9: the verbatim session quote, as recorded. */
+export interface LegacyFounderSightDelegation {
   founder: "@Founder";
   date: string;
   sessionQuote: string;
   release: string;
   revoked: false;
 }
+/** From round 10 on: the quote's SHA-256 and the fixed neutral statement, never the quote. */
+export interface HashedFounderSightDelegation {
+  founder: "@Founder";
+  date: string;
+  sessionQuoteSha256: string;
+  statement: string;
+  release: string;
+  revoked: false;
+}
+export type FounderSightDelegation = LegacyFounderSightDelegation | HashedFounderSightDelegation;
 export interface DelegatedAIReviewer {
   kind: "delegated-ai";
   handle: string;

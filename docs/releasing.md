@@ -204,15 +204,22 @@ and complete physical inventory. `assessHumanGate` remains human-only: only `@Br
 
 Ledger schema 6 additionally permits `kind: "delegated-ai"` for a sight review explicitly
 delegated by the Founder for that release. The round carries `founder: "@Founder"`, the date,
-verbatim session quote, a concrete stable release version (for example `release: "0.10.0"`)
-and `revoked: false`. A version field records the scope of the actual session authorization;
+a concrete stable release version (for example `release: "0.10.0"`) and `revoked: false`.
+Rounds 1–9 also carry the verbatim session quote (`sessionQuote`) and stay as recorded. From
+round 10 on, the public ledger carries no quote: `sessionQuoteSha256` is the SHA-256 of the
+verbatim quote and `statement` is exactly `release-specific delegation recorded`; a round 10 or
+later with a `sessionQuote`, another statement or no hash is refused. A version field records the scope of the actual session authorization;
 it cannot grant authorization. The strict sight gate requires the latest delegated round's
 release to equal `package.json.version` in the bound review-input root. Historical 0.9.0
 rounds keep their original delegation and bytes; their votes do not approve a later release.
 This version-specific validation uses the existing schema-6 fields without a schema migration.
 The reviewer must have a
 nonhuman handle, a recorded nonUNKNOWN `actual_model`, prompt/output SHA-256 hashes, and a native
-receipt with path, SHA-256 and exact image count. Its closed `receivedImages` entries contain
+receipt with path, SHA-256 and exact image count. Rounds 1–9 committed their full native receipts
+under `tests/golden/report-surfaces/`; those files stay byte-identical to their ledger hashes, and no
+other receipt file may be added there. From round 10 on, the receipt itself (session telemetry)
+stays in the maintainers' evidence store outside this repository, and the ledger binds it as
+`maintainer-evidence:<relative path>` with its SHA-256 and image count. Its closed `receivedImages` entries contain
 exact `{path, sha256}` pairs for **every assigned full screen PNG, every screen tile and every A4
 page PNG**. PDF cells are judged through their complete matching raster sets; the receipt cannot
 substitute a PDF filename for unseen pages. Missing, extra, duplicate or differently hashed images

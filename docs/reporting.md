@@ -445,8 +445,10 @@ Reviewers are named for what they are, and the human roster is closed:
   move into a field of its own.
 
 Every passing cell must name a rostered `human` or `delegated-ai` reviewer of its round.
-A delegated AI record carries the release-specific Founder delegation, actual model identity
-from the native runner output, prompt/output hashes, a native receipt with image count, and
+A delegated AI record carries the release-specific Founder delegation (from round 10 on as the
+SHA-256 of the session quote and a fixed neutral statement, never the quote), actual model identity
+from the native runner output, prompt/output hashes, a native receipt with image count (from round
+10 on bound by path and SHA-256 in the maintainers' evidence store, not committed), and
 the exact path and SHA-256 of every assigned full-page PNG, tile and printed-page raster.
 The strict gate checks the complete received-image inventory and never calls this a human pass.
 Its latest delegated round must also name the package version in the bound review-input root;

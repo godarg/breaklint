@@ -267,15 +267,36 @@ function assertClosedFields(value, fields, label) {
   assert.deepEqual(Object.keys(value).sort(), [...fields].sort(), `${label}: fields must be exactly ${fields.join(", ")}`);
 }
 
+/**
+ * Rounds 1–9 were recorded with the Founder's verbatim session quote and with their full native
+ * receipts committed under tests/golden/report-surfaces/. They keep that shape and those bytes.
+ * From round 10 on, a public ledger records neither: the delegation carries the SHA-256 of the
+ * verbatim quote and one fixed neutral statement, and each native receipt is bound by path, SHA-256
+ * and image count in the maintainers' evidence store outside this repository. The cut is the round
+ * number, not the shape a writer chooses, so a new round cannot fall back to the old one.
+ */
+export const LEGACY_LEDGER_ROUNDS = 9;
+export const DELEGATION_STATEMENT = "release-specific delegation recorded";
+export const EXTERNAL_RECEIPT_PREFIX = "maintainer-evidence:";
+const EXTERNAL_RECEIPT_PATH = /^maintainer-evidence:(?!.*(?:^|\/)\.\.?(?:\/|$))[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9][A-Za-z0-9._-]*)*$/u;
+
 /** A delegation records the explicit session authorization; ledger data cannot grant it. */
 function assertDelegation(round, label) {
   assert.ok(round.delegation, `${label}: Founder delegation missing`);
-  assertClosedFields(round.delegation, ["founder", "date", "sessionQuote", "release", "revoked"], `${label} delegation`);
   const delegation = round.delegation;
+  if (round.round > LEGACY_LEDGER_ROUNDS) {
+    assert.ok(!Object.hasOwn(delegation, "sessionQuote"),
+      `${label}: the delegation carries a verbatim session quote; from round ${LEGACY_LEDGER_ROUNDS + 1} on the ledger records only sessionQuoteSha256 and the neutral statement`);
+    assertClosedFields(delegation, ["founder", "date", "sessionQuoteSha256", "statement", "release", "revoked"], `${label} delegation`);
+    assert.match(delegation.sessionQuoteSha256 ?? "", SHA256, `${label}: delegation sessionQuoteSha256 must be the SHA-256 of the verbatim session quote`);
+    assert.equal(delegation.statement, DELEGATION_STATEMENT, `${label}: delegation must carry exactly the neutral statement "${DELEGATION_STATEMENT}"`);
+  } else {
+    assertClosedFields(delegation, ["founder", "date", "sessionQuote", "release", "revoked"], `${label} delegation`);
+    assert.ok(typeof delegation.sessionQuote === "string" && delegation.sessionQuote.trim().length > 0, `${label}: delegation session quote missing`);
+  }
   assert.equal(delegation.founder, "@Founder", `${label}: delegation must name @Founder`);
   assert.match(delegation.date ?? "", /^\d{4}-\d{2}-\d{2}$/u, `${label}: delegation date missing`);
   assertUtcOrDate(delegation.date, `${label}: delegation date invalid`);
-  assert.ok(typeof delegation.sessionQuote === "string" && delegation.sessionQuote.trim().length > 0, `${label}: delegation session quote missing`);
   assert.match(delegation.release ?? "", /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u, `${label}: delegation must name a concrete stable release version`);
   assert.equal(delegation.revoked, false, `${label}: delegation is revoked or not explicitly active`);
   assert.equal(round.record, "current", `${label}: a delegated review must be a current record`);
@@ -284,7 +305,7 @@ function assertDelegation(round, label) {
   }
 }
 
-function assertDelegatedReviewer(reviewer, label) {
+function assertDelegatedReviewer(reviewer, label, roundNumber) {
   assert.match(reviewer.handle ?? "", AGENT_HANDLE, `${label}: delegated AI handle is malformed`);
   assert.ok(!HUMAN_REVIEW_ROLES.includes(reviewer.handle), `${label}: a delegated AI cannot carry the human review role ${reviewer.handle}`);
   assert.ok(typeof reviewer.actual_model === "string" && reviewer.actual_model.trim().length > 0 && !/^(?:(?:UNKNOWN|UNBEKANNT)\b|n\/a$)/iu.test(reviewer.actual_model.trim()),
@@ -294,6 +315,10 @@ function assertDelegatedReviewer(reviewer, label) {
   }
   assertClosedFields(reviewer.nativeReceipt, ["path", "sha256", "imageCount"], `${label} native receipt`);
   assert.ok(typeof reviewer.nativeReceipt.path === "string" && reviewer.nativeReceipt.path.trim().length > 0, `${label}: native receipt path missing`);
+  if (roundNumber > LEGACY_LEDGER_ROUNDS) {
+    assert.match(reviewer.nativeReceipt.path, EXTERNAL_RECEIPT_PATH,
+      `${label}: native receipt ${reviewer.nativeReceipt.path} must be bound as ${EXTERNAL_RECEIPT_PREFIX}<relative path>, kept outside the repository`);
+  }
   assert.match(reviewer.nativeReceipt.sha256 ?? "", SHA256, `${label}: native receipt SHA-256 missing`);
   assert.ok(Array.isArray(reviewer.receivedImages) && reviewer.receivedImages.length > 0, `${label}: received images missing`);
   assert.ok(Number.isSafeInteger(reviewer.nativeReceipt.imageCount) && reviewer.nativeReceipt.imageCount > 0, `${label}: native image count invalid`);
@@ -315,7 +340,7 @@ function assertDelegatedReviewer(reviewer, label) {
  * time did not name the reviewer, instead of inventing a name afterwards. No other field is
  * accepted, so an agent cannot pass as a human by moving its model label into a field of its own.
  */
-function assertReviewer(reviewer, label) {
+function assertReviewer(reviewer, label, roundNumber) {
   assert.ok(reviewer && typeof reviewer === "object", `${label}: reviewer entry missing`);
   assert.ok(Object.hasOwn(REVIEWER_FIELDS, reviewer.kind ?? ""), `${label}: reviewer kind must be human, agent or not-recorded; delegated-ai requires an explicit Founder delegation`);
   const allowed = REVIEWER_FIELDS[reviewer.kind];
@@ -323,7 +348,7 @@ function assertReviewer(reviewer, label) {
   assert.deepEqual(unknown, [], `${label}: a ${reviewer.kind} reviewer carries only ${allowed.join(" and ")}; unknown field ${unknown.join(", ")}` +
     (reviewer.kind === "human" && unknown.includes("model") ? " (a human reviewer does not carry a model label)" : ""));
   if (reviewer.kind === "delegated-ai") {
-    assertDelegatedReviewer(reviewer, label);
+    assertDelegatedReviewer(reviewer, label, roundNumber);
     assertClosedFields(reviewer, allowed, label);
   } else if (reviewer.kind === "human") {
     assert.ok(HUMAN_REVIEW_ROLES.includes(reviewer.handle),
@@ -430,7 +455,7 @@ export function validateReviewLedger(ledger, { cellCount = 32, now = Date.now() 
     }
     assert.ok(Array.isArray(round.reviewers), `${label}: reviewers missing`);
     assertDistinctReviewers(round.reviewers, label);
-    round.reviewers.forEach((reviewer, reviewerIndex) => assertReviewer(reviewer, `${label} reviewer ${reviewerIndex + 1}`));
+    round.reviewers.forEach((reviewer, reviewerIndex) => assertReviewer(reviewer, `${label} reviewer ${reviewerIndex + 1}`, round.round));
     if (round.reviewers.some((reviewer) => reviewer.kind === "delegated-ai")) assertDelegation(round, label);
     assert.ok(typeof round.note === "string" && round.note.trim().length >= 12, `${label}: note missing`);
     for (const key of ["blocker", "high", "medium", "low"]) {
