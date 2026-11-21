@@ -20,9 +20,9 @@ const result = await checkPage(page, {
   trust: "host-controlled-page",
   networkPolicy: "host-owned",
   scenario: "signed-in-dashboard",
-  stabilizationTimeoutMs: 500,
   output: { dir: "artifacts/breaklint", screenshot: "viewport" },
   geometry: {
+    stabilizationTimeoutMs: 500,
     allowedScrollContainers: [{ selector: "[data-grid]", reason: "wide data grid", scope: "suite" }],
     intentionalOverlays: [{ selector: "[role=dialog]", reason: "open modal" }],
     rules: { smallText: true, smallTouchTarget: true },
