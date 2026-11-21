@@ -9,7 +9,7 @@ export const REVIEW_LEDGER_SCHEMA_VERSION: number;
 export const REQUIRED_BROWSER_RENDER_ARGS: readonly string[];
 export const DECLARED_ENVIRONMENT_FIELDS: readonly string[];
 export const OBSERVED_ENVIRONMENT_FIELDS: readonly string[];
-export const HUMAN_REVIEW_ROLES: readonly string[];
+export const ROSTERED_REVIEW_ROLES: readonly string[];
 export const REVIEWER_AUTHENTICATION_NOTE: string;
 
 export interface ReviewInput {
@@ -26,13 +26,13 @@ export function assertReviewEnvironment(environment: unknown, label: string, opt
 export function assertObservedEnvironment(observed: unknown, label: string): void;
 export const REVIEW_TIME_SKEW_MS: number;
 export function validateReviewLedger(ledger: unknown, options?: { cellCount?: number; now?: number }): { rounds: number; latest: ReviewRound };
-export function isRosteredHuman(reviewer: unknown): boolean;
+export function isRosteredReviewer(reviewer: unknown): boolean;
 export function summarizeLatestRound(ledger: ReviewLedger): {
   latest: ReviewRound;
   reviewers: string[];
   passingCells: number;
-  humanPassingCells: number;
-  humanPass: boolean;
+  rosteredPassingCells: number;
+  rosteredPass: boolean;
   delegatedPassingCells: number;
   delegatedPass: boolean;
 };
@@ -43,9 +43,9 @@ export function latestBindingStatus(ledger: ReviewLedger, manifest: unknown, cur
   reason: string | null;
 };
 export function describeLatestRound(ledger: ReviewLedger, manifest: unknown, currentFingerprint: string): string;
-export function assessHumanGate(ledger: ReviewLedger, manifest: unknown, currentFingerprint: string): ReviewRound;
+export function assessRosterGate(ledger: ReviewLedger, manifest: unknown, currentFingerprint: string): ReviewRound;
 export function assertCurrentDelegationRelease(latest: ReviewRound, reviewInputRoot?: string): void;
-export function assessSightGate(ledger: ReviewLedger, manifest: unknown, currentFingerprint: string, reviewInputRoot?: string): { latest: ReviewRound; reviewKind: "human" | "delegatedAI" };
+export function assessSightGate(ledger: ReviewLedger, manifest: unknown, currentFingerprint: string, reviewInputRoot?: string): { latest: ReviewRound; reviewKind: "rostered" | "delegatedAI" };
 
 export const LEGACY_LEDGER_ROUNDS: number;
 export const DELEGATION_STATEMENT: string;

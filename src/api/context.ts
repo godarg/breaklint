@@ -12,7 +12,7 @@ import { READABLE_REPORT_SCHEMA_VERSIONS } from "../core/enums.ts";
  * Context-pack schema. 2 adds the required `whatWasNotMeasured` key and the `fingerprint`,
  * `source` and `remediation` keys on a finding card. A consumer that keys on the stamp can tell
  * the two shapes apart; without the bump it could not, and that is the failure this project has
- * paid for before (see docs/limitations.md on the schema-3 move).
+ * paid for before (see maintainers/burden-of-proof.md on the schema-3 move).
  */
 export const CONTEXT_SCHEMA_VERSION = 2;
 

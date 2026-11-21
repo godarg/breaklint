@@ -60,8 +60,8 @@ at your own HTML and the same chain measures a real page.
 
 This documentation describes **version 0.11.0**. The npm command below installs the registry's
 current `latest`; check the installed version with `npx breaklint --version`. Publication and
-verification records are in [status](docs/status.md), and the release procedure is in
-[releasing](docs/releasing.md). The [bounded human example evaluation](docs/evaluation-0.10.md)
+verification records are in [status](maintainers/status.md), and the release procedure is in
+[releasing](maintainers/releasing.md). The [bounded human example evaluation](maintainers/evaluation-0.10.md)
 records what the selected 0.10.0 real examples establish and what remains unknown.
 
 Historical publication checkpoint, **2026-10-08**: `breaklint@0.10.0` was read back from
@@ -69,7 +69,7 @@ npm after the successful [release workflow](https://github.com/godarg/breaklint/
 Clean registry consumers on Node 22.13.0 and 24.21.0 matched the released package bytes.
 Four frozen real-product readbacks retained all 215 original page PNGs; one still exited 4
 for insufficient measurement and three exited 1 with findings. See the dated
-[publication and limitations checkpoint](docs/status.md#release-v0100-published-2026-10-08)
+[publication and limitations checkpoint](maintainers/status.md#release-v0100-published-2026-10-08)
 for package identity, review scope and the separately measured Action, website and local
 consumer integration outcomes.
 
@@ -247,10 +247,10 @@ the report. `checker-crashed` remains a real exit-3 path for injected driver fai
 interference and process-boundary faults; it is not a placeholder for an unbuilt live path.
 M3-0's SVG validation and calibration foundation exists in the repository, but empirical threshold
 calibration and a representative human-labelled real corpus remain unfinished. The
-[ten selected human-reviewed examples](docs/evaluation-0.10.md) establish a narrower evaluation.
+[ten selected human-reviewed examples](maintainers/evaluation-0.10.md) establish a narrower evaluation.
 Packaging and the first npm release
 are complete; the post-release trust work and remaining validation boundaries are tracked in
-`docs/status.md`.
+`maintainers/status.md`.
 
 ## Exit codes
 
@@ -338,7 +338,7 @@ without a horizontal table on mobile; print uses an A4 layout. What CI verifies 
 surfaces is technical — `test:report-surfaces:technical` checks every current screen and print
 cell for decoded pixels, contrast, accessibility and fragmentation. A human review counts only as
 a passing round by a rostered reviewer in the review ledger, bound to the current inputs; see its
-latest round and [`docs/releasing.md`](docs/releasing.md).
+latest round and [`maintainers/releasing.md`](maintainers/releasing.md).
 <!-- review-state -->
 For 0.11.0 the current record is round 9: four fresh Claude Opus reviews, actual model
 `claude-opus-5-5`, passed all 32 cells under the Founder's release-specific AI delegation
@@ -352,8 +352,8 @@ measure width, and repeated print tail labels); zero blocker or high findings we
 Fine-text judgment rests on native viewport tiles and A4 rasters. The local macOS arm64 Node 24
 sight review does not establish human or Ubuntu visual review; Linux CI technical verification
 separately confirms 212 viewport tiles and 3/8/8/8 printed pages. JSON remains canonical.
-The information contract and the reproducible 32-cell screen/print review are documented in
-[`docs/reporting.md`](docs/reporting.md).
+The information contract is documented in [`docs/reporting.md`](docs/reporting.md), and the
+reproducible 32-cell screen/print review in [`maintainers/report-review.md`](maintainers/report-review.md).
 
 ## Requirements
 

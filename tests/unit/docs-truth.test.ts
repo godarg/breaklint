@@ -7,8 +7,9 @@
  * readable-report set and the snapshot stamp from its enums. None of them is written in this file,
  * so a stamp that moves — the snapshot is moving in this release — moves the oracle with it.
  *
- * The documents are the repository's own README, SECURITY.md, docs/** (all shipped) and
- * CONTRIBUTING.md. CHANGELOG.md is not scanned: every entry states a change.
+ * The documents are the repository's own README, SECURITY.md, docs/** (all shipped),
+ * CONTRIBUTING.md and maintainers/** (not shipped, but moved there from docs/ and still read).
+ * CHANGELOG.md is not scanned: every entry states a change.
  */
 
 import { strict as assert } from "node:assert";
@@ -19,7 +20,7 @@ import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { checkDocsTruth, currentStamps, scanText } from "../tools/docs-truth.mjs";
+import { checkDocsTruth, currentStamps, peerCommandIssues, scanText, statusIssues } from "../tools/docs-truth.mjs";
 import type { PendingCorrection, Stamps } from "../tools/docs-truth.mjs";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
@@ -48,9 +49,31 @@ after(() => {
 
 describe("schema stamps in the shipped documents", () => {
   it("every stamp README, SECURITY.md, docs/** and CONTRIBUTING.md name is the built package's", () => {
-    const result = checkDocsTruth({ packageDir: stage, docsRoot: ROOT, extra: [join(ROOT, "CONTRIBUTING.md")], pending: PENDING, stamps });
+    const result = checkDocsTruth({ packageDir: stage, docsRoot: ROOT, extra: [join(ROOT, "CONTRIBUTING.md")], maintainers: join(ROOT, "maintainers"), pending: PENDING, stamps });
     assert.ok(result.scanned >= 30, `only ${result.scanned} documents were scanned; the guard has lost its subject`);
     assert.deepEqual(result.issues, [], "a document names a schema stamp the built package does not carry");
+  });
+
+  it("reads maintainers/** too, so a page moved out of the package cannot go stale unseen", () => {
+    const docs = mkdtempSync(join(tmpdir(), "breaklint-docs-truth-maintainers-"));
+    try {
+      mkdirSync(join(docs, "maintainers"), { recursive: true });
+      writeFileSync(join(docs, "README.md"), `Live document reports use Report ${stamps.report}.\n`);
+      writeFileSync(join(docs, "maintainers/status.md"), `Live document reports use Report ${stamps.report}.\n`);
+      const ok = checkDocsTruth({ packageDir: stage, docsRoot: docs, maintainers: join(docs, "maintainers"), stamps });
+      assert.deepEqual(ok.issues, [], "positive control: a current maintainers page fails");
+      assert.equal(ok.scanned, 2);
+      writeFileSync(join(docs, "maintainers/status.md"), `Live document reports use Report ${stamps.report - 1}.\n`);
+      const stale = checkDocsTruth({ packageDir: stage, docsRoot: docs, maintainers: join(docs, "maintainers"), stamps });
+      assert.ok(stale.issues.some((issue) => issue.startsWith("maintainers/status.md:1: says report")), stale.issues.join("\n"));
+      // Without --maintainers the same stale page is not read: the CI call must pass it.
+      assert.deepEqual(checkDocsTruth({ packageDir: stage, docsRoot: docs, stamps }).issues, []);
+      rmSync(join(docs, "maintainers/status.md"));
+      assert.ok(checkDocsTruth({ packageDir: stage, docsRoot: docs, maintainers: join(docs, "maintainers"), stamps }).issues
+        .some((issue) => /holds no Markdown file/u.test(issue)), "an empty maintainers directory passed silently");
+    } finally {
+      rmSync(docs, { recursive: true, force: true });
+    }
   });
 
   it("reads its stamps from the build, not from a constant in this test", () => {
@@ -238,4 +261,46 @@ it("reads actual snapshot compatibility and refuses an unsupported readable stam
     assert.equal(report.documents[0].coverage["figure/caption-separated"].measured, 0);
     assert.equal(report.documents[0].notMeasured[0].reason, "env/figure-index-unavailable");
   } finally { writeFileSync(path, original); }
+});
+
+describe("release-status sentences and peer install commands in the shipped documents", () => {
+  const peers = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).peerDependencies as Record<string, string>;
+
+  it("a sentence that is true only before the tag fails; the current documents carry none", () => {
+    assert.equal(statusIssues("README.md", "Publication of 0.11.0 is pending candidate review and tagging.\n").length, 2,
+      "negative control: the 0.11.0 README sentence passed");
+    assert.equal(statusIssues("README.md", "The release is pending final tagging by the maintainer.\n").length, 1);
+    assert.deepEqual(statusIssues("README.md", "Tagged releases are listed on GitHub.\n"), [], "positive control");
+    for (const file of ["README.md", "SECURITY.md"]) {
+      assert.deepEqual(statusIssues(file, readFileSync(join(ROOT, file), "utf8")), [], `${file} carries a pre-tag status sentence`);
+    }
+  });
+
+  it("an install command must name each peer with the range package.json declares", () => {
+    const range = peers["puppeteer-core"]!;
+    const floor = /^>=\s*(\d+\.\d+\.\d+)/u.exec(range)?.[1];
+    assert.ok(floor, `the peer range ${range} has no readable floor; this test needs one`);
+    const command = (spec: string) => `npm i -D breaklint ${spec} pagedjs@${peers.pagedjs} pdfjs-dist@${peers["pdfjs-dist"]}`;
+    assert.deepEqual(peerCommandIssues("README.md", command(`puppeteer-core@^${floor}`), peers), [], "positive control: the caret form of the declared range");
+    assert.deepEqual(peerCommandIssues("README.md", command(`puppeteer-core@${floor}`), peers), [], "positive control: an exact version inside the range");
+    const [major, minor] = floor.split(".").map(Number) as [number, number];
+    for (const stale of [`puppeteer-core@^${major}.${minor - 1}.0`, `puppeteer-core@^${major - 1}.0.0`, `puppeteer-core@${major + 1}.0.0`, "puppeteer-core"]) {
+      assert.equal(peerCommandIssues("README.md", command(stale), peers).length, 1, `negative control: ${stale} passed`);
+    }
+    assert.equal(peerCommandIssues("docs/x.md", "npm i -D pagedjs@0.4.4", peers).length, 1, "negative control: a different pagedjs passed");
+    assert.deepEqual(peerCommandIssues("SECURITY.md", "the puppeteer-core 25.8.0 pin", peers), [], "prose without an install command is not a command");
+  });
+
+  it("the shipped documents fail the whole check when one carries a stale status sentence or peer", () => {
+    const docs = mkdtempSync(join(tmpdir(), "breaklint-docs-truth-peers-"));
+    try {
+      writeFileSync(join(docs, "README.md"), `npm i -D breaklint puppeteer-core@^25.8.0 pagedjs@${peers.pagedjs}\n\nPublication is pending candidate review.\n`);
+      const result = checkDocsTruth({ packageDir: stage, docsRoot: docs, stamps });
+      assert.equal(result.valid, false);
+      assert.ok(result.issues.some((issue) => /installs puppeteer-core@\^25\.8\.0/u.test(issue)), result.issues.join("\n"));
+      assert.ok(result.issues.some((issue) => /pending candidate review/u.test(issue)), result.issues.join("\n"));
+    } finally {
+      rmSync(docs, { recursive: true, force: true });
+    }
+  });
 });

@@ -112,8 +112,8 @@ jobs:
           npm run test:documented-figures
 
       - name: rendered technical report-surface matrix
-        # Reconstruct the complete 32-cell technical matrix. Do not invent or refresh a human
-        # review ledger in CI; exact-environment human review is a distinct local gate.
+        # Reconstruct the complete 32-cell technical matrix. Do not invent or refresh a
+        # review ledger in CI; exact-environment sight review is a distinct local gate.
         run: npm run test:report-surfaces:technical
 
       - name: physical report-edge mutation controls
@@ -227,7 +227,8 @@ jobs:
           # --release: a pending exception is a sentence known to be stale, and a tag must not
           # ship one. A non-empty pending list fails here and says what to change.
           node "$GITHUB_WORKSPACE/tests/tools/docs-truth.mjs" --package "$consumer/node_modules/breaklint" \
-            --pending "$GITHUB_WORKSPACE/tests/tools/docs-truth-pending.jsonl" --release
+            --pending "$GITHUB_WORKSPACE/tests/tools/docs-truth-pending.jsonl" --release \
+            --maintainers "$GITHUB_WORKSPACE/maintainers"
           node "$GITHUB_WORKSPACE/tests/tools/installed-config-contract.mjs"
           npm install --no-audit --no-fund --save-exact \
             pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.16.0
@@ -430,7 +431,8 @@ jobs:
           # registry copy of the CLI prints.
           node "$GITHUB_WORKSPACE/tests/tools/readme-demo-contract.mjs" --consumer "$registry_consumer"
           node "$GITHUB_WORKSPACE/tests/tools/docs-truth.mjs" --package "$registry_consumer/node_modules/breaklint" \
-            --pending "$GITHUB_WORKSPACE/tests/tools/docs-truth-pending.jsonl" --release
+            --pending "$GITHUB_WORKSPACE/tests/tools/docs-truth-pending.jsonl" --release \
+            --maintainers "$GITHUB_WORKSPACE/maintainers"
           npm install --no-audit --no-fund --save-exact \
             pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.16.0 \
             @playwright/test@1.62.1 typescript@5.9.2

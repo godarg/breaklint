@@ -29,12 +29,12 @@ import {
 import {
   BROWSER_VERSION_PATTERN,
   DECLARED_ENVIRONMENT_FIELDS,
-  HUMAN_REVIEW_ROLES,
+  ROSTERED_REVIEW_ROLES,
   REQUIRED_BROWSER_RENDER_ARGS,
   REVIEWER_AUTHENTICATION_NOTE,
   REVIEW_INPUT_ROOTS,
   REVIEW_ARTIFACT_CONTRACT_VERSION,
-  assessHumanGate,
+  assessRosterGate,
   assessSightGate,
   assertCurrentDelegationRelease,
   describeLatestRound,
@@ -474,7 +474,7 @@ function boundPassingFixture(): { ledger: ReviewLedger; manifest: Record<string,
   return { ledger, manifest, fingerprint };
 }
 
-describe("report-surface human review gate", () => {
+describe("report-surface rostered review gate", () => {
   it("admits a concrete later release delegation without rewriting historical review rounds", () => {
     const ledger = committedLedger();
     const previousRounds = JSON.stringify(ledger.rounds);
@@ -542,9 +542,9 @@ describe("report-surface human review gate", () => {
     assert.ok(latest.reviewers.every((reviewer) => reviewer.kind === "not-recorded" && reviewer.handle === null),
       "the public record names no reviewer handle, so the ledger names none");
     const { manifest, fingerprint } = boundPassingFixture();
-    assert.throws(() => assessHumanGate(historicalLedger(), manifest, fingerprint), /latest review round 2 is FAIL \(2026-09-18/u);
+    assert.throws(() => assessRosterGate(historicalLedger(), manifest, fingerprint), /latest review round 2 is FAIL \(2026-09-18/u);
     assert.match(describeLatestRound(historicalLedger(), manifest, fingerprint),
-      /reviewers: not recorded, not recorded; cells passed by a rostered human: 0 of 0 passing\); bound to the current render: inputs no; environment\/artifacts no$/u);
+      /reviewers: not recorded, not recorded; cells passed by a rostered reviewer: 0 of 0 passing\); bound to the current render: inputs no; environment\/artifacts no$/u);
   });
 
   it("retains the 0.7.0 review and records the 0.8.0 Founder pass of all 32 cells", () => {
@@ -601,46 +601,46 @@ describe("report-surface human review gate", () => {
     const summary = summarizeLatestRound(ledger);
     assert.equal(summary.passingCells, 32);
     assert.equal(summary.delegatedPassingCells, 32);
-    assert.equal(summary.humanPassingCells, 0);
+    assert.equal(summary.rosteredPassingCells, 0);
     assert.equal(summary.delegatedPass, true);
-    assert.equal(summary.humanPass, false);
+    assert.equal(summary.rosteredPass, false);
   });
 
-  it("passes only a latest human round bound to the current inputs, environment and cells", () => {
+  it("passes only a latest rostered round bound to the current inputs, environment and cells", () => {
     const { ledger, manifest, fingerprint } = boundPassingFixture();
-    assert.equal(assessHumanGate(ledger, manifest, fingerprint).round, 3, "positive control: a genuinely bound round passes");
+    assert.equal(assessRosterGate(ledger, manifest, fingerprint).round, 3, "positive control: a genuinely bound round passes");
 
     // Mutation: a passing round over changed inputs is not a review of those inputs.
-    assert.throws(() => assessHumanGate(ledger, manifest, "b".repeat(64)), /bound to a different source\/input revision/u);
+    assert.throws(() => assessRosterGate(ledger, manifest, "b".repeat(64)), /bound to a different source\/input revision/u);
 
     // Observations may drift without re-reviewing; the declared environment may not.
     const observedOnly = structuredClone(manifest);
     (observedOnly.observedEnvironment as Record<string, string>).platformRelease = "6.19.0";
     (observedOnly.observedEnvironment as Record<string, string>).node = "v24.99.1";
-    assert.equal(assessHumanGate(ledger, observedOnly, fingerprint).round, 3, "a kernel or Node patch update must not unbind a review");
+    assert.equal(assessRosterGate(ledger, observedOnly, fingerprint).round, 3, "a kernel or Node patch update must not unbind a review");
     const otherBrowser = structuredClone(manifest);
     (otherBrowser.reviewEnvironment as Record<string, string>).browser = "Google Chrome 152.0.7977.64";
-    assert.throws(() => assessHumanGate(ledger, otherBrowser, fingerprint), /different declared browser\/platform\/render environment/u);
+    assert.throws(() => assessRosterGate(ledger, otherBrowser, fingerprint), /different declared browser\/platform\/render environment/u);
 
     // One changed cell fingerprint is a different rendered artifact.
     const changedCell = structuredClone(ledger);
     changedCell.rounds.at(-1)!.cells!["print/findings/pdf"]!.reviewArtifactFingerprint = "c".repeat(64);
-    assert.throws(() => assessHumanGate(changedCell, manifest, fingerprint), /print\/findings\/pdf: strict local human review is bound to a different rendered artifact/u);
+    assert.throws(() => assessRosterGate(changedCell, manifest, fingerprint), /print\/findings\/pdf: strict local sight review is bound to a different rendered artifact/u);
 
     // A screen cell is reviewed as its full page AND its tiles.
     const missingTile = structuredClone(ledger);
     missingTile.rounds.at(-1)!.cells!["screen/clean/light/mobile"]!.reviewedArtifacts = ["clean--light--mobile.png"];
-    assert.throws(() => assessHumanGate(missingTile, manifest, fingerprint), /reviewed screen artifacts are not named exactly/u);
+    assert.throws(() => assessRosterGate(missingTile, manifest, fingerprint), /reviewed screen artifacts are not named exactly/u);
 
     // An earlier pass never carries forward over a later failed round.
     const laterFail = structuredClone(ledger);
     laterFail.rounds.push({ ...structuredClone(ledger.rounds[1]!), round: 4, record: "current", reviewedAt: "2026-09-21" });
-    assert.throws(() => assessHumanGate(laterFail, manifest, fingerprint), /latest review round 4 is FAIL/u);
+    assert.throws(() => assessRosterGate(laterFail, manifest, fingerprint), /latest review round 4 is FAIL/u);
   });
 
-  it("admits only the closed human roster, and an agent never passes a cell (bypasses A-I)", () => {
-    assert.deepEqual([...HUMAN_REVIEW_ROLES], ["@Brand", "@Neo", "@Founder"], "the roster changes only by a reviewed code change");
-    assert.ok(Object.isFrozen(HUMAN_REVIEW_ROLES), "the roster cannot be extended at run time");
+  it("admits only the closed reviewer roster, and an agent never passes a cell (bypasses A-I)", () => {
+    assert.deepEqual([...ROSTERED_REVIEW_ROLES], ["@Brand", "@Neo", "@Founder"], "the roster changes only by a reviewed code change");
+    assert.ok(Object.isFrozen(ROSTERED_REVIEW_ROLES), "the roster cannot be extended at run time");
     const agent = { handle: "@Bot", kind: "agent" as const, model: "example-review-model" };
     /** The bound fixture with the latest round's reviewers and every cell's reviewer replaced. */
     const probe = (reviewers: unknown[], cellReviewer: string, only?: string) => {
@@ -648,36 +648,36 @@ describe("report-surface human review gate", () => {
       const round = ledger.rounds.at(-1)!;
       round.reviewers = reviewers as ReviewRound["reviewers"];
       for (const [cellId, cell] of Object.entries(round.cells!)) if (!only || cellId === only) cell.reviewer = cellReviewer;
-      return () => assessHumanGate(ledger, manifest, fingerprint);
+      return () => assessRosterGate(ledger, manifest, fingerprint);
     };
-    // A: an agent labels itself human under a handle of its own.
-    assert.throws(probe([{ kind: "human", handle: "@review-model-5" }], "@review-model-5"), /"@review-model-5" is not a rostered human review role \(@Brand, @Neo, @Founder\)/u);
+    // A: an agent records itself under ledger kind "human" with a handle of its own.
+    assert.throws(probe([{ kind: "human", handle: "@review-model-5" }], "@review-model-5"), /"@review-model-5" is not a rostered reviewer role \(@Brand, @Neo, @Founder\)/u);
     // B: the same with the model label moved into a field of its own, under an unrostered and a rostered handle.
-    assert.throws(probe([{ kind: "human", handle: "@Agent", tool: "example-review-model" }], "@Agent"), /human reviewer carries only handle and kind; unknown field tool/u);
-    assert.throws(probe([{ kind: "human", handle: "@Neo", tool: "example-review-model" }], "@Neo"), /human reviewer carries only handle and kind; unknown field tool/u);
-    // C: a rostered human is named, but an agent passed every cell, or just one of them.
-    assert.throws(probe([{ kind: "human", handle: "@Neo" }, agent], "@Bot"), /screen\/clean\/light\/desktop passed under @Bot, an agent reviewer; a pass is recorded only by a rostered human/u);
+    assert.throws(probe([{ kind: "human", handle: "@Agent", tool: "example-review-model" }], "@Agent"), /rostered \(kind "human"\) reviewer carries only handle and kind; unknown field tool/u);
+    assert.throws(probe([{ kind: "human", handle: "@Neo", tool: "example-review-model" }], "@Neo"), /rostered \(kind "human"\) reviewer carries only handle and kind; unknown field tool/u);
+    // C: a rostered reviewer is named, but an agent passed every cell, or just one of them.
+    assert.throws(probe([{ kind: "human", handle: "@Neo" }, agent], "@Bot"), /screen\/clean\/light\/desktop passed under @Bot, an agent reviewer; a pass is recorded only by a rostered reviewer/u);
     assert.throws(probe([{ kind: "human", handle: "@Neo" }, agent], "@Bot", "print/findings/raster-set"), /print\/findings\/raster-set passed under @Bot, an agent reviewer/u);
-    // D: one handle listed as both agent and human, and an agent borrowing a human role on its own.
+    // D: one handle listed as both agent and rostered, and an agent borrowing a rostered role on its own.
     assert.throws(probe([{ kind: "agent", handle: "@Neo", model: "example-review-model" }, { kind: "human", handle: "@Neo" }], "@Neo"), /reviewer handle @Neo is listed more than once \(agent and human\)/u);
     assert.throws(probe([{ kind: "human", handle: "@Neo" }, { kind: "human", handle: "@Neo" }], "@Neo"), /reviewer handle @Neo is listed more than once \(human and human\)/u);
-    assert.throws(probe([{ kind: "human", handle: "@Founder" }, { kind: "agent", handle: "@Neo", model: "example-review-model" }], "@Founder"), /an agent cannot carry the human review role @Neo/u);
-    // E-I: agent only, nobody, no kind, a null model on a human, not-recorded beside an agent.
+    assert.throws(probe([{ kind: "human", handle: "@Founder" }, { kind: "agent", handle: "@Neo", model: "example-review-model" }], "@Founder"), /an agent cannot carry the rostered reviewer role @Neo/u);
+    // E-I: agent only, nobody, no kind, a null model on a rostered entry, not-recorded beside an agent.
     assert.throws(probe([agent], "@Bot"), /passed under @Bot, an agent reviewer/u);
     assert.throws(probe([], "@Bot"), /reviewer @Bot is not a reviewer of this round/u);
-    assert.throws(probe([{ handle: "@Neo" }], "@Neo"), /reviewer kind must be human, agent or not-recorded/u);
+    assert.throws(probe([{ handle: "@Neo" }], "@Neo"), /reviewer kind must be human \(a rostered role handle\), agent or not-recorded/u);
     assert.throws(probe([{ kind: "human", handle: "@Neo", model: null }], "@Neo"), /does not carry a model label/u);
     assert.throws(probe([{ kind: "not-recorded", handle: null }, agent], "@Bot"), /passed under @Bot, an agent reviewer/u);
 
-    // Positive controls: an agent may be recorded beside the humans who passed the cells, and may
+    // Positive controls: an agent may be recorded beside the rostered reviewers who passed the cells, and may
     // record a failed cell; the summary line names every reviewer by kind.
     const recorded = probe([{ kind: "human", handle: "@Neo" }, agent], "@Neo");
-    assert.equal(recorded().round, 3, "an agent recorded beside the rostered human who passed every cell does not block the gate");
+    assert.equal(recorded().round, 3, "an agent recorded beside the rostered reviewer who passed every cell does not block the gate");
     const { ledger, manifest, fingerprint } = boundPassingFixture();
     ledger.rounds.at(-1)!.reviewers = [{ kind: "human", handle: "@Neo" }, agent];
     assert.equal(describeLatestRound(ledger, manifest, fingerprint),
-      "latest human review round 3 is PASS (2026-09-20T10:00:00.000Z; 0 blocker, 0 high, 0 medium, 0 low; current record; " +
-        "reviewers: @Neo (human), @Bot (agent: example-review-model); cells passed by a rostered human: 32 of 32 passing); " +
+      "latest rostered review round 3 is PASS (2026-09-20T10:00:00.000Z; 0 blocker, 0 high, 0 medium, 0 low; current record; " +
+        "reviewers: @Neo (rostered), @Bot (agent: example-review-model); cells passed by a rostered reviewer: 32 of 32 passing); " +
         "bound to the current render: inputs yes; environment/artifacts yes");
     const agentFail = structuredClone(ledger);
     const failRound = agentFail.rounds.at(-1)!;
@@ -685,14 +685,14 @@ describe("report-surface human review gate", () => {
     Object.assign(failRound.cells!["screen/findings/dark/mobile"]!, { status: "fail", reviewer: "@Bot" });
     assert.equal(validateReviewLedger(agentFail).latest.outcome, "fail", "an agent may record a failed cell");
 
-    // The summary never calls a round a human PASS unless a rostered human passed every cell, even
+    // The summary never calls a round a rostered PASS unless a rostered reviewer passed every cell, even
     // when it is handed a ledger that skipped validation.
     const unvalidated = structuredClone(ledger);
     unvalidated.rounds.at(-1)!.reviewers = [agent];
     for (const cell of Object.values(unvalidated.rounds.at(-1)!.cells!)) cell.reviewer = "@Bot";
     const line = describeLatestRound(unvalidated, manifest, fingerprint);
-    assert.doesNotMatch(line, /human review/u);
-    assert.match(line, /^latest review round 3 is PASS but NOT a human pass \(.*reviewers: @Bot \(agent: example-review-model\); cells passed by a rostered human: 0 of 32 passing\)/u);
+    assert.doesNotMatch(line, /rostered review round/u);
+    assert.match(line, /^latest review round 3 is PASS but NOT a rostered pass \(.*reviewers: @Bot \(agent: example-review-model\); cells passed by a rostered reviewer: 0 of 32 passing\)/u);
     assert.throws(() => validateReviewLedger(unvalidated), /passed under @Bot, an agent reviewer/u);
   });
 
@@ -702,13 +702,13 @@ describe("report-surface human review gate", () => {
     const otherBrowser = structuredClone(manifest);
     (otherBrowser.reviewEnvironment as Record<string, string>).browser = "Google Chrome 152.0.7977.64";
     assert.match(describeLatestRound(ledger, otherBrowser, fingerprint), /bound to the current render: inputs yes; environment\/artifacts no$/u);
-    assert.throws(() => assessHumanGate(ledger, otherBrowser, fingerprint), /different declared browser/u);
+    assert.throws(() => assessRosterGate(ledger, otherBrowser, fingerprint), /different declared browser/u);
     // Same inputs, one changed cell fingerprint.
     const otherCell = structuredClone(manifest);
     ((otherCell.artifacts as Record<string, unknown>[])[0]!).reviewArtifactFingerprint = "d".repeat(64);
     const status = latestBindingStatus(ledger, otherCell, fingerprint);
     assert.deepEqual([status.inputs, status.environmentAndArtifacts, status.bound], [true, false, false]);
-    assert.match(status.reason ?? "", /strict local human review is bound to a different rendered artifact/u);
+    assert.match(status.reason ?? "", /strict local sight review is bound to a different rendered artifact/u);
     // Same inputs, a different physical inventory.
     const otherInventory = structuredClone(manifest);
     (otherInventory.physicalArtifacts as Record<string, number>).rasterPages = 9;
@@ -777,20 +777,20 @@ describe("report-surface human review gate", () => {
     assert.equal(validateReviewLedger(structuredClone(ledger)).latest.round, 3, "positive control: a current round reviewed after its render");
   });
 
-  it("names exactly the code roster wherever the docs name the human roles", () => {
-    const roster = [...HUMAN_REVIEW_ROLES].sort();
-    for (const path of ["docs/reporting.md", "docs/releasing.md"]) {
+  it("names exactly the code roster wherever the maintainer docs name the reviewer roles", () => {
+    const roster = [...ROSTERED_REVIEW_ROLES].sort();
+    for (const path of ["maintainers/report-review.md", "maintainers/releasing.md"]) {
       const text = readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
-      const listed = [...text.matchAll(/<!-- human-review-roles: ([^>]*?) -->/gu)];
-      assert.equal(listed.length, 1, `${path} must carry exactly one human-review-roles marker`);
-      assert.deepEqual(listed[0]![1]!.split(/,\s*/u).sort(), roster, `${path} lists a human roster other than HUMAN_REVIEW_ROLES`);
+      const listed = [...text.matchAll(/<!-- rostered-reviewer-roles: ([^>]*?) -->/gu)];
+      assert.equal(listed.length, 1, `${path} must carry exactly one rostered-reviewer-roles marker`);
+      assert.deepEqual(listed[0]![1]!.split(/,\s*/u).sort(), roster, `${path} lists a roster other than ROSTERED_REVIEW_ROLES`);
       for (const role of roster) assert.ok(text.includes(`\`${role}\``), `${path} does not name ${role}`);
     }
     assert.ok(REVIEWER_AUTHENTICATION_NOTE.includes("does not authenticate a person"), "the residual is stated, not implied");
     // The review package names exactly the inputs a review is bound to.
-    const reporting = readFileSync(new URL("../../docs/reporting.md", import.meta.url), "utf8");
+    const reporting = readFileSync(new URL("../../maintainers/report-review.md", import.meta.url), "utf8");
     const roots = [...reporting.matchAll(/<!-- review-input-roots: ([^>]*?) -->/gu)];
-    assert.equal(roots.length, 1, "docs/reporting.md must carry exactly one review-input-roots marker");
+    assert.equal(roots.length, 1, "maintainers/report-review.md must carry exactly one review-input-roots marker");
     assert.deepEqual(roots[0]![1]!.split(/,\s*/u), [...REVIEW_INPUT_ROOTS], "the review package lists bound inputs other than REVIEW_INPUT_ROOTS");
     for (const root of REVIEW_INPUT_ROOTS) assert.ok(reporting.includes(`\`${root}\``), `the review package does not name ${root}`);
   });
@@ -812,7 +812,7 @@ describe("report-surface human review gate", () => {
     failed((ledger) => { delete ledger.rounds[1]!.source; }, /must name its source record/u);
     failed((ledger) => { (ledger.rounds.at(-1)!.binding!.reviewEnvironment as Record<string, unknown>).platformRelease = "6.18.44"; },
       new RegExp(`binds exactly ${DECLARED_ENVIRONMENT_FIELDS.join(", ")}`, "u"));
-    failed((ledger) => { ledger.schemaVersion = 4; }, /human ledger schema drift/u);
+    failed((ledger) => { ledger.schemaVersion = 4; }, /review ledger schema drift/u);
   });
 });
 

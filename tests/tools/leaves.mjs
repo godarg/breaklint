@@ -1,7 +1,7 @@
 /**
  * Count the leaf values in a measurement report, and diff two reports leaf by leaf.
  *
- * This exists because `docs/status.md` claims a leaf count and a "exactly one value differs
+ * This exists because `maintainers/status.md` claims a leaf count and a "exactly one value differs
  * between two runs" reproducibility result, and an audit established that the stated number
  * (209) was not derivable under any plausible counting rule — nothing in the repository computed
  * it, so the claim was checkable only in the sense that a reader could disbelieve it.

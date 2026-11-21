@@ -53,7 +53,7 @@ intended, and each says what it does not cover:
   `columns: 1`) or a nonempty `display: contents` heading produces a fatal diagnostic and exit 3.
   This is conservative: a short heading that happens to print in full is refused too. It does not
   establish a general PDF/source text-completeness guarantee; other multicolumn and footnote
-  cases remain open in [limitations](docs/limitations.md).
+  cases remain open in [known limits](docs/known-limits.md).
 - **No browser-wide file-access switch.** The document is served from a loopback origin instead. A
   test measures that a document loaded this way cannot read a neighbouring file, because removing
   the reason for a switch and leaving the switch in place is a mistake that was actually made here

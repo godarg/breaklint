@@ -288,7 +288,7 @@ export const VERDICT_PRECEDENCE: readonly RunVerdict[] = [
   "clean",
 ];
 
-/** Coverage floors by severity. `error` demands full coverage; see `docs/limitations.md`. */
+/** Coverage floors by severity. `error` demands full coverage; see `maintainers/burden-of-proof.md`. */
 export const COVERAGE_FLOOR_BY_SEVERITY: Readonly<Record<Severity, number>> = {
   error: 1.0,
   warn: 0.5,

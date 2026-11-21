@@ -129,8 +129,8 @@ jobs:
 
       - name: technical report-surface matrix
         # Linux verifies all 32 current cells, including decoded-pixel, semantic, accessibility
-        # and print integrity. The historical human ledger is deliberately not restamped by CI;
-        # exact-environment human review remains a separate, explicit local gate.
+        # and print integrity. The historical review ledger is deliberately not restamped by CI;
+        # exact-environment sight review remains a separate, explicit local gate.
         run: npm run test:report-surfaces:technical
 
       - name: physical report-edge mutation controls
@@ -188,7 +188,8 @@ jobs:
           # carries, read by running it. Mentions another change is still correcting are listed,
           # and a listed mention that no longer occurs fails too.
           node "$GITHUB_WORKSPACE/tests/tools/docs-truth.mjs" --package node_modules/breaklint \
-            --pending "$GITHUB_WORKSPACE/tests/tools/docs-truth-pending.jsonl"
+            --pending "$GITHUB_WORKSPACE/tests/tools/docs-truth-pending.jsonl" \
+            --maintainers "$GITHUB_WORKSPACE/maintainers"
           node "$GITHUB_WORKSPACE/tests/tools/installed-config-contract.mjs"
           npm install --no-audit --no-fund --save-exact \
             pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.16.0

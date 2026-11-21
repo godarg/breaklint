@@ -17,7 +17,7 @@
  * WHY THE BYTES ARE NOT IN THE REPOSITORY, AND WHAT THAT COSTS. They are chapters of a paid
  * product — 27 492 of that bundle's 69 017 words — and this repository is public and MIT. The
  * public record is therefore hash-only, exactly the `private_nonredistributable` shape
- * `docs/validation/corpus-contract-v1.md` defines. Two consequences are load-bearing here:
+ * `maintainers/validation/corpus-contract-v1.md` defines. Two consequences are load-bearing here:
  *
  *   1. WITHOUT AN ARTIFACT ROOT THIS GATE MAKES NO SUCCESS CLAIM. It prints `SKIPPED` and says how
  *      many documents it did not read. A gate that printed a tick over zero documents would be the

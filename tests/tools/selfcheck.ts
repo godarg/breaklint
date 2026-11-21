@@ -92,7 +92,7 @@ for (const file of prose) {
 }
 
 // 3. No absolute build-machine path anywhere in the published tree.
-for (const file of [join(ROOT, "README.md"), join(ROOT, "docs/status.md")]) {
+for (const file of [join(ROOT, "README.md"), join(ROOT, "maintainers/status.md")]) {
   const text = readFileSync(file, "utf8");
   if (/\/(Users|home)\/[a-z][a-z0-9_-]+\//u.test(text)) problems.push(`${file}: absolute build-machine path`);
 }

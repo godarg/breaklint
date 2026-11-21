@@ -53,6 +53,20 @@
  * what to do; with an empty one every mention is checked with no exception. Pull requests keep
  * accepting pending entries; tags do not — the same rule as `TBD-at-tag` in the changelog.
  *
+ * TWO MORE KINDS OF STALE SENTENCE, checked in the shipped documents only:
+ *   - a release-status sentence that is true only before a tag — "pending candidate review",
+ *     "pending … tagging" — fails, because the README ships to npm with the tag and would then say
+ *     the version it belongs to is not yet tagged (it did, at 0.11.0);
+ *   - an install command (`npm i`, `npm install`, `pnpm add`, `yarn add`) that names a peer
+ *     (`puppeteer-core`, `pagedjs`, `pdfjs-dist`) with a version the package's own
+ *     `peerDependencies` does not declare fails: a caret spec must denote exactly the declared range,
+ *     an exact version must lie inside it, and a peer named without a version fails too.
+ * The oracle for the second is the `package.json` of the package under test, never this file.
+ *
+ * `--maintainers <dir>` adds every Markdown file under that directory (the repository's
+ * `maintainers/`, which npm does not ship) to the stamp check, so a moved page cannot go stale
+ * unseen. Status and install-command checks stay on the shipped documents.
+ *
  * KNOWN LIMITS, accepted: the history grammar is a heuristic over English. A sentence can take one
  * of its forms and still be false ("Live reports have used Report 4 since 0.5.0" passes form 3a),
  * and a stamp named in a shape no pattern reads — "schema version 4", "v4 reports", a number in a
@@ -328,6 +342,89 @@ export function scanText(file, text, stamps) {
   return scanIssues(file, text, stamps).map((issue) => issue.message);
 }
 
+/** Release-status sentences that are true only before a tag, and must not ship with one. */
+const STALE_STATUS = [
+  { re: /\bpending\s+candidate\s+review\b/iu, label: "pending candidate review" },
+  { re: /\bpending\b[^.\n]{0,80}?\btagging\b/iu, label: "pending … tagging" },
+];
+
+/** Stale release-status sentences in one shipped document. */
+export function statusIssues(file, text) {
+  const issues = [];
+  for (const { unit, line } of unitsOf(text)) {
+    for (const { re, label } of STALE_STATUS) {
+      if (re.test(unit)) issues.push(`${file}:${line}: says "${label}", a release status that is false once the version is tagged and shipped: ${unit.trim()}`);
+    }
+  }
+  return issues;
+}
+
+const PEERS = ["puppeteer-core", "pagedjs", "pdfjs-dist"];
+const INSTALL = /\b(?:npm\s+(?:i|install|add)|pnpm\s+(?:add|i|install)|yarn\s+add)\b/u;
+
+function version(text) {
+  const match = /^(\d+)(?:\.(\d+))?(?:\.(\d+))?$/u.exec(text.trim());
+  return match ? [Number(match[1]), Number(match[2] ?? 0), Number(match[3] ?? 0)] : null;
+}
+
+function compare(a, b) {
+  for (let i = 0; i < 3; i += 1) if (a[i] !== b[i]) return a[i] - b[i];
+  return 0;
+}
+
+/** A declared or written version spec as an interval [min, max), max null = exactly min. */
+export function specInterval(spec) {
+  const text = spec.trim();
+  const exact = version(text);
+  if (exact && /^\d+\.\d+\.\d+$/u.test(text)) return { min: exact, max: null };
+  const caret = /^\^(\d+\.\d+\.\d+)$/u.exec(text);
+  if (caret) {
+    const min = version(caret[1]);
+    const max = min[0] > 0 ? [min[0] + 1, 0, 0] : min[1] > 0 ? [0, min[1] + 1, 0] : [0, 0, min[2] + 1];
+    return { min, max };
+  }
+  const range = /^>=\s*(\d+(?:\.\d+){0,2})\s+<\s*(\d+(?:\.\d+){0,2})$/u.exec(text);
+  if (range) return { min: version(range[1]), max: version(range[2]) };
+  return null;
+}
+
+function sameInterval(a, b) {
+  return compare(a.min, b.min) === 0 && (a.max === null ? b.max === null : b.max !== null && compare(a.max, b.max) === 0);
+}
+
+function inside(point, range) {
+  if (range.max === null) return compare(point, range.min) === 0;
+  return compare(point, range.min) >= 0 && compare(point, range.max) < 0;
+}
+
+/**
+ * Install commands in one shipped document that name a peer with a version the package does not
+ * declare. `peers` is the `peerDependencies` object of the package under test.
+ */
+export function peerCommandIssues(file, text, peers) {
+  const issues = [];
+  const lines = text.replace(/\r\n/gu, "\n").split("\n");
+  for (const [index, line] of lines.entries()) {
+    if (!INSTALL.test(line)) continue;
+    for (const name of PEERS) {
+      const declared = peers?.[name];
+      if (typeof declared !== "string") continue;
+      const wanted = specInterval(declared);
+      if (!wanted) { issues.push(`${file}:${index + 1}: package.json declares ${name} as "${declared}", which this check cannot read`); continue; }
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+      for (const match of line.matchAll(new RegExp(String.raw`(?<![\w@/-])${escaped}(?:@([^\s` + "`" + String.raw`'"),;]+))?(?=[\s` + "`" + String.raw`'"),;]|$)`, "gu"))) {
+        const spec = match[1]?.replace(/^["']|["']$/gu, "");
+        const written = spec ? specInterval(spec) : null;
+        const ok = written !== null && (written.max === null ? inside(written.min, wanted) : sameInterval(written, wanted));
+        if (!ok) {
+          issues.push(`${file}:${index + 1}: installs ${name}${spec ? `@${spec}` : " without a version"}, but package.json declares the peer range "${declared}": ${line.trim()}`);
+        }
+      }
+    }
+  }
+  return issues;
+}
+
 function markdownUnder(dir) {
   if (!existsSync(dir)) return [];
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -347,16 +444,27 @@ export function shippedDocuments(packageDir) {
  * documents. They differ only in the unit suite, which builds `dist/` into a staging directory and
  * reads the repository's own documents.
  */
-export function checkDocsTruth({ packageDir, docsRoot = packageDir, extra = [], pending = [], stamps = currentStamps(packageDir) }) {
+export function checkDocsTruth({ packageDir, docsRoot = packageDir, extra = [], maintainers = null, pending = [], stamps = currentStamps(packageDir) }) {
   const root = resolve(docsRoot);
-  const files = [...shippedDocuments(root), ...extra.map((path) => resolve(path))];
+  const shipped = shippedDocuments(root);
+  const maintainerDocs = maintainers ? markdownUnder(resolve(maintainers)) : [];
+  const files = [...shipped, ...extra.map((path) => resolve(path)), ...maintainerDocs];
   const issues = [];
+  if (maintainers && maintainerDocs.length === 0) issues.push(`--maintainers ${maintainers} holds no Markdown file; nothing there was checked`);
+  const peers = JSON.parse(readFileSync(join(resolve(packageDir), "package.json"), "utf8")).peerDependencies ?? {};
+  for (const path of shipped) {
+    const text = readFileSync(path, "utf8");
+    const name = relative(root, path);
+    issues.push(...statusIssues(name, text), ...peerCommandIssues(name, text, peers));
+  }
   // One entry absorbs exactly one issue: same file, kind, number and exact sentence.
   const pendingLeft = new Set(pending.map((_, i) => i));
   let scanned = 0;
   for (const path of files) {
     const text = readFileSync(path, "utf8");
-    const name = path.startsWith(root) ? relative(root, path) : path;
+    const name = maintainers && path.startsWith(resolve(maintainers))
+      ? join("maintainers", relative(resolve(maintainers), path))
+      : path.startsWith(root) ? relative(root, path) : path;
     scanned += 1;
     for (const issue of scanIssues(name, text, stamps)) {
       const match = [...pendingLeft].find((i) => {
@@ -384,7 +492,7 @@ function readPending(file) {
   return file ? readFileSync(file, "utf8").split("\n").filter((line) => line.trim()).map((line) => JSON.parse(line)) : [];
 }
 
-const USAGE = "usage: docs-truth.mjs --package <package-dir> [--docs-root <dir>] [--extra <file> ...] [--pending <jsonl>] [--release]\n";
+const USAGE = "usage: docs-truth.mjs --package <package-dir> [--docs-root <dir>] [--extra <file> ...] [--maintainers <dir>] [--pending <jsonl>] [--release]\n";
 
 /**
  * Arguments are parsed strictly: `--release=no`, `--release-dry` or `--Release` are not a quieter
@@ -393,7 +501,7 @@ const USAGE = "usage: docs-truth.mjs --package <package-dir> [--docs-root <dir>]
  */
 function parseArgs(args) {
   const options = { extra: [], release: false };
-  const single = { "--package": "package", "--docs-root": "docsRoot", "--pending": "pending" };
+  const single = { "--package": "package", "--docs-root": "docsRoot", "--pending": "pending", "--maintainers": "maintainers" };
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
     if (arg === "--release") {
@@ -438,7 +546,11 @@ function main(args) {
     );
     return 1;
   }
-  const result = checkDocsTruth({ packageDir, docsRoot: options.docsRoot ?? packageDir, extra: options.extra, pending: release ? [] : pending });
+  if (options.maintainers !== undefined && !statSync(options.maintainers, { throwIfNoEntry: false })?.isDirectory()) {
+    process.stderr.write(`docs-truth.mjs: --maintainers ${options.maintainers} is not a directory\n${USAGE}`);
+    return 2;
+  }
+  const result = checkDocsTruth({ packageDir, docsRoot: options.docsRoot ?? packageDir, extra: options.extra, maintainers: options.maintainers ?? null, pending: release ? [] : pending });
   const { stamps } = result;
   const summary = `report ${stamps.report} (reads ${stamps.readable.join(", ")}), snapshot ${stamps.snapshot}, screen ${stamps.screen} (reads ${stamps.readableScreens.join(", ")}), context pack ${stamps.context}, comparison ${stamps.comparison}, configuration contract ${stamps.config}`;
   if (!result.valid) {

@@ -396,7 +396,7 @@ describe("output formats", () => {
   });
 
   /**
-   * The demo's own numbers, so `docs/status.md` cannot state them wrong again.
+   * The demo's own numbers, so `maintainers/status.md` cannot state them wrong again.
    *
    * That file once said "8 findings across 8 rules", later "7 findings across 6 rules" — the
    * second was true only of `demoReport()`, where `layout/half-empty-page` still runs and fires
@@ -407,7 +407,7 @@ describe("output formats", () => {
    * Red condition: change either number here, or change the demo fixture so the counts move, and
    * this fails with both values named.
    */
-  it("the demo produces the counts docs/status.md states", () => {
+  it("the demo produces the counts maintainers/status.md states", () => {
     // From the real CLI's JSON report, not from `demoReport()`: that fixture activates every rule,
     // and it carried "7 findings across 6 rules" in this assertion and in the row for as long as
     // the shipped command printed 5 across 5 (see `runRealDemo`).
@@ -441,15 +441,15 @@ describe("output formats", () => {
     // record above it cites the demo's exit code and counts in prose, and a `includes` selector
     // picked THAT line and compared it against the canonical row. The finding was correct and the
     // subject was wrong. Exactly one row may open this way; a second would make "the row" a guess.
-    const status = readFileSync(new URL("../../docs/status.md", import.meta.url), "utf8");
+    const status = readFileSync(new URL("../../maintainers/status.md", import.meta.url), "utf8");
     const rows = status.split("\n").filter((l) => l.startsWith("| `npx breaklint --demo` |"));
-    assert.equal(rows.length, 1, "docs/status.md must carry exactly one --demo contract row");
+    assert.equal(rows.length, 1, "maintainers/status.md must carry exactly one --demo contract row");
     const row = rows[0];
     assert.equal(
       row,
       "| `npx breaklint --demo` | runs the real rule and reporter chain, exit 1, " +
         `${demo.findings.length} findings across ${ruleIds.size} rules |`,
-      "the docs/status.md row for --demo does not match what the demo produces",
+      "the maintainers/status.md row for --demo does not match what the demo produces",
     );
   });
 

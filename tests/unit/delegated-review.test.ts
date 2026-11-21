@@ -76,15 +76,15 @@ describe("delegated AI sight review", () => {
   it("accepts an explicit release delegation and all exact received images as delegatedAI", () => {
     const input = fixture();
     assert.equal(sight(input).reviewKind, "delegatedAI");
-    assert.throws(() => contract.assessHumanGate(input.ledger as unknown as ReviewLedger, input.manifest, input.fingerprint), /human-only/u);
+    assert.throws(() => contract.assessRosterGate(input.ledger as unknown as ReviewLedger, input.manifest, input.fingerprint), /roster-only/u);
     const line = contract.describeLatestRound(input.ledger as unknown as ReviewLedger, input.manifest, input.fingerprint);
     assert.match(line, /delegatedAI/u);
-    assert.doesNotMatch(line, /latest human review/u);
-    assert.equal(contract.summarizeLatestRound(input.ledger as unknown as ReviewLedger).humanPass, false);
+    assert.doesNotMatch(line, /latest rostered review/u);
+    assert.equal(contract.summarizeLatestRound(input.ledger as unknown as ReviewLedger).rosteredPass, false);
   });
 
   it("refuses unknown reviewer kinds", () => reject((i) => { i.ledger.rounds[0]!.reviewers[0]!.kind = "unknown"; }, /reviewer kind/u));
-  it("refuses a delegated AI borrowing a human handle", () => reject((i) => { i.ledger.rounds[0]!.reviewers[0]!.handle = "@Founder"; }, /human review role/u));
+  it("refuses a delegated AI borrowing a rostered handle", () => reject((i) => { i.ledger.rounds[0]!.reviewers[0]!.handle = "@Founder"; }, /rostered reviewer role/u));
   it("refuses an ordinary agent pass even beside a delegation", () => reject((i) => { i.ledger.rounds[0]!.reviewers = [{ kind: "agent", handle: "@SightAI", model: "example" }] as unknown as typeof i.ledger.rounds[0]["reviewers"]; }, /an agent reviewer/u));
   it("refuses missing delegation", () => reject((i) => { Reflect.deleteProperty(i.ledger.rounds[0]!, "delegation"); }, /delegation missing/u));
   it("refuses revoked delegation", () => reject((i) => { i.ledger.rounds[0]!.delegation.revoked = true; }, /revoked/u));
@@ -183,14 +183,14 @@ describe("delegated AI sight review", () => {
         "this release needs its own sight-review round");
   });
 
-  it("the latest round passes all 32 cells under delegated AI, never as a human pass", () => {
+  it("the latest round passes all 32 cells under delegated AI, never as a rostered pass", () => {
     const ledger = JSON.parse(readFileSync(LEDGER_URL, "utf8")) as ReviewLedger;
     const summary = contract.summarizeLatestRound(ledger);
     assert.equal(summary.passingCells, 32);
     assert.equal(summary.delegatedPassingCells, 32);
-    assert.equal(summary.humanPassingCells, 0);
+    assert.equal(summary.rosteredPassingCells, 0);
     assert.equal(summary.delegatedPass, true);
-    assert.equal(summary.humanPass, false);
+    assert.equal(summary.rosteredPass, false);
   });
 });
 

@@ -81,38 +81,29 @@ captured input artifact. `originalSource.location` addresses the verified editab
 the copy chain and inventory prove it. The location includes a role, digest and byte count; unknown
 and duplicate origins remain visible.
 
-## Digital Product Studio
+## Example host: a document generator
 
-The first real consumer preserves source pieces in its existing generator and print-edition path,
-before chapter/block provenance is lost. Its host project register selects a fixed adapter; it does
-not infer executable commands from a manifest. The Python advisory entry point invokes the installed
-public package through a fixed Node bridge:
+A host generator binds sources best when it preserves source pieces in its own build and
+print-edition path, before chapter and block provenance is lost. The host chooses a fixed adapter
+from its own project register; breaklint never infers executable commands from a manifest. A host
+wrapper may stay advisory (exit 0) as long as it keeps the checker's actual exit 0–4 and an
+explicit unavailable state, and publishes each fresh attempt before the child process starts, so
+an older successful report is never mistaken for the current one.
 
-```bash
-python3 _tools/breaklint_layout_report.py <product-directory> \
-  --breaklint <consumer>/node_modules/breaklint \
-  --out-dir <private-report-directory> \
-  --output-path build/chapter.html
-```
+Such a bridge can add an optional bounded ZIP delivery binding and then call `writeReportBundle`
+on the final canonical report. Archive inspection captures bytes once and validates member
+headers, names, CRC, actual decompression limits and the complete mapping without extracting
+files. `local-package-bound` means matching local package bytes; `delivery-verified` additionally
+requires matching readback of the attachment as delivered. Covered and omitted members remain
+listed; it is not a purchase or download receipt. Private product bytes and seller metadata stay
+outside the public package.
 
-Repeated `--output-path` selects existing multi-file inputs. Expected outputs are checked; this is
-not a second batch implementation. A fresh attempt is published before child startup. `current.json`
-can point only to that attempt; older successful reports remain historical. The Python wrapper stays
-advisory (exit 0) while retaining the actual checker exit 0–4 and explicit unavailable state.
+The retained `diagnostic-pdf` is the exact PDF selected from the measured acquisition. Its hash
+binds the checked input; its `delivery: "not-asserted"` prevents a separately produced native PDF
+from borrowing page addresses. A host's own native print renderer is a different artifact, and a
+green diagnostic render does not establish that PDF's layout.
 
-The bridge adds optional bounded ZIP delivery binding, then calls `writeReportBundle` on the final
-canonical report. Archive inspection captures bytes once and validates member headers, names, CRC,
-actual decompression limits and the complete mapping without extracting files. `local-package-bound`
-means matching local package bytes. `delivery-verified` additionally requires matching current seller
-attachment readback. Covered and omitted members remain listed; it is not a purchase or download
-receipt. Private product bytes and seller metadata are kept outside this public package.
-
-The retained `diagnostic-pdf` is the exact selected PDF from the measured acquisition. Its hash binds
-the checked input; its `delivery: "not-asserted"` prevents a separate native PDF from borrowing page
-addresses. The Studio native print renderer remains a different artifact. A green diagnostic render
-does not establish the shipped native PDF's layout.
-
-## Existing Playwright page and DS_OS
+## Existing Playwright page
 
 `checkPage` observes a caller-owned, already prepared page. It does not navigate, authenticate,
 resize, scroll, change network policy or close it. Pass route state through the actual page and name
@@ -139,13 +130,13 @@ inert/ARIA alone do not hide geometry. CSS Color 4 solid colors (`oklch()`, `okl
 capture drift (reported via `capture.driftDetails` after the bounded stabilization loop), font timeout,
 and truncated inventory prevent a clean claim.
 
-DS_OS reuses its existing authenticated E2E navigation, scenario fixtures and five viewports. The
-shared overflow harness adds canonical breaklint diagnostics while retaining its independent width
-assertion. A dedicated scenario suite and reporter enumerate expected states before navigation and
-retain missing/skipped/aborted attempts and retry inconsistencies. This is hermetic frontend evidence,
-not a backend correctness, live operational-state or human usability claim.
+An example host reuses its existing authenticated end-to-end navigation, scenario fixtures and
+viewports; its own overflow assertions keep running beside breaklint's diagnostics. A scenario
+suite and reporter that enumerate the expected states before navigation keep missing, skipped or
+aborted attempts visible. This is frontend evidence, not a backend correctness, operational-state
+or usability claim.
 
-Its production build records sorted source/config/lock file hashes. A generated build ID is compiled
+A host production build records sorted source/config/lock file hashes. A generated build ID is compiled
 into `<meta name="breaklint-build">`; sources are checked again after the build. Completed builds
 record the compiled output inventory as a separate receipt: output-receipt version 1
 (`.next/BUILD_ID` for Next.js) or framework-agnostic output-receipt version 2 (`buildId`, optional

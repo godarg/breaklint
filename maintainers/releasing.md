@@ -109,15 +109,15 @@ configuration in `release.yml`.
 
 Complete preparation and review on a frozen candidate branch before merging its pull request.
 For 0.10.0, actual human feedback on all ten bound examples is recorded in
-`docs/evaluation-0.10.md`. Round 8 supplies fresh delegated AI surface sight evidence, separate
+`maintainers/evaluation-0.10.md`. Round 8 supplies fresh delegated AI surface sight evidence, separate
 from those human labels. Preserve all
 source, environment, artifact and pixel bindings, including historical failed attempts. The
-0.9.0 completion record in `planning/finish-0.9.md` is historical, not approval of the candidate.
+0.9.0 completion record (kept outside this repository) is historical, not approval of the candidate.
 
 1. **Prepare the candidate:** version all package/workflow references, date the changelog,
    generate rule documentation and schema, and run the ordered local gates below. Run the
    packed consumers from foreign working directories on Node 22.13 and 24.
-2. **Review the complete report matrix:** follow `docs/reporting.md`, *Review package*.
+2. **Review the complete report matrix:** follow `maintainers/report-review.md`, *Review package*.
    A rostered human or the explicitly delegated AI reviewer must actually inspect every
    assigned PNG, tile and A4 page raster. Append one truthful new ledger round and update
    current review-state prose. A failed or incomplete review stops the release.
@@ -199,8 +199,9 @@ red when the bound inputs changed and no authorized reviewer reviewed the new ar
 refresh its ledger as release ceremony. A real later review is a new round with its actual
 reviewers, date and outcome — `pass` or `fail`. A passing latest round must cover every cell and
 bind the current input fingerprint, declared environment, rendered artifacts, screen RGBA hashes
-and complete physical inventory. `assessHumanGate` remains human-only: only `@Brand`, `@Neo` or
-`@Founder` can pass it. An ordinary `agent` entry never passes a cell.
+and complete physical inventory. `assessRosterGate` passes only the rostered reviewer handles `@Brand`, `@Neo` or
+`@Founder`. A handle is a role in the maintainer's workflow, which an agent may operate; a pass under
+it is not evidence that a person reviewed. An ordinary `agent` entry never passes a cell.
 
 Ledger schema 6 additionally permits `kind: "delegated-ai"` for a sight review explicitly
 delegated by the Founder for that release. The round carries `founder: "@Founder"`, the date,
@@ -214,7 +215,7 @@ release to equal `package.json.version` in the bound review-input root. Historic
 rounds keep their original delegation and bytes; their votes do not approve a later release.
 This version-specific validation uses the existing schema-6 fields without a schema migration.
 The reviewer must have a
-nonhuman handle, a recorded nonUNKNOWN `actual_model`, prompt/output SHA-256 hashes, and a native
+handle outside the roster, a recorded nonUNKNOWN `actual_model`, prompt/output SHA-256 hashes, and a native
 receipt with path, SHA-256 and exact image count. Rounds 1–9 committed their full native receipts
 under `tests/golden/report-surfaces/`; those files stay byte-identical to their ledger hashes, and no
 other receipt file may be added there. From round 10 on, the receipt itself (session telemetry)
@@ -225,13 +226,13 @@ page PNG**. PDF cells are judged through their complete matching raster sets; th
 substitute a PDF filename for unseen pages. Missing, extra, duplicate or differently hashed images
 refuse the gate. The release operator must extract these bindings from actual native image-read results; a
 planned call or a model's self-reported image count is insufficient. Strict local status reports
-`delegatedAI` for this path and never calls it a human pass. Migrating the schema stamp preserves
+`delegatedAI` for this path and never calls it a rostered pass. Migrating the schema stamp preserves
 every prior round and does not upgrade any old agent entry or invent a new review.
-<!-- human-review-roles: @Brand, @Neo, @Founder -->
+<!-- rostered-reviewer-roles: @Brand, @Neo, @Founder -->
 The roster check proves only that a rostered handle was written into the ledger; it does not
 authenticate a person. Delegated AI model, receipt and image fields likewise bind the recorded
 review to the manifest; the gate does not authenticate a provider identity or independently prove
-image perception. Whether a rostered human really reviewed rests on repository access control
+image perception. Who stands behind a rostered handle rests on repository access control
 and on reviewing the ledger diff before it merges — check who committed it and that the round's
 cells name the artifacts actually rendered — not on this gate.
 
@@ -255,7 +256,7 @@ not happen, which is the one thing this gate exists to prevent. The ledger forma
 (schema 4) could not hold a failed review at all; since schema 5 the 2026-09-18 FAIL is round 2 of
 the ledger itself, marked as a historical reconstruction from this record and carrying only what is
 stated here — date, outcome, scope, finding counts and headline findings, with no reviewer handle,
-per-cell outcome or binding invented after the fact (see `docs/reporting.md`).
+per-cell outcome or binding invented after the fact (see `maintainers/report-review.md`).
 
 **That leaves 0.6.0 in a third state this document did not provide for, and the decision to ship in
 it was taken deliberately.** The release plan for this version pre-registered exactly two
@@ -297,7 +298,7 @@ Round 6 is a fresh review after the measured platform inventory correction; hist
 The green real-document gate reads the rights/privacy-reviewed corpus manifest and binds exact
 artifact hashes, source evidence, page/rule counts and the positive independent geometry-oracle
 sample. Its one-time red condition is preserved in
-`docs/validation/real-document-red-control-v0.2.3.json`; it was produced by installing the signed
+`maintainers/validation/real-document-red-control-v0.2.3.json`; it was produced by installing the signed
 registry package and running
 `BREAKLINT_023_CLI=<0.2.3-package>/dist/cli/index.js npm run test:real-document:red-control` against
 the exact same third-party bytes. It is historical evidence, not a network-dependent release step.
@@ -306,7 +307,7 @@ The pagination-residue record is the negative half of the same property: six rea
 must NOT measure, and must say why — which elements a paginator left in an overflow column, on which
 pages, and by how far. Their bytes are **not in this repository**: they are chapters of a paid
 product, 27 492 of that bundle's 69 017 words, and this repository is public and MIT. What is public
-is a hash-only record in the shape `docs/validation/corpus-contract-v1.md` defines for
+is a hash-only record in the shape `maintainers/validation/corpus-contract-v1.md` defines for
 `private_nonredistributable` material.
 
 **That record is historical, and it is not a release step.** Re-measured on 2026-09-18, five of the
@@ -347,7 +348,7 @@ only.
   version. The changelog half is also checked, by `tests/tools/changelog-contract.mjs` in
   `npm run test:release-tag`: for a version with no tag yet, the first section must be
   `## X.Y.Z — YYYY-MM-DD` or exactly `## X.Y.Z — TBD-at-tag`, no `## Unreleased` section may
-  remain, and `docs/status.md` must not call the version unreleased. At the tag commit — in the
+  remain, and `maintainers/status.md` must not call the version unreleased. At the tag commit — in the
   release workflow, because that commit is what npm serves — only a date is accepted: the
   published 0.6.0 tarball says `## 0.6.0 — unreleased`, and nothing checked it. A `TBD-at-tag`
   that reaches the tag stops the release workflow in its validation job, before anything is
